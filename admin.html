@@ -94,6 +94,7 @@
       <button class="ghost" data-tab="testers">신청자</button>
       <button class="ghost" data-tab="play">앱별 Play 등록</button>
       <button class="ghost" data-tab="apps">앱 관리</button>
+      <button class="ghost" data-tab="files">PC 파일</button>
     </div>
 
     <!-- 신청자 -->
@@ -116,6 +117,22 @@
         <div class="meta">① 이메일 복사 → ② Play Console의 해당 앱 내부 테스트 → 테스터 목록에 붙여넣고 저장 → ③ 「Play에 추가함」 처리 → ④ 신청자 탭에서 「안내 메일 보내기」</div>
       </div>
       <div id="playList"></div>
+    </div>
+
+    <!-- PC 파일 -->
+    <div id="tab-files" hidden>
+      <div class="card">
+        <h2>PC 프로그램 올리기 <span class="tag">(승인된 테스터만 다운로드)</span></h2>
+        <div class="grid2">
+          <input id="fTitle" type="text" maxlength="100" placeholder="이름 * (예: 볼링클럽 PC)">
+          <input id="fVer" type="text" maxlength="30" placeholder="버전 (예: v1.0.0)">
+        </div>
+        <input id="fDesc" type="text" maxlength="300" placeholder="한 줄 설명 (선택)">
+        <input id="fFile" type="file" accept=".zip,.exe,.msi" style="margin:6px 0">
+        <button id="fUpBtn">올리기</button>
+        <div class="meta" id="fMsg" style="margin-top:6px">zip으로 압축해서 올리는 것을 권장해요. 최대 50MB예요.</div>
+      </div>
+      <div class="card"><div id="fileList"></div></div>
     </div>
 
     <!-- 앱 관리 -->
@@ -167,7 +184,7 @@ function h(tag, props = {}, ...kids) {
 function toast(t) { const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = "none", 3200); }
 const fmt = (d) => d ? new Date(d).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "-";
 
-let testers = [], apps = [], tab = "testers", filter = "pending", accepting = true;
+let testers = [], apps = [], files = [], tab = "testers", filter = "pending", accepting = true;
 
 /* ---------- 로그인 ---------- */
 async function init() {
@@ -196,6 +213,8 @@ async function showApp() { $("loginCard").hidden = true; $("app").hidden = false
 
 /* ---------- 데이터 ---------- */
 async function load() {
+  const fr = await sb.from("downloads").select("*").order("sort_order").order("created_at", { ascending: false });
+  files = fr.data || [];
   const [t, a, s] = await Promise.all([
     sb.from("testers").select("*, tester_apps(app_id, enabled, play_registered)").order("created_at", { ascending: false }),
     sb.from("apps").select("*").order("sort_order").order("created_at"),
@@ -215,10 +234,11 @@ const taOf = (t, appId) => (t.tester_apps || []).find((x) => x.app_id === appId)
 
 function render() {
   document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("sel", b.dataset.tab === tab));
-  for (const id of ["testers", "play", "apps"]) $("tab-" + id).hidden = id !== tab;
+  for (const id of ["testers", "play", "apps", "files"]) $("tab-" + id).hidden = id !== tab;
   if (tab === "testers") renderTesters();
   if (tab === "play") renderPlay();
   if (tab === "apps") renderApps();
+  if (tab === "files") renderFiles();
 }
 document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; render(); });
 
@@ -350,6 +370,49 @@ function renderPlay() {
       card.append(rm);
     }
     box.append(card);
+  }
+}
+
+/* ---------- PC 파일 ---------- */
+const fmtSize = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.ceil(n / 1024) + " KB";
+$("fUpBtn").onclick = async () => {
+  const title = $("fTitle").value.trim(), f = $("fFile").files[0], msg = $("fMsg");
+  if (!title) return toast("이름을 입력해 주세요.");
+  if (!f) return toast("파일을 선택해 주세요.");
+  if (f.size > 52428800) return toast("50MB를 넘는 파일은 올릴 수 없어요.");
+  const btn = $("fUpBtn"); btn.disabled = true; msg.textContent = "올리는 중… (파일 확인값 계산 포함)";
+  try {
+    const buf = await f.arrayBuffer();
+    const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", buf))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const safe = f.name.replace(/[^A-Za-z0-9._-]/g, "_");
+    const path = Date.now() + "_" + safe;
+    const up = await sb.storage.from("downloads").upload(path, f, { contentType: f.type || "application/octet-stream", upsert: false });
+    if (up.error) throw up.error;
+    const ins = await sb.from("downloads").insert({ title, version: $("fVer").value.trim(), description: $("fDesc").value.trim(), file_path: path, file_name: f.name, size_bytes: f.size, sha256: sha });
+    if (ins.error) { await sb.storage.from("downloads").remove([path]); throw ins.error; }
+    for (const id of ["fTitle", "fVer", "fDesc", "fFile"]) $(id).value = "";
+    msg.textContent = "올렸어요."; toast("파일을 올렸어요."); load();
+  } catch (e) { msg.textContent = "올리지 못했어요: " + (e.message || e); }
+  finally { btn.disabled = false; }
+};
+function renderFiles() {
+  const box = $("fileList"); box.textContent = "";
+  if (!files.length) { box.append(h("div", { class: "meta" }, "올린 파일이 없어요.")); return; }
+  for (const r of files) {
+    const row = h("div", { class: "item" });
+    row.append(h("b", {}, r.title + (r.version ? " · " + r.version : "")));
+    row.append(h("div", { class: "meta" }, r.file_name + " · " + fmtSize(r.size_bytes) + (r.active ? "" : " · 숨김")));
+    row.append(h("div", { class: "meta", style: "word-break:break-all" }, "SHA-256: " + (r.sha256 || "-")));
+    const tg = h("button", { class: "ghost" }, r.active ? "숨기기" : "공개하기");
+    tg.onclick = async () => { const { error } = await sb.from("downloads").update({ active: !r.active }).eq("id", r.id); if (error) return toast("변경하지 못했어요."); load(); };
+    const del = h("button", { class: "danger" }, "삭제");
+    del.onclick = async () => {
+      if (!confirm("이 파일을 삭제할까요?")) return;
+      await sb.storage.from("downloads").remove([r.file_path]);
+      const { error } = await sb.from("downloads").delete().eq("id", r.id);
+      if (error) return toast("삭제하지 못했어요."); toast("삭제했어요."); load();
+    };
+    const bar = h("div", { class: "row" }); bar.append(tg, del); row.append(bar); box.append(row);
   }
 }
 

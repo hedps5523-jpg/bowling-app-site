@@ -28,6 +28,12 @@
     <a class="btn ghost" href="/apps" id="again" style="margin-top:8px">다른 이메일로 확인</a>
   </section>
 
+  <section class="card" id="pcCard" hidden>
+    <h2>PC 프로그램</h2>
+    <div id="pcList"></div>
+    <div class="note warn">Windows에서 "PC를 보호했습니다" 경고가 나오면 <b>추가 정보 → 실행</b>을 눌러 주세요. 압축(zip)은 풀고 실행해 주세요. 다운로드 링크는 10분 동안만 유효해요.</div>
+  </section>
+
   <section class="card">
     <h2>자주 묻는 질문</h2>
     <details><summary>설치 버튼이 안 보여요.</summary><p>테스터 수락 직후에는 스토어에 반영되기까지 몇 분~몇 시간 걸릴 수 있어요.</p></details>
@@ -58,6 +64,21 @@ else {
       out.append(card);
     }
   }
+  fetch(fn("download"), { method: "POST", headers, body: JSON.stringify({ email: saved.email }) })
+    .then((r) => r.json()).then((x) => {
+      if (!x.files || !x.files.length) return;
+      $("pcCard").hidden = false;
+      const size = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.ceil(n / 1024) + " KB";
+      for (const f of x.files) {
+        if (typeof f.url !== "string" || !f.url.startsWith(SUPABASE_URL + "/storage/")) continue;
+        const c = el("div", "appitem");
+        c.append(el("b", null, f.title + (f.version ? " · " + f.version : "")));
+        c.append(el("div", "d", (f.description ? f.description + " · " : "") + f.fileName + " (" + size(f.size) + ")"));
+        const l = el("a", "btn", "PC용 다운로드"); l.href = f.url; c.append(l);
+        if (f.sha256) { const s = el("div", "d", "SHA-256: " + f.sha256); s.style.cssText = "margin-top:8px;word-break:break-all;font-size:12px"; c.append(s); }
+        $("pcList").append(c);
+      }
+    }).catch(() => {});
   $("again").addEventListener("click", () => { try { sessionStorage.removeItem("myappsData"); } catch {} });
 }
 </script>
