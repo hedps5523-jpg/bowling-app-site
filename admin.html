@@ -299,6 +299,15 @@ function renderTesters() {
       back.onclick = async () => { await sb.from("testers").update({ status: "pending" }).eq("id", t.id); load(); };
       act.append(back);
     }
+    const del = h("button", { class: "danger", title: "회원 정보를 완전히 삭제" }, "삭제");
+    del.onclick = async () => {
+      if (!confirm(t.name + " (" + t.email + ")\n회원 정보를 완전히 삭제할까요? 복구할 수 없어요.\n\nPlay Console에 이미 등록한 이메일이 있으면 「앱별 Play 등록」에서 먼저 삭제 처리해 주세요.")) return;
+      del.disabled = true;
+      const { data, error } = await sb.from("testers").delete().eq("id", t.id).select("id");
+      if (error || !data || !data.length) { del.disabled = false; return toast("삭제하지 못했어요."); }
+      toast("삭제했어요."); load();
+    };
+    act.append(del);
     el.append(act);
     list.append(el);
   }
