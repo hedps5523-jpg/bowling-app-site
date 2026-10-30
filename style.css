@@ -64,3 +64,14 @@
   .btn.ghost:hover{background:#e3e8f1}
   .step-no{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:14px;margin-right:8px}
   .lead{color:var(--sub);margin:0 0 14px}
+
+  /* 상단 고정 영역 (제목 + 탭) */
+  .appbar{position:sticky;top:0;z-index:50;background:var(--bg);padding:10px 0 10px;border-bottom:1px solid var(--line)}
+  .appbar .brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px}
+  .appbar .brand .logo{width:36px;height:36px;border-radius:10px;font-size:20px;margin:0;box-shadow:none}
+  .appbar .brand h1{font-size:19px;margin:0}
+  .appbar nav.top{margin:0}
+  .wrap{padding-top:0}
+  .pagehead{text-align:center;margin:18px 0 0}
+  .pagehead .tag{margin-top:2px}
+  .pagehead .badge{margin-top:10px}

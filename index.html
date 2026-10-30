@@ -3,90 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Bowling APP 테스트 신청</title>
 <meta name="description" content="Bowling APP 테스트 버전 사용 신청 안내">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <div class="wrap">
+  <div class="appbar">
+    <div class="brand"><div class="logo" aria-hidden="true">🎳</div><h1 id="appName">Bowling APP</h1></div>
+    <nav class="top" aria-label="메뉴">
+      <a href="/" aria-current="page">신청하기</a>
+      <a href="/apps">내 앱 보기</a>
+    </nav>
+  </div>
 
-  <header class="hero">
-    <div class="logo" aria-hidden="true">🎳</div>
-    <h1 id="appName">Bowling APP</h1>
+  <div class="pagehead">
     <p class="tag">한 번 신청으로 테스트 중인 여러 앱을 설치해 보세요.</p>
     <span class="badge" id="remainBadge">자리 확인 중…</span>
-  </header>
-
-  <nav class="top" aria-label="메뉴">
-    <a href="/" aria-current="page">신청하기</a>
-    <a href="/apps">내 앱 보기</a>
-  </nav>
+  </div>
 
   <section class="card">
     <h2>테스트 중인 앱</h2>
     <div class="applist" id="appList"><span class="tag">앱 목록을 불러오는 중…</span></div>
   </section>
 
-  <section class="card" id="mainCard">
-    <h2>테스트 신청하기</h2>
-    <p class="lead">현재는 <b>신청 후 승인된 분들께만</b> 설치가 열려 있는 테스트 버전이에요. (최대 100명)</p>
-    <ol class="steps">
-      <li><b>신청</b> — 아래 양식을 작성해 주세요.</li>
-      <li><b>승인</b> — 이메일을 등록하면 안내 메일을 보내드려요. (보통 1~2일)</li>
-      <li><b>설치</b> — <a href="/apps">내 앱 보기</a>에서 이메일을 입력하면 설치 링크가 나와요.</li>
-    </ol>
-
-    <!-- 신청 양식 -->
-    <div class="panel" id="panelNew">
-      <form id="form" novalidate>
-        <div class="note">Play 스토어에 로그인된 <b>구글 계정 이메일</b>을 입력해 주세요. 네이버·다음 메일로는 설치할 수 없어요.<br>한 번 신청하면 테스트 중인 앱을 함께 이용할 수 있도록 등록해 드려요. (앱별 허용 여부는 관리자가 조정할 수 있어요)</div>
-
-        <label for="name">이름 또는 닉네임 <span class="req">*</span></label>
-        <input type="text" id="name" maxlength="50" autocomplete="nickname" required>
-
-        <label for="email">구글 계정 이메일 <span class="req">*</span></label>
-        <input type="email" id="email" maxlength="254" autocomplete="email" inputmode="email" placeholder="example@gmail.com" required>
-        <div class="hint">오타가 있으면 설치가 되지 않아요. 한 번 더 확인해 주세요.</div>
-
-        <label for="os">휴대폰 종류 <span class="req">*</span></label>
-        <select id="os" required>
-          <option value="android">안드로이드</option>
-          <option value="iphone">아이폰</option>
-        </select>
-
-        <label for="device">기기 모델 · 안드로이드 버전 (선택)</label>
-        <input type="text" id="device" maxlength="100" placeholder="예: 갤럭시 S23, Android 14">
-
-        <label for="message">하고 싶은 말 (선택)</label>
-        <textarea id="message" maxlength="500"></textarea>
-
-        <!-- 봇 방지용 숨김 입력칸 -->
-        <div class="hp" aria-hidden="true"><label>website<input type="text" id="website" tabindex="-1" autocomplete="off"></label></div>
-
-        <label class="check">
-          <input type="checkbox" id="consent">
-          <span>개인정보 수집·이용에 동의합니다. <span class="req">*</span>
-            <a href="#privacy">자세히 보기</a></span>
-        </label>
-
-        <div class="msg" id="formMsg" role="alert"></div>
-        <button class="btn" id="submitBtn" type="submit" style="margin-top:16px">신청하기</button>
-      </form>
-    </div>
-
-    <!-- 신청 완료 -->
-    <div class="panel done" id="panelDone" hidden>
-      <div class="ico">✅</div>
-      <h2>신청이 접수되었어요</h2>
-      <p class="tag">이메일이 등록되면(보통 1~2일) 안내 메일을 보내드려요.<br>승인 후에는 <b>내 앱 보기</b>에서 이메일로 설치 링크를 확인할 수 있어요.</p>
-      <div class="note" id="doneMail" style="text-align:left"></div>
-      <a class="btn" href="/apps" style="margin-top:12px">내 앱 보기로 이동</a>
-      <a class="btn ghost" href="/" style="margin-top:8px">처음으로</a>
-    </div>
-  </section>
-
   <section class="card">
-    <p class="lead" style="margin:0">이미 승인받으셨나요? <a href="/apps"><b>내 앱 보기</b></a>에서 설치 링크를 확인하세요.</p>
+    <p class="lead" style="margin:0">앱이 마음에 드시나요? 아래 버튼으로 테스트를 신청해 보세요.</p>
+    <a class="btn" id="goApply" href="/apply" style="margin-top:12px">테스트 신청하러 가기</a>
+    <a class="btn ghost" href="/apps" style="margin-top:8px">이미 승인받으셨나요? 내 앱 보기</a>
   </section>
 
   <section class="card">
@@ -97,23 +42,11 @@
     <details><summary>아이폰도 되나요?</summary><p>현재는 안드로이드 기기에서만 사용할 수 있어요.</p></details>
     <details><summary>문의는 어디로 하나요?</summary><p>블로그 비밀 댓글이나 안내 메일에 회신해 주세요.</p></details>
   </section>
-
-  <section class="card" id="privacy">
-    <h2>개인정보 수집·이용 안내</h2>
-    <p class="tag" style="font-size:14px">
-      · 수집 항목: 이름(닉네임), 구글 계정 이메일, 기기 정보(선택), 남긴 말(선택)<br>
-      · 수집 목적: 테스터 등록 및 설치 안내, 피드백 대응<br>
-      · 보관 기간: 테스트 종료 또는 서비스 종료 시까지 (삭제 요청 시 즉시 삭제)<br>
-      · 동의를 거부할 수 있으나, 거부하면 테스트 참여가 어려워요.
-    </p>
-  </section>
-
   <footer>© Bowling APP · 테스트 버전 안내 페이지</footer>
 </div>
-
 <script src="/common.js"></script>
 <script>
-// 남은 자리 · 앱 목록
+fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => { if (s.appName) $("appName").textContent = s.appName; }).catch(() => {});
 function renderApps(list) {
   const box = $("appList"); box.textContent = "";
   if (!list.length) { box.append(el("span", "tag", "곧 테스트 앱이 추가될 예정이에요.")); return; }
@@ -127,52 +60,13 @@ function renderApps(list) {
 fetch(fn("status"), { headers })
   .then((r) => r.json())
   .then((s) => {
-    if (s.appName) { $("appName").textContent = s.appName; document.title = s.appName + " 테스트 신청"; }
+    if (s.appName) document.title = s.appName + " 테스트 신청";
     renderApps(s.apps || []);
     const b = $("remainBadge");
     if (s.accepting) b.textContent = `남은 자리 ${s.remaining} / ${s.max}`;
-    else { b.textContent = "신청 마감"; b.classList.add("closed"); $("submitBtn").disabled = true; $("submitBtn").textContent = "신청이 마감되었어요"; }
+    else { b.textContent = "신청 마감"; b.classList.add("closed"); const g = $("goApply"); g.textContent = "신청이 마감되었어요"; g.removeAttribute("href"); g.setAttribute("aria-disabled", "true"); }
   })
   .catch(() => { $("remainBadge").textContent = "테스트 버전 안내"; renderApps([]); });
-
-// 신청
-$("form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const msg = $("formMsg");
-  msg.className = "msg"; msg.textContent = "";
-  const fail = (t) => { msg.className = "msg err"; msg.textContent = t; };
-
-  const name = $("name").value.trim();
-  const email = $("email").value.trim();
-  if (!name) return fail("이름(닉네임)을 입력해 주세요.");
-  if (!EMAIL_RE.test(email)) return fail("이메일 형식을 확인해 주세요.");
-  if ($("os").value !== "android") return fail("안드로이드 기기에서만 설치할 수 있어요.");
-  if (!$("consent").checked) return fail("개인정보 수집·이용에 동의해 주세요.");
-
-  const btn = $("submitBtn");
-  btn.disabled = true; btn.textContent = "접수 중…";
-  try {
-    const res = await fetch(fn("apply"), {
-      method: "POST", headers,
-      body: JSON.stringify({
-        name, email, os: $("os").value,
-        device: $("device").value, message: $("message").value,
-        consent: true, website: $("website").value,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { fail(data.error || "오류가 발생했어요. 잠시 후 다시 시도해 주세요."); btn.disabled = false; btn.textContent = "신청하기"; return; }
-    $("panelNew").hidden = true;
-    $("panelDone").hidden = false;
-    $("doneMail").textContent = data.mailSent
-      ? "접수 확인 메일을 보냈어요. 메일이 안 보이면 스팸함을 확인해 주세요."
-      : "신청하신 이메일: " + email + " (오타가 있다면 블로그 댓글로 알려 주세요)";
-    window.scrollTo({ top: $("mainCard").offsetTop - 12, behavior: "smooth" });
-  } catch {
-    fail("네트워크 오류가 발생했어요. 잠시 후 다시 시도해 주세요.");
-    btn.disabled = false; btn.textContent = "신청하기";
-  }
-});
 </script>
 </body>
 </html>
