@@ -6,16 +6,18 @@
 <meta name="robots" content="noindex,nofollow">
 <title>관리자</title>
 <style>
-  :root{--bg:#f5f7fb;--card:#fff;--text:#1c2333;--sub:#5b6478;--line:#e3e8f1;--brand:#2f6bff;--ok:#12a150;--err:#d93a3a}
+  :root{--bg:#f5f7fb;--card:#fff;--text:#1c2333;--sub:#5b6478;--line:#e3e8f1;--brand:#2f6bff;--ok:#12a150;--err:#d93a3a;--warn:#c97a00}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
   .wrap{max-width:900px;margin:0 auto;padding:16px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
   h1{font-size:20px;margin:6px 0 12px}
-  input{width:100%;padding:11px;border:1.5px solid var(--line);border-radius:10px;font:inherit;margin:6px 0}
-  button{appearance:none;border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer;background:var(--brand);color:#fff}
+  h2{font-size:16px;margin:0 0 8px}
+  input[type=text],input[type=email],input[type=password],input[type=number],textarea{width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;margin:4px 0;background:#fff;color:var(--text)}
+  button{appearance:none;border:0;border-radius:10px;padding:9px 13px;font:inherit;font-weight:600;cursor:pointer;background:var(--brand);color:#fff}
   button.ghost{background:#eef1f8;color:var(--text)}
   button.ok{background:var(--ok)} button.danger{background:#f3d8d8;color:var(--err)}
+  button.sel{outline:2px solid var(--brand)}
   button:disabled{opacity:.5;cursor:not-allowed}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -26,7 +28,18 @@
   .meta{color:var(--sub);font-size:13px;word-break:break-all}
   .pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#eef1f8;margin-left:6px}
   .pill.pending{background:#fff1cf;color:#7a4b00} .pill.registered{background:#dff5e8;color:#0b6b36} .pill.rejected{background:#f3d8d8;color:var(--err)}
-  .err{color:var(--err);margin-top:8px} .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1c2333;color:#fff;padding:10px 16px;border-radius:10px;display:none;max-width:90%}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;background:#fff;cursor:pointer}
+  .chip.on{border-color:var(--brand);background:#eef3ff}
+  .chip input{margin:0;width:auto}
+  .chip small{color:var(--sub)} .chip small.done{color:var(--ok)} .chip small.wait{color:var(--warn)}
+  .chip.off{opacity:.55}
+  .err{color:var(--err);margin-top:8px}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1c2333;color:#fff;padding:10px 16px;border-radius:10px;display:none;max-width:90%;z-index:9}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media (max-width:560px){.grid2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}}
+  .box{background:#f7f9fd;border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+  .tag{font-size:12px;color:var(--sub)}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -46,32 +59,64 @@
   <!-- 관리 화면 -->
   <div id="app" hidden>
     <div class="row" style="justify-content:space-between">
-      <h1 id="title">신청자 관리</h1>
+      <h1>관리자</h1>
       <button class="ghost" id="logoutBtn">로그아웃</button>
     </div>
 
     <div class="card">
       <div class="stats">
         <div class="stat"><b id="sPending">0</b>접수 대기</div>
-        <div class="stat"><b id="sReg">0</b>등록 완료</div>
+        <div class="stat"><b id="sReg">0</b>안내 완료</div>
         <div class="stat"><b id="sMax">100</b>최대 인원</div>
       </div>
       <div class="row" style="margin-top:12px">
-        <button id="copyBtn">미등록 이메일 복사</button>
         <button class="ghost" id="toggleBtn">신청 접수: -</button>
         <button class="ghost" id="reloadBtn">새로고침</button>
       </div>
-      <div class="meta" style="margin-top:8px">① 「미등록 이메일 복사」 → ② Play Console 테스터 목록에 붙여넣고 저장 → ③ 아래 「등록 완료」 클릭</div>
     </div>
 
-    <div class="card">
-      <div class="row" style="margin-bottom:6px">
-        <button class="ghost" data-f="pending">접수 대기</button>
-        <button class="ghost" data-f="registered">등록 완료</button>
-        <button class="ghost" data-f="rejected">제외</button>
-        <button class="ghost" data-f="all">전체</button>
+    <div class="row" style="margin-bottom:12px">
+      <button class="ghost" data-tab="testers">신청자</button>
+      <button class="ghost" data-tab="play">앱별 Play 등록</button>
+      <button class="ghost" data-tab="apps">앱 관리</button>
+    </div>
+
+    <!-- 신청자 -->
+    <div id="tab-testers">
+      <div class="card">
+        <div class="row" style="margin-bottom:6px">
+          <button class="ghost" data-f="pending">접수 대기</button>
+          <button class="ghost" data-f="registered">안내 완료</button>
+          <button class="ghost" data-f="rejected">제외</button>
+          <button class="ghost" data-f="all">전체</button>
+        </div>
+        <div class="meta">칩을 눌러 사람별로 설치 가능한 앱을 켜고 끌 수 있어요. 끄면 해당 앱은 안내 메일·내 앱 확인에서 빠져요. (Play에서 이미 등록된 이메일은 「앱별 Play 등록」에서 삭제 처리해 주세요)</div>
+        <div id="list"></div>
       </div>
-      <div id="list"></div>
+    </div>
+
+    <!-- 앱별 Play 등록 -->
+    <div id="tab-play" hidden>
+      <div class="card">
+        <div class="meta">① 이메일 복사 → ② Play Console의 해당 앱 내부 테스트 → 테스터 목록에 붙여넣고 저장 → ③ 「Play에 추가함」 처리 → ④ 신청자 탭에서 「안내 메일 보내기」</div>
+      </div>
+      <div id="playList"></div>
+    </div>
+
+    <!-- 앱 관리 -->
+    <div id="tab-apps" hidden>
+      <div class="card">
+        <h2>앱 추가 <span class="tag">(최대 10개 권장)</span></h2>
+        <div class="grid2">
+          <input id="nName" type="text" maxlength="60" placeholder="앱 이름 *">
+          <input id="nOrder" type="number" placeholder="표시 순서 (작을수록 위)" value="0">
+        </div>
+        <input id="nDesc" type="text" maxlength="300" placeholder="한 줄 설명 (선택)">
+        <input id="nUrl" type="text" placeholder="Play 내부 테스트 링크 (https://play.google.com/...)">
+        <button id="addAppBtn" style="margin-top:6px">앱 추가</button>
+        <div class="meta" style="margin-top:6px">앱을 추가하면 기존 신청자 전원에게 기본 허용으로 연결돼요. 링크는 나중에 입력해도 돼요.</div>
+      </div>
+      <div class="card"><div id="appList"></div></div>
     </div>
   </div>
 </div>
@@ -82,26 +127,41 @@
 /* ▼▼ 설정 영역 ▼▼ */
 const SUPABASE_URL = "https://dzwsiragcbunekpdtjeo.supabase.co";
 const SUPABASE_KEY = "sb_publishable_elQjeIp9DcG4_D9TrCR3hQ_-n1_tMJr"; // 공개용 키
-const OPTIN_URL = ""; // 옵트인 링크 (메일 자동 발송 실패 시 '메일 앱으로 보내기'에 사용)
-const APP_NAME = "Bowling APP";
+const SITE_NAME = "Bowling APP";
 /* ▲▲ 설정 영역 ▲▲ */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = (id) => document.getElementById(id);
-let rows = [], filter = "pending", accepting = true, maxT = 100;
+const PLAY_RE = /^https:\/\/play\.google\.com\//;
 
-function toast(t) { const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = "none", 2600); }
+function h(tag, props = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") el.className = v;
+    else if (k === "style") el.style.cssText = v;
+    else if (k.startsWith("on")) el[k] = v;
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+function toast(t) { const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = "none", 3200); }
 const fmt = (d) => d ? new Date(d).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "-";
 
+let testers = [], apps = [], tab = "testers", filter = "pending", accepting = true;
+
+/* ---------- 로그인 ---------- */
 async function init() {
   const { data } = await sb.auth.getSession();
   data.session ? showApp() : ($("loginCard").hidden = false);
 }
-
 $("showPw").onchange = (e) => { $("pw").type = e.target.checked ? "text" : "password"; };
 $("loginBtn").onclick = async () => {
-  const errEl = $("loginErr");
-  errEl.textContent = "";
+  const errEl = $("loginErr"); errEl.textContent = "";
   const btn = $("loginBtn"); btn.disabled = true;
   try {
     const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("pw").value });
@@ -117,98 +177,207 @@ $("loginBtn").onclick = async () => {
 };
 $("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
-async function showApp() {
-  $("loginCard").hidden = true; $("app").hidden = false;
-  await load();
-}
+async function showApp() { $("loginCard").hidden = true; $("app").hidden = false; await load(); }
 
+/* ---------- 데이터 ---------- */
 async function load() {
-  const [t, s] = await Promise.all([
-    sb.from("testers").select("*").order("created_at", { ascending: false }),
+  const [t, a, s] = await Promise.all([
+    sb.from("testers").select("*, tester_apps(app_id, enabled, play_registered)").order("created_at", { ascending: false }),
+    sb.from("apps").select("*").order("sort_order").order("created_at"),
     sb.from("settings").select("key,value"),
   ]);
-  if (t.error) { toast("권한이 없거나 불러오지 못했어요."); return; }
-  rows = t.data;
+  if (t.error || a.error) { toast("권한이 없거나 불러오지 못했어요."); return; }
+  testers = t.data; apps = a.data;
   const cfg = Object.fromEntries((s.data || []).map((r) => [r.key, r.value]));
-  accepting = cfg.accepting === "true"; maxT = parseInt(cfg.max_testers || "100", 10);
-  $("sMax").textContent = maxT;
-  $("sPending").textContent = rows.filter((r) => r.status === "pending").length;
-  $("sReg").textContent = rows.filter((r) => r.status === "registered").length;
+  accepting = cfg.accepting === "true";
+  $("sMax").textContent = parseInt(cfg.max_testers || "100", 10);
+  $("sPending").textContent = testers.filter((r) => r.status === "pending").length;
+  $("sReg").textContent = testers.filter((r) => r.status === "registered").length;
   $("toggleBtn").textContent = "신청 접수: " + (accepting ? "받는 중 (눌러서 마감)" : "마감 (눌러서 열기)");
   render();
 }
-
-function mailtoHref(r) {
-  const subject = `[${APP_NAME}] 등록 완료 — 설치 방법 안내`;
-  const body = `안녕하세요, ${r.name}님 :)\n${APP_NAME} 테스트 이용자로 등록되었습니다.\n\n1. 신청하신 구글 계정으로 Play 스토어에 로그인된 상태에서 아래 링크를 열어 "테스터 되기"를 눌러 주세요.\n${OPTIN_URL || "(옵트인 링크를 여기에 넣어 주세요)"}\n\n2. 앱이 스토어에 보이면 설치해 주세요. (바로 안 보이면 몇 분~몇 시간 뒤 다시 확인해 주세요.)\n\n감사합니다!`;
-  return `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
+const taOf = (t, appId) => (t.tester_apps || []).find((x) => x.app_id === appId);
 
 function render() {
+  document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("sel", b.dataset.tab === tab));
+  for (const id of ["testers", "play", "apps"]) $("tab-" + id).hidden = id !== tab;
+  if (tab === "testers") renderTesters();
+  if (tab === "play") renderPlay();
+  if (tab === "apps") renderApps();
+}
+document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; render(); });
+
+/* ---------- 신청자 ---------- */
+function mailtoHref(t) {
+  const list = apps.filter((a) => a.active && a.optin_url && PLAY_RE.test(a.optin_url)).filter((a) => { const x = taOf(t, a.id); return x && x.enabled && x.play_registered; });
+  const lines = list.map((a) => `- ${a.name}\n  ${a.optin_url}`).join("\n");
+  const subject = `[${SITE_NAME}] 등록 완료 — 설치 가능한 앱 안내`;
+  const body = `안녕하세요, ${t.name}님 :)\n${SITE_NAME} 테스트 이용자로 등록되었습니다. 아래 앱을 설치할 수 있어요.\n\n신청하신 구글 계정으로 Play 스토어에 로그인된 상태에서, 설치할 앱의 링크를 열어 "테스터 되기"를 눌러 주세요.\n\n${lines || "(설치 가능한 앱이 아직 없어요)"}\n\n앱이 스토어에 보이면 설치해 주세요. (바로 안 보이면 몇 분~몇 시간 뒤 다시 확인해 주세요.)\n\n감사합니다!`;
+  return `mailto:${encodeURIComponent(t.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function renderTesters() {
+  document.querySelectorAll("[data-f]").forEach((b) => b.classList.toggle("sel", b.dataset.f === filter));
   const list = $("list"); list.textContent = "";
-  const items = rows.filter((r) => filter === "all" || r.status === filter);
-  document.querySelectorAll("[data-f]").forEach((b) => b.style.outline = b.dataset.f === filter ? "2px solid #2f6bff" : "none");
-  if (!items.length) { const p = document.createElement("div"); p.className = "meta"; p.textContent = "표시할 신청자가 없어요."; list.append(p); return; }
+  const items = testers.filter((r) => filter === "all" || r.status === filter);
+  if (!items.length) { list.append(h("div", { class: "meta", style: "margin-top:8px" }, "표시할 신청자가 없어요.")); return; }
 
-  for (const r of items) {
-    const el = document.createElement("div"); el.className = "item";
-    const top = document.createElement("div");
-    const nm = document.createElement("b"); nm.textContent = r.name;
-    const pill = document.createElement("span"); pill.className = "pill " + r.status;
-    pill.textContent = { pending: "접수", registered: "등록 완료", rejected: "제외" }[r.status];
-    top.append(nm, pill);
+  for (const t of items) {
+    const el = h("div", { class: "item" });
+    el.append(h("div", {}, h("b", {}, t.name), h("span", { class: "pill " + t.status }, { pending: "접수", registered: "안내 완료", rejected: "제외" }[t.status])));
+    el.append(h("div", { class: "meta" }, `${t.email} · 신청 ${fmt(t.created_at)}` + (t.registered_at ? ` · 안내 ${fmt(t.registered_at)}` : "")));
+    if (t.device || t.message) el.append(h("div", { class: "meta" }, [t.device && "기기: " + t.device, t.message && "메모: " + t.message].filter(Boolean).join(" / ")));
 
-    const meta = document.createElement("div"); meta.className = "meta";
-    meta.textContent = `${r.email} · 신청 ${fmt(r.created_at)}` + (r.registered_at ? ` · 등록 ${fmt(r.registered_at)}` : "");
-    el.append(top, meta);
-    if (r.device || r.message) {
-      const d = document.createElement("div"); d.className = "meta";
-      d.textContent = [r.device && "기기: " + r.device, r.message && "메모: " + r.message].filter(Boolean).join(" / ");
-      el.append(d);
+    if (apps.length) {
+      const chips = h("div", { class: "chips" });
+      for (const a of apps) {
+        const x = taOf(t, a.id) || { enabled: true, play_registered: false };
+        const cb = h("input", { type: "checkbox" });
+        cb.checked = !!x.enabled;
+        cb.onchange = async () => {
+          cb.disabled = true;
+          const { error } = await sb.from("tester_apps").update({ enabled: cb.checked, updated_at: new Date().toISOString() }).eq("tester_id", t.id).eq("app_id", a.id);
+          if (error) { toast("변경하지 못했어요."); cb.checked = !cb.checked; cb.disabled = false; return; }
+          await load();
+          if (!cb.checked && x.play_registered) toast("Play에 등록된 이메일이에요. 「앱별 Play 등록」에서 삭제 처리해 주세요.");
+        };
+        const state = !x.enabled ? "" : x.play_registered ? "Play 등록됨" : "등록 대기";
+        chips.append(h("label", { class: "chip" + (x.enabled ? " on" : "") + (a.active ? "" : " off") }, cb, a.name + (a.active ? "" : " (숨김)"), state && h("small", { class: x.play_registered ? "done" : "wait" }, state)));
+      }
+      el.append(chips);
     }
 
-    const act = document.createElement("div"); act.className = "row"; act.style.marginTop = "8px";
-    if (r.status !== "registered") {
-      const ok = document.createElement("button"); ok.className = "ok"; ok.textContent = "등록 완료";
-      ok.onclick = () => approve(r, ok); act.append(ok);
-    } else {
-      const m = document.createElement("a"); m.href = mailtoHref(r); m.textContent = "메일 앱으로 보내기";
-      m.style.cssText = "font-size:14px;color:#2f6bff"; act.append(m);
-    }
-    if (r.status !== "rejected") {
-      const no = document.createElement("button"); no.className = "danger"; no.textContent = "제외";
-      no.onclick = async () => { if (!confirm(r.name + " 님을 제외할까요?")) return; await sb.from("testers").update({ status: "rejected" }).eq("id", r.id); load(); };
+    const act = h("div", { class: "row", style: "margin-top:10px" });
+    if (t.status !== "rejected") {
+      const ok = h("button", { class: "ok" }, "안내 메일 보내기");
+      ok.onclick = () => approve(t, ok);
+      act.append(ok);
+      if (t.status === "registered") act.append(h("a", { href: mailtoHref(t), style: "font-size:14px;color:#2f6bff" }, "메일 앱으로 보내기"));
+      const no = h("button", { class: "danger" }, "제외");
+      no.onclick = async () => {
+        if (!confirm(t.name + " 님을 제외할까요?\nPlay에 이미 등록된 앱이 있으면 「앱별 Play 등록」에서 삭제 처리해 주세요.")) return;
+        await sb.from("testers").update({ status: "rejected" }).eq("id", t.id); load();
+      };
       act.append(no);
+    } else {
+      const back = h("button", { class: "ghost" }, "복구");
+      back.onclick = async () => { await sb.from("testers").update({ status: "pending" }).eq("id", t.id); load(); };
+      act.append(back);
     }
-    el.append(act); list.append(el);
+    el.append(act);
+    list.append(el);
   }
 }
 
-async function approve(r, btn) {
-  if (!confirm(`${r.email}\nPlay Console에 이메일을 등록하셨나요?\n「확인」을 누르면 등록 완료 처리 후 안내 메일을 보냅니다.`)) return;
+async function approve(t, btn) {
+  const ready = apps.filter((a) => a.active).filter((a) => { const x = taOf(t, a.id); return x && x.enabled && x.play_registered; });
+  const msg = ready.length
+    ? `${t.email}\n설치 가능한 앱 ${ready.length}개(${ready.map((a) => a.name).join(", ")})의 링크를 담아 안내 메일을 보낼까요?`
+    : `${t.email}\n아직 Play에 등록된 앱이 없어요. 「안내 완료」로만 표시하고 메일은 보내지 않아요. 계속할까요?`;
+  if (!confirm(msg)) return;
   btn.disabled = true;
   const { data: s } = await sb.auth.getSession();
   const res = await fetch(`${SUPABASE_URL}/functions/v1/approve`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + s.session.access_token },
-    body: JSON.stringify({ id: r.id }),
+    body: JSON.stringify({ id: t.id }),
   });
   const d = await res.json().catch(() => ({}));
   if (!res.ok) { toast(d.error || "처리하지 못했어요."); btn.disabled = false; return; }
-  if (d.mailSent) toast("등록 완료 처리 후 안내 메일을 보냈어요.");
+  if (d.mailSent) toast(`안내 메일을 보냈어요. (앱 ${d.count}개)`);
   else {
-    const why = { optin_missing: "옵트인 링크가 서버에 설정되지 않았어요", mail_key_missing: "메일 발송 키가 설정되지 않았어요", mail_rejected: "메일 서비스가 발송을 거절했어요" }[d.reason] || "메일을 보내지 못했어요";
-    toast("등록 완료 처리됨. " + why + " → 「메일 앱으로 보내기」를 사용해 주세요.");
+    const why = { no_apps: "Play에 등록된 앱이 아직 없어요", mail_key_missing: "메일 발송 키가 설정되지 않았어요", mail_rejected: "메일 서비스가 발송을 거절했어요" }[d.reason] || "메일을 보내지 못했어요";
+    toast("안내 완료로 표시했어요. " + why + (d.reason === "no_apps" ? "" : " → 「메일 앱으로 보내기」를 사용해 주세요."));
   }
   load();
 }
 
-$("copyBtn").onclick = async () => {
-  const emails = rows.filter((r) => r.status === "pending").map((r) => r.email);
-  if (!emails.length) return toast("복사할 미등록 이메일이 없어요.");
-  try { await navigator.clipboard.writeText(emails.join(", ")); toast(`${emails.length}개 이메일을 복사했어요.`); }
-  catch { prompt("아래 내용을 복사해 주세요", emails.join(", ")); }
+/* ---------- 앱별 Play 등록 ---------- */
+async function copyText(text, okMsg) {
+  try { await navigator.clipboard.writeText(text); toast(okMsg); }
+  catch { prompt("아래 내용을 복사해 주세요", text); }
+}
+function renderPlay() {
+  const box = $("playList"); box.textContent = "";
+  if (!apps.length) { box.append(h("div", { class: "card meta" }, "먼저 「앱 관리」에서 앱을 추가해 주세요.")); return; }
+  for (const a of apps) {
+    const toAdd = testers.filter((t) => t.status !== "rejected").filter((t) => { const x = taOf(t, a.id); return x && x.enabled && !x.play_registered; });
+    const toRemove = testers.filter((t) => { const x = taOf(t, a.id); return x && x.play_registered && (!x.enabled || t.status === "rejected"); });
+    const registered = testers.filter((t) => { const x = taOf(t, a.id); return x && x.play_registered && x.enabled && t.status !== "rejected"; }).length;
+
+    const card = h("div", { class: "card" });
+    card.append(h("h2", {}, a.name + (a.active ? "" : " (숨김)")));
+    card.append(h("div", { class: "meta" }, `Play 등록 중 ${registered}명 · 추가 필요 ${toAdd.length}명 · 삭제 필요 ${toRemove.length}명`));
+
+    const add = h("div", { class: "box" }, h("b", {}, "Play에 추가해야 할 이메일 (" + toAdd.length + ")"));
+    if (toAdd.length) {
+      add.append(h("div", { class: "meta", style: "margin:6px 0" }, toAdd.map((t) => t.email).join(", ")));
+      add.append(h("div", { class: "row" },
+        h("button", { onclick: () => copyText(toAdd.map((t) => t.email).join(", "), `${toAdd.length}개 이메일을 복사했어요.`) }, "이메일 복사"),
+        h("button", { class: "ok", onclick: async () => {
+          if (!confirm(`${a.name}의 Play Console 테스터 목록에 ${toAdd.length}명을 추가하고 저장하셨나요?`)) return;
+          const { error } = await sb.from("tester_apps").update({ play_registered: true, updated_at: new Date().toISOString() }).eq("app_id", a.id).in("tester_id", toAdd.map((t) => t.id));
+          toast(error ? "처리하지 못했어요." : "Play 등록으로 처리했어요."); load();
+        } }, "Play에 추가함")));
+    } else add.append(h("div", { class: "meta" }, "추가할 이메일이 없어요."));
+    card.append(add);
+
+    if (toRemove.length) {
+      const rm = h("div", { class: "box" }, h("b", {}, "Play에서 삭제해야 할 이메일 (" + toRemove.length + ")"));
+      rm.append(h("div", { class: "meta", style: "margin:6px 0" }, toRemove.map((t) => t.email).join(", ")));
+      rm.append(h("div", { class: "row" },
+        h("button", { onclick: () => copyText(toRemove.map((t) => t.email).join(", "), `${toRemove.length}개 이메일을 복사했어요.`) }, "이메일 복사"),
+        h("button", { class: "danger", onclick: async () => {
+          if (!confirm(`${a.name}의 Play Console 테스터 목록에서 ${toRemove.length}명을 삭제하셨나요?`)) return;
+          const { error } = await sb.from("tester_apps").update({ play_registered: false, updated_at: new Date().toISOString() }).eq("app_id", a.id).in("tester_id", toRemove.map((t) => t.id));
+          toast(error ? "처리하지 못했어요." : "삭제 처리했어요."); load();
+        } }, "Play에서 삭제함")));
+      card.append(rm);
+    }
+    box.append(card);
+  }
+}
+
+/* ---------- 앱 관리 ---------- */
+function validUrl(u) { return !u || PLAY_RE.test(u); }
+$("addAppBtn").onclick = async () => {
+  const name = $("nName").value.trim(), url = $("nUrl").value.trim();
+  if (!name) return toast("앱 이름을 입력해 주세요.");
+  if (!validUrl(url)) return toast("링크는 https://play.google.com/ 으로 시작해야 해요.");
+  const { error } = await sb.from("apps").insert({ name, description: $("nDesc").value.trim() || null, optin_url: url || null, sort_order: parseInt($("nOrder").value || "0", 10) });
+  if (error) return toast("추가하지 못했어요.");
+  for (const id of ["nName", "nDesc", "nUrl"]) $(id).value = "";
+  toast("앱을 추가했어요."); load();
 };
+function renderApps() {
+  const box = $("appList"); box.textContent = "";
+  if (!apps.length) { box.append(h("div", { class: "meta" }, "등록된 앱이 없어요. 위에서 추가해 주세요.")); return; }
+  for (const a of apps) {
+    const name = h("input", { type: "text", value: a.name, maxlength: "60" });
+    const desc = h("input", { type: "text", value: a.description || "", maxlength: "300", placeholder: "한 줄 설명" });
+    const url = h("input", { type: "text", value: a.optin_url || "", placeholder: "Play 내부 테스트 링크" });
+    const order = h("input", { type: "number", value: String(a.sort_order) });
+    const active = h("input", { type: "checkbox" }); active.checked = a.active;
+    const save = h("button", {}, "저장");
+    save.onclick = async () => {
+      if (!name.value.trim()) return toast("앱 이름을 입력해 주세요.");
+      if (!validUrl(url.value.trim())) return toast("링크는 https://play.google.com/ 으로 시작해야 해요.");
+      const { error } = await sb.from("apps").update({ name: name.value.trim(), description: desc.value.trim() || null, optin_url: url.value.trim() || null, sort_order: parseInt(order.value || "0", 10), active: active.checked }).eq("id", a.id);
+      toast(error ? "저장하지 못했어요." : "저장했어요."); load();
+    };
+    const del = h("button", { class: "danger" }, "삭제");
+    del.onclick = async () => {
+      if (!confirm(`「${a.name}」을 삭제할까요?\n사람별 허용 정보도 함께 삭제돼요. 숨기려면 삭제 대신 「공개」를 끄세요.`)) return;
+      const { error } = await sb.from("apps").delete().eq("id", a.id);
+      toast(error ? "삭제하지 못했어요." : "삭제했어요."); load();
+    };
+    box.append(h("div", { class: "item" },
+      h("div", { class: "grid2" }, name, order), desc, url,
+      h("div", { class: "row", style: "margin-top:6px" }, h("label", { class: "chip" }, active, "공개 (끄면 숨김)"), save, del)));
+  }
+}
+
+/* ---------- 공통 버튼 ---------- */
 $("toggleBtn").onclick = async () => {
   const { error } = await sb.from("settings").update({ value: accepting ? "false" : "true" }).eq("key", "accepting");
   toast(error ? "변경하지 못했어요." : "변경했어요."); load();
