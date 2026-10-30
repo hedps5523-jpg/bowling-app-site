@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>내 앱 보기</title>
+<meta name="description" content="승인된 이메일로 설치 가능한 테스트 앱 링크를 확인합니다">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="logo" aria-hidden="true">🎳</div>
+    <h1 id="appName">Bowling APP</h1>
+    <p class="tag">승인된 이메일로 설치 가능한 앱을 확인하세요.</p>
+  </header>
+
+  <nav class="top" aria-label="메뉴">
+    <a href="/">신청하기</a>
+    <a href="/apps" aria-current="page">내 앱 보기</a>
+  </nav>
+
+  <section class="card">
+    <h2>내 앱 확인</h2>
+    <ol class="steps">
+      <li>신청하신 <b>구글 계정 이메일</b>을 입력하고 <b>내 앱 확인</b>을 눌러 주세요.</li>
+      <li>설치할 수 있는 앱의 버튼이 나타나요. 버튼을 눌러 <b>"테스터 되기"</b>를 수락해 주세요.</li>
+      <li>Play 스토어에 앱이 보이면 설치해 주세요.</li>
+    </ol>
+
+    <form id="lookupForm" novalidate>
+      <label for="lookupEmail">구글 계정 이메일</label>
+      <input type="email" id="lookupEmail" maxlength="254" autocomplete="email" inputmode="email" placeholder="example@gmail.com">
+      <div class="msg" id="lookupMsg" role="status"></div>
+      <button class="btn" id="lookupBtn" type="submit" style="margin-top:12px">내 앱 확인</button>
+    </form>
+
+    <div id="lookupResult"></div>
+    <div id="lookupAction"></div>
+
+    <div class="note warn">등록되지 않은 계정은 "사용할 수 없음"이 표시돼요. 아직 신청 전이라면 <a href="/">신청하기</a>에서 먼저 신청해 주세요.</div>
+  </section>
+
+  <section class="card">
+    <h2>자주 묻는 질문</h2>
+    <details><summary>링크가 안 나와요.</summary><p>신청 후 관리자가 승인하면 링크가 나타나요. 승인 대기 중이거나, 앱 등록이 끝나지 않았을 수 있어요. 안내 메일을 받은 뒤 다시 확인해 주세요.</p></details>
+    <details><summary>"사용할 수 없음"이 떠요.</summary><p>신청한 구글 계정과 다른 계정으로 Play 스토어에 로그인된 경우가 많아요. 신청한 계정으로 로그인했는지 확인해 주세요.</p></details>
+    <details><summary>설치 버튼이 안 보여요.</summary><p>테스터 수락 직후에는 스토어에 반영되기까지 몇 분~몇 시간 걸릴 수 있어요.</p></details>
+    <details><summary>문의는 어디로 하나요?</summary><p>블로그 비밀 댓글이나 안내 메일에 회신해 주세요.</p></details>
+  </section>
+
+  <footer>© Bowling APP · 테스트 버전 안내 페이지</footer>
+</div>
+
+<script src="/common.js"></script>
+<script>
+fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => {
+  if (s.appName) $("appName").textContent = s.appName;
+}).catch(() => {});
+
+function linkTo(href, text, cls) {
+  const a = el("a", "btn" + (cls ? " " + cls : ""), text);
+  a.href = href; return a;
+}
+
+$("lookupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("lookupMsg"), out = $("lookupResult"), act = $("lookupAction");
+  msg.className = "msg"; msg.textContent = ""; out.textContent = ""; act.textContent = "";
+  const email = $("lookupEmail").value.trim();
+  if (!EMAIL_RE.test(email)) { msg.className = "msg err"; msg.textContent = "이메일 형식을 확인해 주세요."; return; }
+
+  const btn = $("lookupBtn"); btn.disabled = true; btn.textContent = "확인 중…";
+  try {
+    const res = await fetch(fn("myapps"), { method: "POST", headers, body: JSON.stringify({ email }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { msg.className = "msg err"; msg.textContent = d.error || "오류가 발생했어요. 잠시 후 다시 시도해 주세요."; return; }
+
+    if (!d.found) {
+      msg.className = "msg info"; msg.textContent = "등록된 이메일이 아니에요. 먼저 신청해 주세요.";
+      act.append(linkTo("/", "신청하러 가기", "ghost")); act.lastChild.style.marginTop = "10px";
+      return;
+    }
+    if (!d.approved) {
+      msg.className = "msg info"; msg.textContent = "신청이 접수되어 승인을 기다리고 있어요. 승인되면 안내 메일을 보내드리고, 이 화면에서 설치 링크를 확인할 수 있어요.";
+      return;
+    }
+    if (!d.apps.length) {
+      msg.className = "msg info";
+      msg.textContent = d.waiting ? `승인되었어요. 앱 등록이 아직 끝나지 않았어요. (등록 준비 중 ${d.waiting}개) 잠시 후 다시 확인해 주세요.` : "승인되었어요. 설치 가능한 앱이 생기면 안내해 드려요.";
+      return;
+    }
+    msg.className = "msg info"; msg.textContent = `설치 가능한 앱 ${d.apps.length}개를 확인했어요.` + (d.waiting ? ` (등록 준비 중 ${d.waiting}개)` : "");
+    for (const a of d.apps) {
+      const card = el("div", "appitem");
+      card.append(el("b", null, a.name));
+      if (a.description) card.append(el("div", "d", a.description));
+      if (typeof a.url === "string" && a.url.startsWith(PLAY_PREFIX)) {
+        const l = linkTo(a.url, "테스터 되기 · 설치하러 가기"); l.target = "_blank"; l.rel = "noopener"; card.append(l);
+      }
+      out.append(card);
+    }
+  } catch {
+    msg.className = "msg err"; msg.textContent = "네트워크 오류가 발생했어요. 잠시 후 다시 시도해 주세요.";
+  } finally { btn.disabled = false; btn.textContent = "내 앱 확인"; }
+});
+</script>
+</body>
+</html>
