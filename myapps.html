@@ -25,7 +25,8 @@
     <div class="msg info" id="resMsg" role="status"></div>
     <div id="resList"></div>
     <div class="note">버튼을 눌러 <b>"테스터 되기"</b>를 수락한 뒤 Play 스토어에서 설치해 주세요. 신청한 계정으로 로그인되어 있어야 해요.</div>
-    <a class="btn ghost" href="/apps" id="again" style="margin-top:8px">다른 이메일로 확인</a>
+    <div class="hint" id="who" style="margin-top:10px"></div>
+    <a class="btn ghost" href="/apps" id="again" style="margin-top:8px">로그아웃 (이 기기에서 인증 해제)</a>
   </section>
 
   <section class="card" id="pcCard" hidden>
@@ -44,16 +45,28 @@
 <script src="/common.js"></script>
 <script>
 fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => { if (s.appName) $("appName").textContent = s.appName; }).catch(() => {});
-let saved = null;
-try { saved = JSON.parse(sessionStorage.getItem("myappsData") || "null"); } catch {}
-if (!saved || !saved.d || !saved.d.approved) { location.replace("/apps"); }
-else {
-  const d = saved.d, msg = $("resMsg"), out = $("resList");
+const token = (() => { try { return localStorage.getItem("authToken") || ""; } catch { return ""; } })();
+const toLogin = () => { try { localStorage.removeItem("authToken"); } catch {} location.replace("/apps"); };
+const post = (path) => fetch(fn(path), { method: "POST", headers, body: JSON.stringify({ token }) })
+  .then(async (r) => ({ status: r.status, d: await r.json().catch(() => ({})) }));
+const size = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.ceil(n / 1024) + " KB";
+
+$("again").addEventListener("click", async (e) => {
+  e.preventDefault();
+  try { await fetch(fn("auth-verify"), { method: "POST", headers, body: JSON.stringify({ action: "logout", token }) }); } catch {}
+  toLogin();
+});
+
+if (!token) toLogin();
+else post("myapps").then(({ status, d }) => {
+  if (status === 401) return toLogin();
+  const msg = $("resMsg"), out = $("resList");
   msg.style.display = "block";
+  if (!d.approved) { msg.textContent = "신청이 접수되어 승인을 기다리고 있어요. 승인되면 안내 메일을 보내드려요. 이 화면은 나중에 다시 열어도 인증이 유지돼요."; return; }
   if (!d.apps || !d.apps.length) {
     msg.textContent = d.waiting ? `승인되었어요. 앱 등록이 아직 끝나지 않았어요. (등록 준비 중 ${d.waiting}개) 잠시 후 다시 확인해 주세요.` : "승인되었어요. 설치 가능한 앱이 생기면 안내해 드려요.";
   } else {
-    msg.textContent = `설치 가능한 앱 ${d.apps.length}개를 확인했어요.` + (d.waiting ? ` (등록 준비 중 ${d.waiting}개)` : "");
+    msg.textContent = `${d.name ? d.name + " 님, " : ""}설치 가능한 앱 ${d.apps.length}개를 확인했어요.` + (d.waiting ? ` (등록 준비 중 ${d.waiting}개)` : "");
     for (const a of d.apps) {
       const card = el("div", "appitem");
       card.append(el("b", null, a.name));
@@ -64,23 +77,21 @@ else {
       out.append(card);
     }
   }
-  fetch(fn("download"), { method: "POST", headers, body: JSON.stringify({ email: saved.email }) })
-    .then((r) => r.json()).then((x) => {
-      if (!x.files || !x.files.length) return;
-      $("pcCard").hidden = false;
-      const size = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.ceil(n / 1024) + " KB";
-      for (const f of x.files) {
-        if (typeof f.url !== "string" || !f.url.startsWith(SUPABASE_URL + "/storage/")) continue;
-        const c = el("div", "appitem");
-        c.append(el("b", null, f.title + (f.version ? " · " + f.version : "")));
-        c.append(el("div", "d", (f.description ? f.description + " · " : "") + f.fileName + " (" + size(f.size) + ")"));
-        const l = el("a", "btn", "PC용 다운로드"); l.href = f.url; c.append(l);
-        if (f.sha256) { const s = el("div", "d", "SHA-256: " + f.sha256); s.style.cssText = "margin-top:8px;word-break:break-all;font-size:12px"; c.append(s); }
-        $("pcList").append(c);
-      }
-    }).catch(() => {});
-  $("again").addEventListener("click", () => { try { sessionStorage.removeItem("myappsData"); } catch {} });
-}
+  $("who").textContent = d.email ? `인증된 이메일: ${d.email}` : "";
+  return post("download").then(({ status: s2, d: x }) => {
+    if (s2 === 401 || !x.files || !x.files.length) return;
+    $("pcCard").hidden = false;
+    for (const f of x.files) {
+      if (typeof f.url !== "string" || !f.url.startsWith(SUPABASE_URL + "/storage/")) continue;
+      const c = el("div", "appitem");
+      c.append(el("b", null, f.title + (f.version ? " · " + f.version : "")));
+      c.append(el("div", "d", (f.description ? f.description + " · " : "") + f.fileName + " (" + size(f.size) + ")"));
+      const l = el("a", "btn", "PC용 다운로드"); l.href = f.url; c.append(l);
+      if (f.sha256) { const s = el("div", "d", "SHA-256: " + f.sha256); s.style.cssText = "margin-top:8px;word-break:break-all;font-size:12px"; c.append(s); }
+      $("pcList").append(c);
+    }
+  });
+}).catch(() => { $("resMsg").style.display = "block"; $("resMsg").textContent = "불러오지 못했어요. 잠시 후 새로고침해 주세요."; });
 </script>
 </body>
 </html>

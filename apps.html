@@ -22,19 +22,27 @@
 
     <section class="card">
     <h2>내 앱 확인</h2>
-    <ol class="steps">
-      <li>신청하신 <b>구글 계정 이메일</b>을 입력해 주세요.</li>
-      <li><b>내 앱 확인</b>을 누르면 설치 가능한 앱이 나와요.</li>
-    </ol>
-    <form id="lookupForm" novalidate>
+    <p class="lead" id="stepLead">신청하신 <b>구글 계정 이메일</b>로 인증번호를 보내드려요.</p>
+
+    <form id="reqForm" novalidate>
       <label for="lookupEmail">구글 계정 이메일</label>
       <input type="email" id="lookupEmail" maxlength="254" autocomplete="email" inputmode="email" placeholder="example@gmail.com">
       <div class="hint">신청 때 입력한 이메일과 같아야 해요.</div>
-      <div class="msg" id="lookupMsg" role="status"></div>
-      <button class="btn" id="lookupBtn" type="submit" style="margin-top:14px">내 앱 확인</button>
+      <div class="msg" id="reqMsg" role="status"></div>
+      <button class="btn" id="reqBtn" type="submit" style="margin-top:14px">인증번호 받기</button>
     </form>
-    <div id="lookupAction"></div>
-    <div class="note warn">등록되지 않은 계정은 "사용할 수 없음"이 표시돼요. 아직 신청 전이라면 <a href="/">신청하기</a>에서 먼저 신청해 주세요.</div>
+
+    <form id="codeForm" novalidate hidden>
+      <div class="note" id="sentNote"></div>
+      <label for="codeInput">인증번호 6자리</label>
+      <input type="text" id="codeInput" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" placeholder="000000">
+      <div class="msg" id="codeMsg" role="status"></div>
+      <button class="btn" id="codeBtn" type="submit" style="margin-top:14px">확인</button>
+      <button class="btn ghost" id="resendBtn" type="button" style="margin-top:8px">인증번호 다시 받기</button>
+      <button class="btn ghost" id="backBtn" type="button" style="margin-top:8px">이메일 다시 입력</button>
+    </form>
+
+    <div class="note warn">인증번호는 10분 동안 유효해요. 메일이 안 보이면 스팸함을 확인해 주세요. 한 번 인증하면 이 기기에서는 30일 동안 다시 입력하지 않아도 돼요.</div>
   </section>
 
   <section class="card">
@@ -48,29 +56,61 @@
 <script src="/common.js"></script>
 <script>
 fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => { if (s.appName) $("appName").textContent = s.appName; }).catch(() => {});
-function linkTo(href, text, cls) { const a = el("a", "btn" + (cls ? " " + cls : ""), text); a.href = href; return a; }
-try { const e = sessionStorage.getItem("lookupEmail"); if (e) $("lookupEmail").value = e; } catch {}
-$("lookupForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const msg = $("lookupMsg"), act = $("lookupAction");
-  msg.className = "msg"; msg.textContent = ""; act.textContent = "";
-  const email = $("lookupEmail").value.trim();
-  if (!EMAIL_RE.test(email)) { msg.className = "msg err"; msg.textContent = "이메일 형식을 확인해 주세요."; return; }
-  const btn = $("lookupBtn"); btn.disabled = true; btn.textContent = "확인 중…";
+function auth(path, body) {
+  return fetch(fn(path), { method: "POST", headers, body: JSON.stringify(body) })
+    .then(async (r) => ({ ok: r.ok, status: r.status, d: await r.json().catch(() => ({})) }));
+}
+// 이미 인증된 기기면 바로 내 앱 화면으로
+try { if (localStorage.getItem("authToken")) location.replace("/myapps"); } catch {}
+
+let email = "", cool = 0, timer = null;
+const say = (id, cls, t) => { const m = $(id); m.className = "msg" + (cls ? " " + cls : ""); m.textContent = t; };
+function startCool(sec) {
+  cool = sec; clearInterval(timer);
+  const b = $("resendBtn");
+  const tick = () => { if (cool <= 0) { clearInterval(timer); b.disabled = false; b.textContent = "인증번호 다시 받기"; } else { b.disabled = true; b.textContent = `다시 받기 (${cool}초)`; cool--; } };
+  tick(); timer = setInterval(tick, 1000);
+}
+async function sendCode(btn, label) {
+  let sent = false;
+  btn.disabled = true; btn.textContent = "보내는 중…";
   try {
-    const res = await fetch(fn("myapps"), { method: "POST", headers, body: JSON.stringify({ email }) });
-    const d = await res.json().catch(() => ({}));
-    if (!res.ok) { msg.className = "msg err"; msg.textContent = d.error || "오류가 발생했어요. 잠시 후 다시 시도해 주세요."; return; }
-    if (!d.found) {
-      msg.className = "msg info"; msg.textContent = "등록된 이메일이 아니에요. 먼저 신청해 주세요.";
-      const l = linkTo("/apply", "신청하러 가기", "ghost"); l.style.marginTop = "10px"; act.append(l); return;
+    const { ok, status, d } = await auth("auth-request", { email });
+    if (!ok) {
+      const t = d.error === "mail_not_configured" || d.error === "mail_failed" ? "인증 메일을 보낼 수 없어요. 관리자에게 문의해 주세요." : (d.error || "오류가 발생했어요. 잠시 후 다시 시도해 주세요.");
+      say($("codeForm").hidden ? "reqMsg" : "codeMsg", "err", t); return false;
     }
-    if (!d.approved) { msg.className = "msg info"; msg.textContent = "신청이 접수되어 승인을 기다리고 있어요. 승인되면 안내 메일을 보내드리고, 이 화면에서 다시 확인할 수 있어요."; return; }
-    try { sessionStorage.setItem("myappsData", JSON.stringify({ email, d })); sessionStorage.setItem("lookupEmail", email); } catch {}
+    $("reqForm").hidden = true; $("codeForm").hidden = false;
+    $("stepLead").textContent = "메일로 받은 인증번호를 입력해 주세요.";
+    $("sentNote").textContent = `${email} 로 인증번호를 보냈어요. (신청한 이메일이 아니면 메일이 오지 않아요)`;
+    say("codeMsg", "", ""); $("codeInput").value = ""; $("codeInput").focus(); startCool(60);
+    return true;
+  } catch { say($("codeForm").hidden ? "reqMsg" : "codeMsg", "err", "네트워크 오류가 발생했어요. 잠시 후 다시 시도해 주세요."); return false; }
+  finally { btn.textContent = label; if (!sent) btn.disabled = false; }
+}
+$("reqForm").addEventListener("submit", (e) => {
+  e.preventDefault(); say("reqMsg", "", "");
+  email = $("lookupEmail").value.trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return say("reqMsg", "err", "이메일 형식을 확인해 주세요.");
+  sendCode($("reqBtn"), "인증번호 받기");
+});
+$("resendBtn").addEventListener("click", () => sendCode($("resendBtn"), "인증번호 다시 받기"));
+$("backBtn").addEventListener("click", () => {
+  clearInterval(timer); $("codeForm").hidden = true; $("reqForm").hidden = false;
+  $("stepLead").innerHTML = "신청하신 <b>구글 계정 이메일</b>로 인증번호를 보내드려요."; say("reqMsg", "", "");
+});
+$("codeForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); say("codeMsg", "", "");
+  const code = $("codeInput").value.trim();
+  if (!/^\d{6}$/.test(code)) return say("codeMsg", "err", "인증번호 6자리를 입력해 주세요.");
+  const btn = $("codeBtn"); btn.disabled = true; btn.textContent = "확인 중…";
+  try {
+    const { ok, d } = await auth("auth-verify", { email, code });
+    if (!ok) return say("codeMsg", "err", d.error || "인증하지 못했어요. 다시 시도해 주세요.");
+    try { localStorage.setItem("authToken", d.token); } catch { return say("codeMsg", "err", "이 브라우저에서는 인증 상태를 저장할 수 없어요. 사생활 보호 모드를 끄고 다시 시도해 주세요."); }
     location.href = "/myapps";
-  } catch {
-    msg.className = "msg err"; msg.textContent = "네트워크 오류가 발생했어요. 잠시 후 다시 시도해 주세요.";
-  } finally { btn.disabled = false; btn.textContent = "내 앱 확인"; }
+  } catch { say("codeMsg", "err", "네트워크 오류가 발생했어요. 잠시 후 다시 시도해 주세요."); }
+  finally { btn.disabled = false; btn.textContent = "확인"; }
 });
 </script>
 </body>
