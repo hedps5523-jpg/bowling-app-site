@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>관리자</title>
+<style>
+  :root{--bg:#f5f7fb;--card:#fff;--text:#1c2333;--sub:#5b6478;--line:#e3e8f1;--brand:#2f6bff;--ok:#12a150;--err:#d93a3a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  h1{font-size:20px;margin:6px 0 12px}
+  input{width:100%;padding:11px;border:1.5px solid var(--line);border-radius:10px;font:inherit;margin:6px 0}
+  button{appearance:none;border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer;background:var(--brand);color:#fff}
+  button.ghost{background:#eef1f8;color:var(--text)}
+  button.ok{background:var(--ok)} button.danger{background:#f3d8d8;color:var(--err)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{background:#f3f5fa;border-radius:10px;padding:10px;text-align:center}
+  .stat b{display:block;font-size:22px}
+  .item{border-top:1px solid var(--line);padding:12px 0}
+  .item:first-child{border-top:0}
+  .meta{color:var(--sub);font-size:13px;word-break:break-all}
+  .pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#eef1f8;margin-left:6px}
+  .pill.pending{background:#fff1cf;color:#7a4b00} .pill.registered{background:#dff5e8;color:#0b6b36} .pill.rejected{background:#f3d8d8;color:var(--err)}
+  .err{color:var(--err);margin-top:8px} .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1c2333;color:#fff;padding:10px 16px;border-radius:10px;display:none;max-width:90%}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 로그인 -->
+  <div class="card" id="loginCard" style="max-width:420px;margin:40px auto">
+    <h1>관리자 로그인</h1>
+    <input id="email" type="email" placeholder="이메일" autocomplete="username">
+    <input id="pw" type="password" placeholder="비밀번호" autocomplete="current-password">
+    <button id="loginBtn" style="width:100%;margin-top:8px">로그인</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+
+  <!-- 관리 화면 -->
+  <div id="app" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h1 id="title">신청자 관리</h1>
+      <button class="ghost" id="logoutBtn">로그아웃</button>
+    </div>
+
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><b id="sPending">0</b>접수 대기</div>
+        <div class="stat"><b id="sReg">0</b>등록 완료</div>
+        <div class="stat"><b id="sMax">100</b>최대 인원</div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button id="copyBtn">미등록 이메일 복사</button>
+        <button class="ghost" id="toggleBtn">신청 접수: -</button>
+        <button class="ghost" id="reloadBtn">새로고침</button>
+      </div>
+      <div class="meta" style="margin-top:8px">① 「미등록 이메일 복사」 → ② Play Console 테스터 목록에 붙여넣고 저장 → ③ 아래 「등록 완료」 클릭</div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:6px">
+        <button class="ghost" data-f="pending">접수 대기</button>
+        <button class="ghost" data-f="registered">등록 완료</button>
+        <button class="ghost" data-f="rejected">제외</button>
+        <button class="ghost" data-f="all">전체</button>
+      </div>
+      <div id="list"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ▼▼ 설정 영역 ▼▼ */
+const SUPABASE_URL = "https://dzwsiragcbunekpdtjeo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_elQjeIp9DcG4_D9TrCR3hQ_-n1_tMJr"; // 공개용 키
+const OPTIN_URL = ""; // 옵트인 링크 (메일 자동 발송 실패 시 '메일 앱으로 보내기'에 사용)
+const APP_NAME = "Bowling APP";
+/* ▲▲ 설정 영역 ▲▲ */
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = (id) => document.getElementById(id);
+let rows = [], filter = "pending", accepting = true, maxT = 100;
+
+function toast(t) { const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = "none", 2600); }
+const fmt = (d) => d ? new Date(d).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "-";
+
+async function init() {
+  const { data } = await sb.auth.getSession();
+  data.session ? showApp() : ($("loginCard").hidden = false);
+}
+
+$("loginBtn").onclick = async () => {
+  $("loginErr").textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("pw").value });
+  if (error) { $("loginErr").textContent = "로그인에 실패했어요. 정보를 확인해 주세요."; return; }
+  showApp();
+};
+$("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function showApp() {
+  $("loginCard").hidden = true; $("app").hidden = false;
+  await load();
+}
+
+async function load() {
+  const [t, s] = await Promise.all([
+    sb.from("testers").select("*").order("created_at", { ascending: false }),
+    sb.from("settings").select("key,value"),
+  ]);
+  if (t.error) { toast("권한이 없거나 불러오지 못했어요."); return; }
+  rows = t.data;
+  const cfg = Object.fromEntries((s.data || []).map((r) => [r.key, r.value]));
+  accepting = cfg.accepting === "true"; maxT = parseInt(cfg.max_testers || "100", 10);
+  $("sMax").textContent = maxT;
+  $("sPending").textContent = rows.filter((r) => r.status === "pending").length;
+  $("sReg").textContent = rows.filter((r) => r.status === "registered").length;
+  $("toggleBtn").textContent = "신청 접수: " + (accepting ? "받는 중 (눌러서 마감)" : "마감 (눌러서 열기)");
+  render();
+}
+
+function mailtoHref(r) {
+  const subject = `[${APP_NAME}] 등록 완료 — 설치 방법 안내`;
+  const body = `안녕하세요, ${r.name}님 :)\n${APP_NAME} 테스트 이용자로 등록되었습니다.\n\n1. 신청하신 구글 계정으로 Play 스토어에 로그인된 상태에서 아래 링크를 열어 "테스터 되기"를 눌러 주세요.\n${OPTIN_URL || "(옵트인 링크를 여기에 넣어 주세요)"}\n\n2. 앱이 스토어에 보이면 설치해 주세요. (바로 안 보이면 몇 분~몇 시간 뒤 다시 확인해 주세요.)\n\n감사합니다!`;
+  return `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function render() {
+  const list = $("list"); list.textContent = "";
+  const items = rows.filter((r) => filter === "all" || r.status === filter);
+  document.querySelectorAll("[data-f]").forEach((b) => b.style.outline = b.dataset.f === filter ? "2px solid #2f6bff" : "none");
+  if (!items.length) { const p = document.createElement("div"); p.className = "meta"; p.textContent = "표시할 신청자가 없어요."; list.append(p); return; }
+
+  for (const r of items) {
+    const el = document.createElement("div"); el.className = "item";
+    const top = document.createElement("div");
+    const nm = document.createElement("b"); nm.textContent = r.name;
+    const pill = document.createElement("span"); pill.className = "pill " + r.status;
+    pill.textContent = { pending: "접수", registered: "등록 완료", rejected: "제외" }[r.status];
+    top.append(nm, pill);
+
+    const meta = document.createElement("div"); meta.className = "meta";
+    meta.textContent = `${r.email} · 신청 ${fmt(r.created_at)}` + (r.registered_at ? ` · 등록 ${fmt(r.registered_at)}` : "");
+    el.append(top, meta);
+    if (r.device || r.message) {
+      const d = document.createElement("div"); d.className = "meta";
+      d.textContent = [r.device && "기기: " + r.device, r.message && "메모: " + r.message].filter(Boolean).join(" / ");
+      el.append(d);
+    }
+
+    const act = document.createElement("div"); act.className = "row"; act.style.marginTop = "8px";
+    if (r.status !== "registered") {
+      const ok = document.createElement("button"); ok.className = "ok"; ok.textContent = "등록 완료";
+      ok.onclick = () => approve(r, ok); act.append(ok);
+    } else {
+      const m = document.createElement("a"); m.href = mailtoHref(r); m.textContent = "메일 앱으로 보내기";
+      m.style.cssText = "font-size:14px;color:#2f6bff"; act.append(m);
+    }
+    if (r.status !== "rejected") {
+      const no = document.createElement("button"); no.className = "danger"; no.textContent = "제외";
+      no.onclick = async () => { if (!confirm(r.name + " 님을 제외할까요?")) return; await sb.from("testers").update({ status: "rejected" }).eq("id", r.id); load(); };
+      act.append(no);
+    }
+    el.append(act); list.append(el);
+  }
+}
+
+async function approve(r, btn) {
+  if (!confirm(`${r.email}\nPlay Console에 이메일을 등록하셨나요?\n「확인」을 누르면 등록 완료 처리 후 안내 메일을 보냅니다.`)) return;
+  btn.disabled = true;
+  const { data: s } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + s.session.access_token },
+    body: JSON.stringify({ id: r.id }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { toast(d.error || "처리하지 못했어요."); btn.disabled = false; return; }
+  if (d.mailSent) toast("등록 완료 처리 후 안내 메일을 보냈어요.");
+  else {
+    const why = { optin_missing: "옵트인 링크가 서버에 설정되지 않았어요", mail_key_missing: "메일 발송 키가 설정되지 않았어요", mail_rejected: "메일 서비스가 발송을 거절했어요" }[d.reason] || "메일을 보내지 못했어요";
+    toast("등록 완료 처리됨. " + why + " → 「메일 앱으로 보내기」를 사용해 주세요.");
+  }
+  load();
+}
+
+$("copyBtn").onclick = async () => {
+  const emails = rows.filter((r) => r.status === "pending").map((r) => r.email);
+  if (!emails.length) return toast("복사할 미등록 이메일이 없어요.");
+  try { await navigator.clipboard.writeText(emails.join(", ")); toast(`${emails.length}개 이메일을 복사했어요.`); }
+  catch { prompt("아래 내용을 복사해 주세요", emails.join(", ")); }
+};
+$("toggleBtn").onclick = async () => {
+  const { error } = await sb.from("settings").update({ value: accepting ? "false" : "true" }).eq("key", "accepting");
+  toast(error ? "변경하지 못했어요." : "변경했어요."); load();
+};
+$("reloadBtn").onclick = load;
+document.querySelectorAll("[data-f]").forEach((b) => b.onclick = () => { filter = b.dataset.f; render(); });
+
+init();
+</script>
+</body>
+</html>
