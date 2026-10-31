@@ -51,11 +51,14 @@ fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => { if (s.appNa
 function renderApps(list) {
   const box = $("appList"); box.textContent = "";
   if (!list.length) { box.append(el("span", "tag", "곧 테스트 앱이 추가될 예정이에요.")); return; }
-  for (const a of list) {
-    const row = el("div", "row");
-    row.append(el("b", null, a.name));
-    if (a.description) row.append(el("span", null, a.description));
-    box.append(row);
+  for (const [g, items] of groupByGenre(list)) {
+    const head = el("div", "genre", g); head.append(el("span", "cnt", String(items.length))); box.append(head);
+    for (const a of items) {
+      const row = el("div", "row");
+      row.append(el("b", null, a.name));
+      if (a.description) row.append(el("span", null, a.description));
+      box.append(row);
+    }
   }
 }
 fetch(fn("status"), { headers })

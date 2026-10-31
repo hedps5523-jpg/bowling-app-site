@@ -75,3 +75,8 @@
   .pagehead{text-align:center;margin:18px 0 0}
   .pagehead .tag{margin-top:2px}
   .pagehead .badge{margin-top:10px}
+
+  /* 장르 구분 */
+  .genre{display:flex;align-items:center;gap:8px;margin:18px 0 4px;font-size:14px;font-weight:700;color:var(--brand-d)}
+  .genre:first-child{margin-top:4px}
+  .genre .cnt{font-weight:600;font-size:12px;background:#eaf0ff;border-radius:999px;padding:1px 8px}

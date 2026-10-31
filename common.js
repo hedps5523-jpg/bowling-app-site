@@ -14,3 +14,10 @@ function el(tag, cls, text) {
   if (text != null) e.textContent = text;
   return e;
 }
+
+// 장르별로 묶기 (처음 나온 순서 유지)
+function groupByGenre(list) {
+  const m = new Map();
+  for (const a of list) { const g = a.genre || "기타"; if (!m.has(g)) m.set(g, []); m.get(g).push(a); }
+  return m;
+}

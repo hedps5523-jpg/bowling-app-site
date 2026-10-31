@@ -67,14 +67,17 @@ else post("myapps").then(({ status, d }) => {
     msg.textContent = d.waiting ? `승인되었어요. 앱 등록이 아직 끝나지 않았어요. (등록 준비 중 ${d.waiting}개) 잠시 후 다시 확인해 주세요.` : "승인되었어요. 설치 가능한 앱이 생기면 안내해 드려요.";
   } else {
     msg.textContent = `${d.name ? d.name + " 님, " : ""}설치 가능한 앱 ${d.apps.length}개를 확인했어요.` + (d.waiting ? ` (등록 준비 중 ${d.waiting}개)` : "");
-    for (const a of d.apps) {
-      const card = el("div", "appitem");
-      card.append(el("b", null, a.name));
-      if (a.description) card.append(el("div", "d", a.description));
-      if (typeof a.url === "string" && a.url.startsWith(PLAY_PREFIX)) {
-        const l = el("a", "btn", "테스터 되기 · 설치하러 가기"); l.href = a.url; l.target = "_blank"; l.rel = "noopener"; card.append(l);
+    for (const [g, items] of groupByGenre(d.apps)) {
+      const head = el("div", "genre", g); head.append(el("span", "cnt", String(items.length))); out.append(head);
+      for (const a of items) {
+        const card = el("div", "appitem");
+        card.append(el("b", null, a.name));
+        if (a.description) card.append(el("div", "d", a.description));
+        if (typeof a.url === "string" && a.url.startsWith(PLAY_PREFIX)) {
+          const l = el("a", "btn", "테스터 되기 · 설치하러 가기"); l.href = a.url; l.target = "_blank"; l.rel = "noopener"; card.append(l);
+        }
+        out.append(card);
       }
-      out.append(card);
     }
   }
   $("who").textContent = d.email ? `인증된 이메일: ${d.email}` : "";
