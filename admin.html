@@ -440,7 +440,7 @@ $("addAppBtn").onclick = async () => {
   for (const id of ["nName", "nDesc", "nUrl"]) $(id).value = "";  // 장르는 연속 등록 편의를 위해 유지
   toast("앱을 추가했어요."); load();
 };
-const PRESET_GENRES = ["게임", "스포츠", "도구", "소셜", "교육", "라이프", "기타"];
+const PRESET_GENRES = ["레포츠", "게임", "스포츠", "도구", "소셜", "교육", "라이프", "기타"];
 function refreshGenres() {
   const set = [...new Set([...PRESET_GENRES, ...apps.map((x) => x.genre).filter(Boolean)])];
   const dl = $("genreList"); dl.textContent = "";
