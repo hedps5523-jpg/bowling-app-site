@@ -48,6 +48,9 @@
   nav.top{display:flex;gap:8px;justify-content:center}
   nav.top a{flex:1;max-width:200px;text-align:center;text-decoration:none;padding:10px 12px;border-radius:999px;border:1.5px solid var(--line);background:#fff;color:var(--sub);font-weight:600;font-size:15px}
   nav.top a[aria-current="page"]{border-color:var(--brand);background:#eef3ff;color:#1f52d6}
+  .grid3{display:grid;grid-template-columns:minmax(0,1fr) 56px minmax(0,1fr);gap:8px}
+  .grid3 input{min-width:0}
+  .grid3 input[type=number]{text-align:center;padding-left:4px;padding-right:4px}
 </style>
 </head>
 <body>
@@ -139,16 +142,16 @@
     <div id="tab-apps" hidden>
       <div class="card">
         <h2>앱 추가 <span class="tag">(최대 10개 권장)</span></h2>
-        <div class="grid2">
+        <div class="grid3">
           <input id="nName" type="text" maxlength="60" placeholder="앱 이름 *">
-          <input id="nOrder" type="number" placeholder="표시 순서 (작을수록 위)" value="0">
+          <input id="nOrder" type="number" value="0" title="표시 순서 (작을수록 위)" aria-label="표시 순서" placeholder="순서">
+          <input id="nGenre" type="text" maxlength="20" list="genreList" placeholder="장르 *" autocomplete="off">
         </div>
-        <input id="nGenre" type="text" maxlength="20" list="genreList" placeholder="장르 * (목록에서 고르거나 직접 입력)" autocomplete="off">
         <datalist id="genreList"></datalist>
         <input id="nDesc" type="text" maxlength="300" placeholder="한 줄 설명 (선택)">
         <input id="nUrl" type="text" placeholder="Play 내부 테스트 링크 (https://play.google.com/...)">
         <button id="addAppBtn" style="margin-top:6px">앱 추가</button>
-        <div class="meta" style="margin-top:6px">앱을 추가하면 기존 신청자 전원에게 기본 허용으로 연결돼요. 링크는 나중에 입력해도 돼요.</div>
+        <div class="meta" style="margin-top:6px">가운데 숫자는 표시 순서예요(작을수록 위). 앱을 추가하면 기존 신청자 전원에게 기본 허용으로 연결돼요. 링크는 나중에 입력해도 돼요.</div>
       </div>
       <div class="card"><div id="appList"></div></div>
     </div>
@@ -455,7 +458,7 @@ function renderApps() {
     const genre = h("input", { type: "text", value: a.genre || "기타", maxlength: "20", list: "genreList", placeholder: "장르", autocomplete: "off" });
     const desc = h("input", { type: "text", value: a.description || "", maxlength: "300", placeholder: "한 줄 설명" });
     const url = h("input", { type: "text", value: a.optin_url || "", placeholder: "Play 내부 테스트 링크" });
-    const order = h("input", { type: "number", value: String(a.sort_order) });
+    const order = h("input", { type: "number", value: String(a.sort_order), title: "표시 순서 (작을수록 위)", "aria-label": "표시 순서" });
     const active = h("input", { type: "checkbox" }); active.checked = a.active;
     const save = h("button", {}, "저장");
     save.onclick = async () => {
@@ -472,7 +475,7 @@ function renderApps() {
       toast(error ? "삭제하지 못했어요." : "삭제했어요."); load();
     };
     box.append(h("div", { class: "item" },
-      h("div", { class: "grid2" }, name, order), genre, desc, url,
+      h("div", { class: "grid3" }, name, order, genre), desc, url,
       h("div", { class: "row", style: "margin-top:6px" }, h("label", { class: "chip" }, active, "공개 (끄면 숨김)"), save, del)));
   }
 }
