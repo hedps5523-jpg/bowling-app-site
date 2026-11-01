@@ -48,6 +48,8 @@
   nav.top{display:flex;gap:8px;justify-content:center}
   nav.top a{flex:1;max-width:200px;text-align:center;text-decoration:none;padding:10px 12px;border-radius:999px;border:1.5px solid var(--line);background:#fff;color:var(--sub);font-weight:600;font-size:15px}
   nav.top a[aria-current="page"]{border-color:var(--brand);background:#eef3ff;color:#1f52d6}
+  .grid64{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,4fr);gap:8px}
+  .grid64 input{min-width:0}
   .grid3{display:grid;grid-template-columns:minmax(0,4fr) 56px minmax(0,2fr);gap:8px}
   .grid3 input{min-width:0}
   .grid3 input[type=number]{text-align:center;padding-left:4px;padding-right:4px}
@@ -126,7 +128,7 @@
     <div id="tab-files" hidden>
       <div class="card">
         <h2>PC 프로그램 올리기 <span class="tag">(승인된 테스터만 다운로드)</span></h2>
-        <div class="grid2">
+        <div class="grid64">
           <input id="fTitle" type="text" maxlength="100" placeholder="이름 * (예: 볼링클럽 PC)">
           <input id="fVer" type="text" maxlength="30" placeholder="버전 (예: v1.0.0)">
         </div>
