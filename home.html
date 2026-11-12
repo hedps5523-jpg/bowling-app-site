@@ -11,59 +11,401 @@
 <body>
 <div class="wrap">
   <div class="appbar">
-    <div class="brand"><div class="logo" aria-hidden="true">🎳</div><h1 id="appName">Bowling APP</h1></div>
-    <nav class="top" aria-label="메뉴">
-      <a href="/home" aria-current="page">홈</a>
-      <a href="/">신청하기</a>
-      <a href="/apps">내 앱 보기</a>
-      <a href="/admin">로그인</a>
-    </nav>
+    <div class="topbar">
+      <a class="tb-left" href="/home" aria-label="홈"><span class="lg">🎳</span></a>
+      <b class="tb-title" id="appName">Bowling APP</b>
+      <button class="burger" id="burger" type="button" aria-label="메뉴" aria-expanded="false">☰</button>
+    </div>
+    <div class="dim" id="dim" hidden></div>
+    <div class="dd" id="dd" hidden>
+      <a class="it" href="/"><span>📝</span><div><b>신청하기</b><small>테스트 앱 사용 신청</small></div></a>
+      <a class="it" href="/apps"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
+      <a class="it" href="/admin"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
+    </div>
   </div>
 
-    <div class="pagehead">
-    <p class="tag">볼링 · 레포츠 앱을 먼저 써 보는 테스트 센터예요.</p>
-    <span class="badge" id="remainBadge">자리 확인 중…</span>
-  </div>
-
-  <section class="card">
-    <h2>이렇게 이용해요</h2>
-    <ol class="steps">
-      <li><b>신청</b> — 구글 계정 이메일로 한 번만 신청해요.</li>
-      <li><b>승인</b> — 관리자가 확인하고 안내 메일을 보내드려요.</li>
-      <li><b>설치</b> — <b>내 앱 보기</b>에서 이메일 인증 후 앱별 설치 링크를 확인해요.</li>
-    </ol>
-    <a class="btn" href="/" style="margin-top:6px">테스트 신청하기</a>
-    <a class="btn ghost" href="/apps" style="margin-top:8px">내 앱 보기</a>
-  </section>
-
-  <section class="card">
-    <h2>테스트 중인 앱</h2>
-    <div class="applist" id="appList"><span class="tag">앱 목록을 불러오는 중…</span></div>
-  </section>
-  <footer>© Bowling APP · 테스트 버전 안내 페이지</footer>
+      <main id="view"><section class="card"><p class="tag">불러오는 중…</p></section></main>
+  <footer>© Bowling APP · 볼링 클럽</footer>
 </div>
+<nav class="bnav" id="bnav" hidden aria-label="클럽 메뉴">
+  <a href="#/" data-r="home"><span>🏠</span>홈</a>
+  <a href="#/members" data-r="members"><span>👥</span>회원</a>
+  <a href="#/lessons" data-r="lessons"><span>🎓</span>강의</a>
+  <a href="#/notices" data-r="notices"><span>📣</span>공지·투표</a>
+</nav>
+<div class="toastc" id="toastc" hidden></div>
 <script src="/common.js"></script>
 <script>
-fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => { if (s.appName) $("appName").textContent = s.appName; }).catch(() => {});
-function renderApps(list) {
-  const box = $("appList"); box.textContent = "";
-  if (!list.length) { box.append(el("span", "tag", "곧 테스트 앱이 추가될 예정이에요.")); return; }
-  for (const [g, items] of groupByGenre(list)) {
-    const head = el("div", "genre", g); head.append(el("span", "cnt", String(items.length))); box.append(head);
-    for (const a of items) {
-      const row = el("div", "row");
-      row.append(el("b", null, a.name));
-      if (a.description) row.append(el("span", null, a.description));
-      box.append(row);
+/* ---------- 도우미 ---------- */
+function h(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") e.className = v;
+    else if (k === "style") e.style.cssText = v;
+    else if (k.startsWith("on")) e[k] = v;
+    else if (v === true) e.setAttribute(k, "");
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) { if (kid == null || kid === false) continue; e.append(kid.nodeType ? kid : document.createTextNode(String(kid))); }
+  return e;
+}
+const view = $("view");
+let toastT;
+function toast(t) { const e = $("toastc"); e.textContent = t; e.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => e.hidden = true, 3000); }
+const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+function fmt(iso, withDay = true) {
+  if (!iso) return "";
+  const d = new Date(iso); const p = (n) => String(n).padStart(2, "0");
+  return `${d.getMonth() + 1}/${d.getDate()}${withDay ? "(" + DAYS[d.getDay()] + ")" : ""} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function dday(iso) {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms < 0) return "마감";
+  const d = Math.ceil(ms / 86400e3);
+  return d <= 1 ? "마감 임박" : `D-${d}`;
+}
+const initial = (n) => (n || "?").trim().slice(0, 1);
+const staffOf = (role) => role === "admin" || role === "staff";
+const ROLE = { admin: "관리자", staff: "운영진", member: "회원" };
+
+let token = "";
+try { token = localStorage.getItem("authToken") || ""; } catch {}
+async function api(action, data = {}) {
+  const r = await fetch(fn("club"), { method: "POST", headers, body: JSON.stringify({ token, action, ...data }) });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401) { try { localStorage.removeItem("authToken"); } catch {} token = ""; guest("expired"); throw new Error("auth"); }
+  if (r.status === 403 && d.error === "not_member") { guest("not_member"); throw new Error("auth"); }
+  return { ok: r.ok, status: r.status, d };
+}
+
+/* ---------- 상단 바 / 하단 메뉴 ---------- */
+function setBar(title, back) {
+  const left = document.querySelector(".tb-left");
+  $("appName").textContent = title || "Bowling APP";
+  if (back) { left.innerHTML = ""; left.append(h("span", {}, "‹ " + back.label)); left.setAttribute("href", back.href); }
+  else { left.innerHTML = '<span class="lg">🎳</span>'; left.setAttribute("href", "#/"); }
+}
+function setNav(route) {
+  $("bnav").hidden = !token;
+  document.querySelectorAll("#bnav a").forEach((a) => a.classList.toggle("on", a.dataset.r === route));
+}
+
+/* ---------- 비회원 화면 ---------- */
+function guest(reason) {
+  $("bnav").hidden = true; setBar("Bowling APP");
+  view.textContent = "";
+  const c = h("section", { class: "card" }, h("h2", {}, "볼링 클럽"),
+    h("p", { class: "lead" }, "회원 공지, 모임 투표, 볼링 강의를 한곳에서 확인해요."));
+  if (reason === "not_member") c.append(h("div", { class: "msg info", style: "display:block" }, "클럽 회원으로 등록된 이메일이 아니에요. 운영진에게 등록을 요청해 주세요."));
+  if (reason === "expired") c.append(h("div", { class: "msg info", style: "display:block" }, "인증이 만료되었어요. 다시 인증해 주세요."));
+  c.append(h("a", { class: "btn", href: "/apps?next=%2Fhome", style: "margin-top:12px" }, "회원 이메일 인증하기"));
+  c.append(h("a", { class: "btn ghost", href: "/", style: "margin-top:8px" }, "테스트 앱 신청하기"));
+  view.append(c);
+}
+
+/* ---------- 홈 ---------- */
+async function vHome() {
+  setBar(); setNav("home");
+  const { d } = await api("home");
+  view.textContent = "";
+  view.append(h("div", { class: "pagehead" }, h("p", { class: "tag" }, `${d.me.name} 님, 안녕하세요 👋`), h("span", { class: "badge" }, `클럽 회원 ${d.memberCount}명`)));
+  view.append(h("section", { class: "card" }, h("h2", {}, "빠른 메뉴"), h("div", { class: "grid4" },
+    h("a", { class: "q", href: "#/members" }, h("b", {}, "👥"), "회원"), h("a", { class: "q", href: "#/lessons" }, h("b", {}, "🎓"), "강의"),
+    h("a", { class: "q", href: "#/notices" }, h("b", {}, "📣"), "공지"), h("a", { class: "q", href: "#/notices" }, h("b", {}, "🗳️"), "투표"))));
+  const nx = d.next, c = h("section", { class: "card" }, h("h2", {}, "다음 모임"));
+  if (!nx) c.append(h("p", { class: "tag" }, "예정된 모임이 없어요."));
+  else {
+    c.append(h("b", { style: "display:block" }, `${fmt(nx.event_at)}`), h("span", { class: "mut" }, `${nx.title}${nx.place ? " · " + nx.place : ""}`));
+    if (nx.poll) {
+      const tot = nx.poll.options.reduce((s, o) => s + o.count, 0), first = nx.poll.options[0];
+      c.append(h("div", { class: "bar2" }, h("i", { style: `width:${tot && first ? Math.round(first.count / tot * 100) : 0}%` })),
+        h("small", { class: "mut" }, nx.poll.options.map((o) => `${o.label} ${o.count}명`).join(" · ")));
     }
+    c.append(h("a", { class: "btn", href: "#/notice/" + nx.id, style: "margin-top:10px" }, nx.poll && nx.poll.mineDone ? "투표 확인 · 바꾸기" : "투표하러 가기"));
+  }
+  view.append(c);
+  const r = h("section", { class: "card" }, h("h2", {}, "최근 공지"));
+  if (!d.recent.length) r.append(h("p", { class: "tag" }, "아직 공지가 없어요."));
+  for (const n of d.recent) r.append(h("a", { class: "li", href: "#/notice/" + n.id }, n.pinned ? h("span", { class: "pin" }, "고정") : null, n.title));
+  view.append(r);
+}
+
+/* ---------- 공지 · 투표 목록 ---------- */
+async function vNotices() {
+  setBar("공지 · 투표"); setNav("notices");
+  const { d } = await api("notices");
+  view.textContent = "";
+  view.append(h("div", { class: "hd" }, "공지 · 투표"));
+  if (staffOf(d.role)) view.append(h("a", { class: "btn ghost sm", href: "#/new" }, "+ 공지·투표 올리기 (운영진)"));
+  if (!d.notices.length) view.append(h("section", { class: "card" }, h("p", { class: "tag" }, "아직 공지가 없어요.")));
+  for (const n of d.notices) {
+    const dd = dday(n.deadline);
+    const st = n.pollCount === 0 ? null : n.myDone >= n.pollCount ? h("span", { class: "pill ok" }, `투표 완료 ${n.myDone}/${n.pollCount}`) : h("span", { class: "pill bad" }, `투표 필요 ${n.myDone}/${n.pollCount}`);
+    view.append(h("a", { class: "li", href: "#/notice/" + n.id },
+      h("div", {}, n.pinned ? h("span", { class: "pin" }, "고정") : null, h("b", {}, n.title)),
+      h("small", {}, `${fmt(n.created_at, false)}${n.event_at ? " · 모임 " + fmt(n.event_at) : ""}${dd ? " · " + dd : ""} `), st));
   }
 }
-fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => {
-  renderApps(s.apps || []);
-  const b = $("remainBadge");
-  if (s.accepting) b.textContent = `남은 자리 ${s.remaining} / ${s.max}`;
-  else { b.textContent = "신청 마감"; b.classList.add("closed"); }
-}).catch(() => { $("remainBadge").textContent = "테스트 버전 안내"; renderApps([]); });
+
+/* ---------- 공지 상세 (투표 여러 개) ---------- */
+async function vNotice(id) {
+  setBar("공지 상세", { label: "공지", href: "#/notices" }); setNav("notices");
+  const { ok, d } = await api("notice", { id });
+  if (!ok) { view.textContent = ""; view.append(h("section", { class: "card" }, h("p", {}, d.error || "불러오지 못했어요."))); return; }
+  const { notice: n, polls, waiting } = d;
+  const open = polls.filter((p) => !p.closed);
+  let editing = open.some((p) => !p.myDone);
+  const sel = new Map(polls.map((p) => [p.id, new Set(p.options.filter((o) => o.mine).map((o) => o.id))]));
+  let flash = history.state && history.state.flash;
+  const staff = staffOf(d.role);
+
+  function draw() {
+    view.textContent = "";
+    view.append(h("div", { style: "padding:14px 2px 2px" },
+      n.pinned ? h("span", { class: "pin" }, "고정") : null,
+      h("h2", { style: "font-size:19px;margin:6px 0" }, n.title),
+      h("div", { class: "mut" }, `${n.author || "운영진"} · ${fmt(n.created_at, false)}`),
+      n.event_at ? h("div", { style: "margin-top:6px;font-weight:600" }, `📅 ${fmt(n.event_at)}${n.place ? " · " + n.place : ""}`) : null,
+      n.body ? h("p", { style: "font-size:14.5px;margin:8px 0;white-space:pre-wrap" }, n.body) : null,
+      n.deadline ? h("span", { class: "pill " + (n.expired ? "" : "bad") }, n.expired ? "투표 마감됨" : `마감 ${fmt(n.deadline)} · ${dday(n.deadline)}`) : null));
+    if (flash) view.append(h("div", { class: "banner ok" }, flash));
+    const done = polls.filter((p) => p.myDone).length;
+    if (polls.length) view.append(h("div", { style: "display:flex;align-items:center;gap:10px;margin-top:10px;font-size:13px" }, h("b", {}, `내 투표 ${done} / ${polls.length}`), h("div", { class: "bar2", style: "flex:1;margin:0" }, h("i", { style: `width:${polls.length ? done / polls.length * 100 : 0}%` }))));
+    polls.forEach((p, i) => view.append(pollCard(p, i)));
+    // 미투표 대기자
+    const w = waiting;
+    const wc = h("section", { class: "card" });
+    if (w.count === 0) wc.append(h("b", {}, "🎉 모두 투표했어요"));
+    else {
+      wc.append(h("b", {}, `⏳ 미투표 대기자 ${w.count}명`), h("small", { class: "mut" }, ` / 전체 ${w.total}명`));
+      wc.append(h("div", { style: "display:flex;flex-wrap:wrap;gap:6px;margin-top:8px" }, w.names.map((nm) => h("span", { class: "pill" }, nm))));
+      if (w.meWaiting) wc.append(h("div", { class: "banner warn" }, "아직 내 투표가 끝나지 않았어요. 투표하면 이 명단에서 빠져요."));
+    }
+    if (n.exclude_rule === "any") wc.append(h("small", { class: "mut", style: "display:block;margin-top:6px" }, "※ 하나라도 투표하면 명단에서 제외돼요."));
+    view.append(wc);
+    if (editing && open.length) {
+      const cnt = [...sel.entries()].filter(([pid, s]) => open.some((p) => p.id === pid) && s.size).length;
+      const b = h("button", { class: "btn", type: "button", style: "margin-top:8px", disabled: cnt === 0 }, `투표 제출 (${cnt}/${open.length})`);
+      b.onclick = submit; view.append(b);
+    } else if (open.length) {
+      view.append(h("button", { class: "btn ghost", type: "button", style: "margin-top:8px", onclick: () => { editing = true; flash = null; draw(); } }, "투표 다시 하기"));
+    }
+    if (staff) {
+      const row = h("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:12px" },
+        h("a", { class: "btn ghost sm", style: "width:auto", href: "#/waiting/" + n.id }, "미투표 현황 · 알림"),
+        open.length ? h("button", { class: "btn ghost sm", style: "width:auto", type: "button", onclick: async () => { if (!confirm("이 공지의 투표를 마감할까요?")) return; await api("close_notice", { id: n.id }); toast("마감했어요."); route(); } }, "투표 마감하기") : null,
+        h("button", { class: "btn sm", style: "width:auto;background:#f3d8d8;color:var(--err)", type: "button", onclick: async () => { if (!confirm("공지와 투표 기록을 모두 삭제할까요? 복구할 수 없어요.")) return; await api("delete_notice", { id: n.id }); toast("삭제했어요."); location.hash = "#/notices"; } }, "삭제"));
+      view.append(row);
+    }
+  }
+
+  function pollCard(p, i) {
+    const showResult = !editing || p.closed;
+    const tags = [p.multi ? "복수 선택" : "단일 선택", p.anonymous ? "익명" : "기명"];
+    const c = h("section", { class: "card poll" }, h("div", { class: "pt" }, h("b", {}, h("i", { class: "no" }, String(i + 1)), p.title),
+      showResult && p.myDone ? h("span", { class: "tagp ok" }, "투표 완료 ✓") : h("span", { class: "tagp" }, p.closed ? "마감" : tags.join(" · "))));
+    if (showResult) {
+      const tot = p.options.reduce((s, o) => s + o.count, 0);
+      for (const o of p.options) c.append(h("div", { class: "rs" + (o.mine ? " mine" : "") }, h("div", { class: "rt" }, h("b", {}, o.label), o.mine ? h("em", { class: "me" }, "내 선택") : null, h("span", {}, `${o.count}명 · ${tot ? Math.round(o.count / tot * 100) : 0}%`)),
+        h("div", { class: "bar2" }, h("i", { style: `width:${tot ? o.count / tot * 100 : 0}%` })), o.names.length ? h("div", { class: "nm" }, o.names.join(", ")) : null));
+      c.append(h("small", { class: "mut" }, `${p.voterCount}명 참여 · ${p.anonymous ? "익명 투표" : "기명 투표"}`));
+    } else {
+      const set = sel.get(p.id);
+      for (const o of p.options) {
+        const b = h("button", { class: "op" + (set.has(o.id) ? " sel" : ""), type: "button" }, h("span", { class: p.multi ? "ck" : "rd" }), h("b", {}, o.label));
+        b.onclick = () => { if (p.multi) { set.has(o.id) ? set.delete(o.id) : set.add(o.id); } else { set.clear(); set.add(o.id); } draw(); };
+        c.append(b);
+      }
+      if (p.allowAdd) {
+        const row = h("div", { class: "rowx", hidden: true }, h("input", { type: "text", maxlength: "60", placeholder: "추가할 항목 (예: 4게임 후 참석)" }),
+          h("button", { class: "xbtn", type: "button" }, "추가"));
+        const add = h("button", { class: "addrow", type: "button" }, "+ 항목 추가 (회원 추가 가능)");
+        add.onclick = () => { row.hidden = !row.hidden; if (!row.hidden) row.querySelector("input").focus(); };
+        row.querySelector("button").onclick = async () => {
+          const v = row.querySelector("input").value.trim(); if (!v) return;
+          const r = await api("add_option", { poll_id: p.id, label: v });
+          if (!r.ok) return toast(r.d.error || "추가하지 못했어요.");
+          toast("항목을 추가했어요."); const keep = new Map([...sel].map(([k, s]) => [k, [...s]])); await vNotice(id); // 다시 그림
+        };
+        c.append(add, row);
+      }
+    }
+    return c;
+  }
+
+  async function submit() {
+    const votes = open.map((p) => ({ poll_id: p.id, option_ids: [...sel.get(p.id)] })).filter((v) => v.option_ids.length);
+    if (!votes.length) return;
+    const r = await api("vote_many", { votes });
+    if (!r.ok) return toast(r.d.error || "투표하지 못했어요.");
+    const again = await api("notice", { id });
+    const w = again.d.waiting;
+    history.replaceState({ flash: w.meWaiting ? "투표를 저장했어요. 남은 투표가 있으면 마저 해 주세요." : "✅ 투표를 모두 마쳤어요! 미투표 대기자 명단에서 제외됐어요." }, "");
+    toast("투표를 저장했어요."); route();
+  }
+  draw();
+}
+
+/* ---------- 공지·투표 만들기 (운영진) ---------- */
+const TEMPLATES = {
+  attend: { title: "참석 여부", options: ["참석", "불참", "미정"], multi: false, anonymous: false, allow_add: false },
+  meal: { title: "회식 메뉴", options: ["삼겹살", "치킨 · 맥주", "보쌈", "회식 불참"], multi: true, anonymous: false, allow_add: true },
+  late: { title: "지각 시 몇 게임 후 참석 가능?", options: ["정시 참석", "1게임 후 참석", "2게임 후 참석", "3게임 후 참석"], multi: false, anonymous: false, allow_add: true },
+  custom: { title: "", options: ["", ""], multi: false, anonymous: false, allow_add: false },
+};
+async function vNew() {
+  setBar("공지 만들기", { label: "취소", href: "#/notices" }); setNav("notices");
+  const mine = await api("members"); if (!staffOf(mine.d.role)) { view.textContent = ""; view.append(h("section", { class: "card" }, "운영진만 올릴 수 있어요.")); return; }
+  view.textContent = "";
+  const polls = [];
+  const title = h("input", { type: "text", maxlength: "100", placeholder: "예: 11/16 정기모임 안내" });
+  const body = h("textarea", { maxlength: "2000", placeholder: "본문 (선택)" });
+  const place = h("input", { type: "text", maxlength: "100", placeholder: "장소 (선택)" });
+  const ev = h("input", { type: "datetime-local" }), dl = h("input", { type: "datetime-local" });
+  const pin = h("input", { type: "checkbox" });
+  const rule = h("select", {}, h("option", { value: "all" }, "모든 투표를 마치면 제외 (기본)"), h("option", { value: "any" }, "하나라도 투표하면 제외"));
+  view.append(h("div", { class: "hd" }, "공지 만들기 ", h("small", {}, "운영진")),
+    h("section", { class: "card" }, h("label", {}, "제목 *"), title, h("label", {}, "본문"), body, h("label", {}, "모임 장소"), place, h("label", {}, "모임 일시 (홈의 '다음 모임'에 표시)"), ev,
+      h("label", { class: "check" }, pin, h("span", {}, "상단에 고정"))));
+  const pbox = h("div", {});
+  const chips = h("div", { class: "chips" }, [["attend", "＋ 참석 투표"], ["meal", "＋ 회식 메뉴"], ["late", "＋ 지각 시 참석 게임"], ["custom", "＋ 직접 만들기"]].map(([k, t]) =>
+    h("button", { class: "chip2", type: "button", onclick: () => { if (polls.length >= 8) return toast("투표는 최대 8개예요."); polls.push(JSON.parse(JSON.stringify(TEMPLATES[k]))); drawPolls(); } }, t)));
+  view.append(h("section", { class: "card" }, h("b", {}, "투표 추가 "), h("small", { class: "mut" }, "(한 공지에 여러 개 가능)"), chips, pbox));
+  function drawPolls() {
+    pbox.textContent = "";
+    polls.forEach((p, i) => {
+      const t = h("input", { type: "text", maxlength: "80", value: p.title, placeholder: "투표 제목", oninput: () => p.title = t.value });
+      const list = h("div", {});
+      p.options.forEach((o, j) => list.append(h("div", { class: "rowx", style: "margin-top:6px" }, h("input", { type: "text", maxlength: "60", value: o, placeholder: `항목 ${j + 1}`, oninput: (e) => p.options[j] = e.target.value }),
+        h("button", { class: "xbtn", type: "button", onclick: () => { if (p.options.length <= 2) return toast("항목은 2개 이상이에요."); p.options.splice(j, 1); drawPolls(); } }, "✕"))));
+      const tg = (key, label) => { const c = h("input", { type: "checkbox" }); c.checked = !!p[key]; c.onchange = () => p[key] = c.checked; return h("label", { class: "check", style: "margin-top:8px" }, c, h("span", {}, label)); };
+      pbox.append(h("div", { class: "mini" }, h("div", { class: "rowx" }, h("b", {}, `${i + 1}.`), t, h("button", { class: "xbtn danger", type: "button", onclick: () => { polls.splice(i, 1); drawPolls(); } }, "삭제")), list,
+        h("button", { class: "addrow", type: "button", style: "margin-top:8px", onclick: () => { if (p.options.length >= 20) return; p.options.push(""); drawPolls(); } }, "+ 항목 추가"),
+        tg("multi", "복수 선택 허용"), tg("anonymous", "익명 투표 (이름 숨김)"), tg("allow_add", "회원이 항목 추가 가능")));
+    });
+    if (!polls.length) pbox.append(h("p", { class: "mut" }, "위 버튼으로 투표를 추가해 주세요. (투표 없이 공지만 올려도 돼요)"));
+  }
+  drawPolls();
+  const send = h("button", { class: "btn", type: "button" }, "공지 올리기");
+  view.append(h("section", { class: "card" }, h("label", {}, "투표 마감 일시 (선택)"), dl, h("label", {}, "미투표 대기자 제외 기준"), rule, send));
+  send.onclick = async () => {
+    if (!title.value.trim()) return toast("제목을 입력해 주세요.");
+    for (const p of polls) { p.options = p.options.map((x) => x.trim()).filter(Boolean); if (!p.title.trim()) return toast("투표 제목을 입력해 주세요."); if (p.options.length < 2) return toast("투표 항목은 2개 이상 필요해요."); }
+    send.disabled = true;
+    const r = await api("create_notice", { title: title.value, body: body.value, place: place.value, event_at: ev.value ? new Date(ev.value).toISOString() : null, deadline: dl.value ? new Date(dl.value).toISOString() : null, pinned: pin.checked, exclude_rule: rule.value, polls });
+    send.disabled = false;
+    if (!r.ok) return toast(r.d.error || "올리지 못했어요.");
+    toast("공지를 올렸어요."); location.hash = "#/notice/" + r.d.id;
+  };
+}
+
+/* ---------- 미투표 현황 (운영진) ---------- */
+async function vWaiting(id) {
+  setBar("미투표 현황", { label: "공지", href: "#/notice/" + id }); setNav("notices");
+  const { ok, d } = await api("waiting", { id });
+  view.textContent = "";
+  if (!ok) { view.append(h("section", { class: "card" }, d.error || "권한이 없어요.")); return; }
+  let filter = "all";
+  function draw() {
+    view.textContent = "";
+    view.append(h("div", { class: "hd" }, "미투표 대기자 ", h("small", {}, "운영진")),
+      h("section", { class: "card" }, h("div", { style: "display:flex;align-items:baseline;gap:6px" }, h("b", { style: "font-size:34px;color:var(--err)" }, String(d.waiting.length)), h("span", { class: "mut" }, `/ ${d.total}명 미투표`)),
+        h("div", { class: "bar2" }, h("i", { style: `width:${d.total ? d.waiting.length / d.total * 100 : 0}%` })), h("small", { class: "mut" }, `${d.total - d.waiting.length}명은 투표를 마쳐서 자동으로 명단에서 빠졌어요.`)));
+    const left = (pid) => d.waiting.filter((w) => w.polls.some((p) => p.id === pid && !p.done)).length;
+    view.append(h("div", { class: "chips" }, h("button", { class: "chip2" + (filter === "all" ? " on" : ""), type: "button", onclick: () => { filter = "all"; draw(); } }, `전체 ${d.waiting.length}`),
+      d.polls.map((p) => h("button", { class: "chip2" + (filter === p.id ? " on" : ""), type: "button", onclick: () => { filter = p.id; draw(); } }, `${p.title.slice(0, 8)} ${left(p.id)}`))));
+    const rows = d.waiting.filter((w) => filter === "all" || w.polls.some((p) => p.id === filter && !p.done));
+    if (!rows.length) view.append(h("section", { class: "card" }, "대기자가 없어요. 🎉"));
+    for (const w of rows) {
+      const b = h("button", { class: "xbtn", type: "button" }, "알림");
+      b.onclick = async () => { b.disabled = true; const r = await api("remind", { id, member_id: w.id }); toast(r.ok ? (r.d.sent ? "알림 메일을 보냈어요." : "메일을 보내지 못했어요.") : (r.d.error || "보내지 못했어요.")); b.disabled = false; };
+      view.append(h("div", { class: "li", style: "display:flex;justify-content:space-between;align-items:center;gap:8px" }, h("div", {}, h("b", {}, w.name), h("div", { style: "margin-top:4px;display:flex;gap:4px;flex-wrap:wrap" },
+        w.polls.map((p, i) => h("span", { class: "pill " + (p.done ? "ok" : "bad") }, `${p.title.slice(0, 6)} ${p.done ? "✓" : "✕"}`)))), b));
+    }
+    const all = h("button", { class: "btn", type: "button", style: "margin-top:12px", disabled: !d.waiting.length }, "미투표자 전체에게 알림 보내기");
+    all.onclick = async () => { if (!confirm(`${d.waiting.length}명에게 알림 메일을 보낼까요?`)) return; all.disabled = true; const r = await api("remind", { id }); toast(r.ok ? `${r.d.sent}명에게 보냈어요.${r.d.failed ? " (실패 " + r.d.failed + ")" : ""}` : (r.d.error || "보내지 못했어요.")); all.disabled = false; };
+    view.append(all, h("p", { class: "mut", style: "text-align:center" }, "알림은 메일로 보내요. (전체 알림은 1시간에 한 번)"));
+  }
+  draw();
+}
+
+/* ---------- 회원 ---------- */
+async function vMembers() {
+  setBar("회원"); setNav("members");
+  const { d } = await api("members");
+  const staff = staffOf(d.role); let f = "all", q = "";
+  const list = h("div", {});
+  const search = h("input", { type: "text", placeholder: staff ? "이름·이메일 검색" : "이름 검색", style: "margin:6px 0", oninput: () => { q = search.value.trim().toLowerCase(); draw(); } });
+  const chipBox = h("div", { class: "chips" });
+  view.textContent = "";
+  view.append(h("div", { class: "hd" }, "회원 ", staff ? h("small", {}, "운영진") : null), search, chipBox, list);
+  if (staff) view.append(h("p", { class: "mut" }, "※ 회원 등록·역할 변경·삭제는 ☰ 메뉴 → 로그인(관리자) → 클럽 회원 탭에서 해요."));
+  function draw() {
+    const cnt = (fn2) => d.members.filter(fn2).length;
+    const tabs = [["all", `전체 ${d.members.length}`], ["staff", `운영진 ${cnt((m) => m.role !== "member")}`], ["member", `회원 ${cnt((m) => m.role === "member" && m.status === "active")}`], ["dormant", `휴면 ${cnt((m) => m.status === "dormant")}`]];
+    chipBox.textContent = ""; tabs.forEach(([k, t]) => chipBox.append(h("button", { class: "chip2" + (f === k ? " on" : ""), type: "button", onclick: () => { f = k; draw(); } }, t)));
+    list.textContent = "";
+    const rows = d.members.filter((m) => (f === "all" || (f === "staff" ? m.role !== "member" : f === "dormant" ? m.status === "dormant" : m.role === "member" && m.status === "active")) && (!q || m.name.toLowerCase().includes(q) || (m.email || "").toLowerCase().includes(q)));
+    if (!rows.length) list.append(h("p", { class: "mut" }, "해당하는 회원이 없어요."));
+    for (const m of rows) list.append(h("div", { class: "li", style: "display:flex;align-items:center;gap:10px" }, h("span", { class: "av", style: "margin:0" }, initial(m.name)),
+      h("div", {}, h("b", {}, m.name + " "), h("span", { class: "pill " + (m.role !== "member" ? "ok" : m.status === "dormant" ? "warn" : "") }, m.status === "dormant" ? "휴면" : ROLE[m.role]),
+        staff ? h("div", { class: "mut" }, `${m.email}${m.avg_score != null ? " · 에버 " + m.avg_score : ""}`) : null)));
+  }
+  draw();
+}
+
+/* ---------- 강의 ---------- */
+async function vLessons() {
+  setBar("볼링 강의"); setNav("lessons");
+  const { d } = await api("lessons");
+  const staff = staffOf(d.role); let cat = "전체";
+  view.textContent = "";
+  const chipBox = h("div", { class: "chips" }), list = h("div", {});
+  view.append(h("div", { class: "hd" }, "볼링 강의"), chipBox, list);
+  function draw() {
+    const cats = ["전체", ...new Set(d.lessons.map((l) => l.category))];
+    chipBox.textContent = ""; cats.forEach((c) => chipBox.append(h("button", { class: "chip2" + (cat === c ? " on" : ""), type: "button", onclick: () => { cat = c; draw(); } }, c)));
+    list.textContent = "";
+    const rows = d.lessons.filter((l) => cat === "전체" || l.category === cat);
+    if (!rows.length) list.append(h("section", { class: "card" }, h("p", { class: "tag" }, "아직 올라온 강의가 없어요.")));
+    for (const l of rows) {
+      const safe = typeof l.url === "string" && l.url.startsWith("https://");
+      const row = h(safe ? "a" : "div", { class: "vid", href: safe ? l.url : null, target: "_blank", rel: "noopener" }, h("div", { class: "th" }, "▶"),
+        h("div", { style: "flex:1;min-width:0" }, h("b", {}, l.title), h("br"), h("small", { class: "mut" }, `${l.category}${l.level ? " · " + l.level : ""}`), l.description ? h("div", { class: "mut" }, l.description) : null));
+      if (staff) row.append(h("button", { class: "xbtn danger", type: "button", onclick: async (e) => { e.preventDefault(); if (!confirm("강의를 삭제할까요?")) return; await api("delete_lesson", { id: l.id }); toast("삭제했어요."); route(); } }, "삭제"));
+      list.append(row);
+    }
+  }
+  draw();
+  if (staff) {
+    const t = h("input", { type: "text", maxlength: "100", placeholder: "강의 제목 *" }), c = h("input", { type: "text", maxlength: "20", placeholder: "분류 (예: 입문, 스핀)" }), lv = h("select", {}, ["", "입문", "중급", "고급"].map((x) => h("option", { value: x }, x || "난이도 (선택)")));
+    const u = h("input", { type: "text", placeholder: "영상 주소 (https://…, 유튜브 일부 공개 권장)" }), ds = h("input", { type: "text", maxlength: "300", placeholder: "한 줄 설명 (선택)" });
+    const go = h("button", { class: "btn", type: "button", style: "margin-top:10px" }, "강의 올리기");
+    go.onclick = async () => { const r = await api("add_lesson", { title: t.value, category: c.value, level: lv.value, url: u.value, description: ds.value }); if (!r.ok) return toast(r.d.error || "올리지 못했어요."); toast("강의를 올렸어요."); route(); };
+    view.append(h("section", { class: "card" }, h("b", {}, "+ 강의 올리기 (운영진)"), h("div", { style: "display:grid;gap:6px;margin-top:8px" }, t, c, lv, u, ds), go));
+  }
+}
+
+/* ---------- 라우터 ---------- */
+async function route() {
+  if (!token) return guest();
+  const hash = location.hash.replace(/^#/, "") || "/";
+  const [, r, arg] = hash.split("/");
+  window.scrollTo(0, 0);
+  try {
+    if (!r) await vHome();
+    else if (r === "notices") await vNotices();
+    else if (r === "notice" && arg) await vNotice(arg);
+    else if (r === "new") await vNew();
+    else if (r === "waiting" && arg) await vWaiting(arg);
+    else if (r === "members") await vMembers();
+    else if (r === "lessons") await vLessons();
+    else await vHome();
+  } catch (e) { if (e.message !== "auth") { view.textContent = ""; view.append(h("section", { class: "card" }, h("p", {}, "불러오지 못했어요. 잠시 후 새로고침해 주세요."))); } }
+}
+window.addEventListener("hashchange", () => { history.replaceState(null, ""); route(); });
+route();
 </script>
 </body>
 </html>

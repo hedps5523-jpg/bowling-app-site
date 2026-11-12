@@ -41,32 +41,41 @@
   .box{background:#f7f9fd;border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
   .tag{font-size:12px;color:var(--sub)}
   [hidden]{display:none!important}
-  .appbar{position:sticky;top:0;z-index:50;background:var(--bg);padding:10px 16px;border-bottom:1px solid var(--line)}
-  .appbar .inner{max-width:900px;margin:0 auto}
-  .appbar .brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;font-weight:700;font-size:19px}
-  .appbar .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2f6bff,#6a9bff);display:grid;place-items:center;font-size:20px}
-  nav.top{display:flex;gap:8px;justify-content:center}
-  nav.top a{flex:1;max-width:200px;text-align:center;text-decoration:none;padding:10px 12px;border-radius:999px;border:1.5px solid var(--line);background:#fff;color:var(--sub);font-weight:600;font-size:15px}
-  nav.top{gap:6px}
-  nav.top a{padding:10px 6px;font-size:14px;max-width:none;white-space:nowrap}
-  nav.top a[aria-current="page"]{border-color:var(--brand);background:#eef3ff;color:#1f52d6}
   .grid64{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,4fr);gap:8px}
   .grid64 input{min-width:0}
   .grid3{display:grid;grid-template-columns:minmax(0,4fr) 56px minmax(0,2fr);gap:8px}
   .grid3 input{min-width:0}
   .grid3 input[type=number]{text-align:center;padding-left:4px;padding-right:4px}
+  .appbar{position:sticky;top:0;z-index:50;background:var(--bg);padding:0 16px;border-bottom:1px solid var(--line)}
+  .appbar>.topbar,.appbar>.dd{max-width:900px;margin-left:auto;margin-right:auto}
+  .topbar{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;background:var(--bg)}
+  .topbar .tb-left{display:inline-flex;min-width:64px;text-decoration:none}
+  .topbar .lg{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2f6bff,#6a9bff);display:grid;place-items:center;font-size:19px}
+  .topbar .tb-title{flex:1;text-align:center;font-size:19px}
+  .burger{appearance:none;width:44px;height:40px;margin-left:20px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:20px;line-height:1;cursor:pointer;color:var(--text)}
+  .appbar .dim{position:fixed;left:0;right:0;top:0;bottom:0;background:rgba(20,28,48,.38);z-index:1}
+  .appbar .dim[hidden],.appbar .dd[hidden]{display:none}
+  .appbar .dd{position:absolute;left:16px;right:16px;top:100%;z-index:3;margin-top:6px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.18);padding:6px}
+  .dd .it{display:flex;gap:12px;align-items:center;padding:12px;border-radius:12px;text-decoration:none;color:var(--text)}
+  .dd .it:not(:last-child){border-bottom:1px solid var(--line)}
+  .dd .it span{font-size:24px}.dd .it b{display:block}.dd .it small{color:var(--sub);font-size:12.5px}
+  .dd .it[aria-current="page"]{background:#eef3ff}
 </style>
 </head>
 <body>
-<div class="appbar"><div class="inner">
-  <div class="brand"><div class="logo" aria-hidden="true">🎳</div><span>Bowling APP</span></div>
-  <nav class="top" aria-label="메뉴">
-    <a href="/home">홈</a>
-    <a href="/">신청하기</a>
-    <a href="/apps">내 앱 보기</a>
-    <a href="/admin" aria-current="page">로그인</a>
-  </nav>
-</div></div>
+<div class="appbar">
+  <div class="topbar">
+    <a class="tb-left" href="/home" aria-label="홈"><span class="lg">🎳</span></a>
+    <b class="tb-title">Bowling APP</b>
+    <button class="burger" id="burger" type="button" aria-label="메뉴" aria-expanded="false">☰</button>
+  </div>
+  <div class="dim" id="dim" hidden></div>
+  <div class="dd" id="dd" hidden>
+    <a class="it" href="/"><span>📝</span><div><b>신청하기</b><small>테스트 앱 사용 신청</small></div></a>
+    <a class="it" href="/apps"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
+    <a class="it" href="/admin" aria-current="page"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
+  </div>
+</div>
 <div class="wrap">
 
   <!-- 로그인 -->
@@ -103,6 +112,7 @@
       <button class="ghost" data-tab="play">앱별 Play 등록</button>
       <button class="ghost" data-tab="apps">앱 관리</button>
       <button class="ghost" data-tab="files">PC 파일</button>
+      <button class="ghost" data-tab="club">클럽 회원</button>
     </div>
 
     <!-- 신청자 -->
@@ -141,6 +151,23 @@
         <div class="meta" id="fMsg" style="margin-top:6px">zip으로 압축해서 올리는 것을 권장해요. 최대 50MB예요.</div>
       </div>
       <div class="card"><div id="fileList"></div></div>
+    </div>
+
+
+    <!-- 클럽 회원 -->
+    <div id="tab-club" hidden>
+      <div class="card">
+        <h2>클럽 회원 추가</h2>
+        <div class="grid3">
+          <input id="mName" type="text" maxlength="30" placeholder="이름 *">
+          <input id="mAvg" type="number" min="0" max="300" placeholder="에버" title="에버(평균 점수, 선택)" aria-label="에버">
+          <select id="mRole"><option value="member">회원</option><option value="staff">운영진</option></select>
+        </div>
+        <input id="mEmail" type="email" maxlength="120" placeholder="구글 이메일 * (이 메일로 인증해서 들어와요)">
+        <button id="addMemberBtn" style="margin-top:6px">회원 추가</button>
+        <div class="meta" style="margin-top:6px">회원이 홈 화면에서 이 이메일로 인증하면 클럽 메뉴가 열려요. 운영진은 공지·투표·강의를 올릴 수 있어요.</div>
+      </div>
+      <div class="card"><div id="memberList"></div></div>
     </div>
 
     <!-- 앱 관리 -->
@@ -244,13 +271,55 @@ const taOf = (t, appId) => (t.tester_apps || []).find((x) => x.app_id === appId)
 
 function render() {
   document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("sel", b.dataset.tab === tab));
-  for (const id of ["testers", "play", "apps", "files"]) $("tab-" + id).hidden = id !== tab;
+  for (const id of ["testers", "play", "apps", "files", "club"]) $("tab-" + id).hidden = id !== tab;
   if (tab === "testers") renderTesters();
   if (tab === "play") renderPlay();
   if (tab === "apps") renderApps();
   if (tab === "files") renderFiles();
+  if (tab === "club") renderClub();
 }
 document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; render(); });
+
+
+/* ---------- 클럽 회원 ---------- */
+let members = [];
+async function loadMembers() {
+  const r = await sb.from("members").select("*").order("role").order("name");
+  if (r.error) { toast("회원을 불러오지 못했어요."); return; }
+  members = r.data; renderClub();
+}
+function renderClub() {
+  const box = $("memberList");
+  if (!members.length && !box.dataset.loaded) { box.dataset.loaded = "1"; loadMembers(); return; }
+  box.textContent = "";
+  if (!members.length) { box.append(h("div", { class: "meta" }, "등록된 회원이 없어요.")); return; }
+  const ROLES = { admin: "관리자", staff: "운영진", member: "회원" };
+  for (const m of members) {
+    const row = h("div", { class: "item" });
+    const info = h("div", {}, h("b", {}, m.name + " "), h("span", { class: "tag" }, ROLES[m.role] + (m.status === "dormant" ? " · 휴면" : "")),
+      h("div", { class: "meta" }, m.email + (m.avg_score != null ? " · 에버 " + m.avg_score : "")));
+    const acts = h("div", { class: "row" });
+    if (m.role !== "admin") {
+      const roleBtn = h("button", { class: "ghost", type: "button" }, m.role === "staff" ? "회원으로" : "운영진으로");
+      roleBtn.onclick = async () => { const x = await sb.from("members").update({ role: m.role === "staff" ? "member" : "staff" }).eq("id", m.id); if (x.error) return toast("변경하지 못했어요."); loadMembers(); };
+      const stBtn = h("button", { class: "ghost", type: "button" }, m.status === "dormant" ? "활동으로" : "휴면");
+      stBtn.onclick = async () => { const x = await sb.from("members").update({ status: m.status === "dormant" ? "active" : "dormant" }).eq("id", m.id); if (x.error) return toast("변경하지 못했어요."); loadMembers(); };
+      const delBtn = h("button", { class: "ghost", type: "button" }, "삭제");
+      delBtn.onclick = async () => { if (!confirm(`${m.name} 님을 클럽 회원에서 삭제할까요? 투표 기록도 함께 지워져요.`)) return; const x = await sb.from("members").delete().eq("id", m.id); if (x.error) return toast("삭제하지 못했어요."); toast("삭제했어요."); loadMembers(); };
+      acts.append(roleBtn, stBtn, delBtn);
+    }
+    row.append(info, acts); box.append(row);
+  }
+}
+$("addMemberBtn").onclick = async () => {
+  const name = $("mName").value.trim(), email = $("mEmail").value.trim().toLowerCase();
+  if (!name) return toast("이름을 입력해 주세요.");
+  if (!EMAIL_RE.test(email)) return toast("이메일 형식을 확인해 주세요.");
+  const avg = $("mAvg").value === "" ? null : Math.max(0, Math.min(300, parseInt($("mAvg").value, 10) || 0));
+  const x = await sb.from("members").insert({ name, email, role: $("mRole").value, avg_score: avg });
+  if (x.error) return toast(x.error.code === "23505" ? "이미 등록된 이메일이에요." : "추가하지 못했어요.");
+  ["mName", "mEmail", "mAvg"].forEach((i) => $(i).value = ""); toast("회원을 추가했어요."); loadMembers();
+};
 
 /* ---------- 신청자 ---------- */
 function mailtoHref(t) {
@@ -494,6 +563,12 @@ $("reloadBtn").onclick = load;
 document.querySelectorAll("[data-f]").forEach((b) => b.onclick = () => { filter = b.dataset.f; render(); });
 
 init();
+</script>
+<script>
+(function(){const b=document.getElementById("burger"),dd=document.getElementById("dd"),dim=document.getElementById("dim");
+const set=(o)=>{dd.hidden=!o;dim.hidden=!o;b.setAttribute("aria-expanded",o?"true":"false");b.textContent=o?"✕":"☰"};
+b.addEventListener("click",()=>set(dd.hidden));dim.addEventListener("click",()=>set(false));
+document.addEventListener("keydown",(e)=>{if(e.key==="Escape")set(false)});})();
 </script>
 </body>
 </html>

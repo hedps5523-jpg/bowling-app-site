@@ -12,13 +12,17 @@
 <body>
 <div class="wrap">
   <div class="appbar">
-    <div class="brand"><div class="logo" aria-hidden="true">🎳</div><h1 id="appName">Bowling APP</h1></div>
-    <nav class="top" aria-label="메뉴">
-      <a href="/home">홈</a>
-      <a href="/">신청하기</a>
-      <a href="/apps" aria-current="page">내 앱 보기</a>
-      <a href="/admin">로그인</a>
-    </nav>
+    <div class="topbar">
+      <a class="tb-left" href="/home" aria-label="홈"><span class="lg">🎳</span></a>
+      <b class="tb-title" id="appName">Bowling APP</b>
+      <button class="burger" id="burger" type="button" aria-label="메뉴" aria-expanded="false">☰</button>
+    </div>
+    <div class="dim" id="dim" hidden></div>
+    <div class="dd" id="dd" hidden>
+      <a class="it" href="/"><span>📝</span><div><b>신청하기</b><small>테스트 앱 사용 신청</small></div></a>
+      <a class="it" href="/apps" aria-current="page"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
+      <a class="it" href="/admin"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
+    </div>
   </div>
 
     <section class="card">
@@ -63,6 +67,7 @@ else post("myapps").then(({ status, d }) => {
   if (status === 401) return toLogin();
   const msg = $("resMsg"), out = $("resList");
   msg.style.display = "block";
+  if (d.found === false) { msg.textContent = "앱 테스트 신청 이력이 없어요. 테스트 앱을 쓰려면 먼저 신청해 주세요."; const g = el("a", "btn", "신청하러 가기"); g.href = "/"; g.style.marginTop = "10px"; out.append(g); $("who").textContent = d.email ? `인증된 이메일: ${d.email}` : ""; return; }
   if (!d.approved) { msg.textContent = "신청이 접수되어 승인을 기다리고 있어요. 승인되면 안내 메일을 보내드려요. 이 화면은 나중에 다시 열어도 인증이 유지돼요."; return; }
   if (!d.apps || !d.apps.length) {
     msg.textContent = d.waiting ? `승인되었어요. 앱 등록이 아직 끝나지 않았어요. (등록 준비 중 ${d.waiting}개) 잠시 후 다시 확인해 주세요.` : "승인되었어요. 설치 가능한 앱이 생기면 안내해 드려요.";

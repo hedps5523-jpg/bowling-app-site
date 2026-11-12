@@ -11,13 +11,17 @@
 <body>
 <div class="wrap">
   <div class="appbar">
-    <div class="brand"><div class="logo" aria-hidden="true">🎳</div><h1 id="appName">Bowling APP</h1></div>
-    <nav class="top" aria-label="메뉴">
-      <a href="/home">홈</a>
-      <a href="/" aria-current="page">신청하기</a>
-      <a href="/apps">내 앱 보기</a>
-      <a href="/admin">로그인</a>
-    </nav>
+    <div class="topbar">
+      <a class="tb-left" href="/home" aria-label="홈"><span class="lg">🎳</span></a>
+      <b class="tb-title" id="appName">Bowling APP</b>
+      <button class="burger" id="burger" type="button" aria-label="메뉴" aria-expanded="false">☰</button>
+    </div>
+    <div class="dim" id="dim" hidden></div>
+    <div class="dd" id="dd" hidden>
+      <a class="it" href="/" aria-current="page"><span>📝</span><div><b>신청하기</b><small>테스트 앱 사용 신청</small></div></a>
+      <a class="it" href="/apps"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
+      <a class="it" href="/admin"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
+    </div>
   </div>
 
   <div class="pagehead">

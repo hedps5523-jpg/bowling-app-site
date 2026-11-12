@@ -12,13 +12,17 @@
 <body>
 <div class="wrap">
   <div class="appbar">
-    <div class="brand"><div class="logo" aria-hidden="true">🎳</div><h1 id="appName">Bowling APP</h1></div>
-    <nav class="top" aria-label="메뉴">
-      <a href="/home">홈</a>
-      <a href="/">신청하기</a>
-      <a href="/apps" aria-current="page">내 앱 보기</a>
-      <a href="/admin">로그인</a>
-    </nav>
+    <div class="topbar">
+      <a class="tb-left" href="/home" aria-label="홈"><span class="lg">🎳</span></a>
+      <b class="tb-title" id="appName">Bowling APP</b>
+      <button class="burger" id="burger" type="button" aria-label="메뉴" aria-expanded="false">☰</button>
+    </div>
+    <div class="dim" id="dim" hidden></div>
+    <div class="dd" id="dd" hidden>
+      <a class="it" href="/"><span>📝</span><div><b>신청하기</b><small>테스트 앱 사용 신청</small></div></a>
+      <a class="it" href="/apps" aria-current="page"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
+      <a class="it" href="/admin"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
+    </div>
   </div>
 
     <section class="card">
@@ -62,7 +66,9 @@ function auth(path, body) {
     .then(async (r) => ({ ok: r.ok, status: r.status, d: await r.json().catch(() => ({})) }));
 }
 // 이미 인증된 기기면 바로 내 앱 화면으로
-try { if (localStorage.getItem("authToken")) location.replace("/myapps"); } catch {}
+const nextQ = new URLSearchParams(location.search).get("next");
+const DEST = nextQ && /^\/(home|myapps)$/.test(nextQ) ? nextQ : "/myapps";
+try { if (localStorage.getItem("authToken")) location.replace(DEST); } catch {}
 
 let email = "", cool = 0, timer = null;
 const say = (id, cls, t) => { const m = $(id); m.className = "msg" + (cls ? " " + cls : ""); m.textContent = t; };
@@ -109,7 +115,7 @@ $("codeForm").addEventListener("submit", async (e) => {
     const { ok, d } = await auth("auth-verify", { email, code });
     if (!ok) return say("codeMsg", "err", d.error || "인증하지 못했어요. 다시 시도해 주세요.");
     try { localStorage.setItem("authToken", d.token); } catch { return say("codeMsg", "err", "이 브라우저에서는 인증 상태를 저장할 수 없어요. 사생활 보호 모드를 끄고 다시 시도해 주세요."); }
-    location.href = "/myapps";
+    location.href = DEST;
   } catch { say("codeMsg", "err", "네트워크 오류가 발생했어요. 잠시 후 다시 시도해 주세요."); }
   finally { btn.disabled = false; btn.textContent = "확인"; }
 });
