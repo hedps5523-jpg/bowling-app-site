@@ -69,6 +69,14 @@ function dday(iso) {
 const initial = (n) => (n || "?").trim().slice(0, 1);
 const staffOf = (role) => role === "admin" || role === "staff";
 const ROLE = { admin: "관리자", staff: "운영진", member: "회원" };
+// 실명 + 직함 (예: 홍길동 관리자). 이름이 비었거나 직함과 같으면 직함만.
+function disp(name, role) {
+  const r = role === "admin" ? "관리자" : role === "staff" ? "운영진" : "";
+  name = (name || "").trim();
+  if (!r) return name;
+  if (!name || name === r) return r;
+  return name.endsWith(" " + r) ? name : `${name} ${r}`;
+}
 
 let token = "";
 try { token = localStorage.getItem("authToken") || ""; } catch {}
@@ -182,10 +190,12 @@ async function vHome() {
   setBar(); setNav("home");
   const { d } = await api("home");
   view.textContent = "";
-  view.append(h("div", { class: "pagehead" }, h("p", { class: "tag" }, `${d.me.name} 님, 안녕하세요 👋`), h("span", { class: "badge" }, `클럽 회원 ${d.memberCount}명`)));
+  view.append(h("div", { class: "pagehead" }, h("p", { class: "tag" }, `${disp(d.me.name, d.me.role)}님, 안녕하세요 👋`), h("span", { class: "badge" }, `클럽 회원 ${d.memberCount}명`)));
   view.append(h("section", { class: "card" }, h("h2", {}, "빠른 메뉴"), h("div", { class: "grid4" },
     h("a", { class: "q", href: "#/members" }, h("b", {}, "👥"), "회원"), h("a", { class: "q", href: "#/lessons" }, h("b", {}, "🎓"), "강의"),
-    h("a", { class: "q", href: "#/notices" }, h("b", {}, "📣"), "공지"), h("a", { class: "q", href: "#/notices" }, h("b", {}, "🗳️"), "투표"))));
+    h("a", { class: "q", href: "#/notices" }, h("b", {}, "📣"), "공지"), h("a", { class: "q", href: "#/notices" }, h("b", {}, "🗳️"), "투표")),
+    h("div", { class: "grid4", style: "margin-top:8px" }, h("a", { class: "q", href: "/myapps" }, h("b", {}, "📲"), "내 앱"),
+      d.me.role === "admin" ? h("a", { class: "q", href: "/admin" }, h("b", {}, "🔐"), "관리") : null)));
   const nx = d.next, c = h("section", { class: "card" }, h("h2", {}, "다음 모임"));
   if (!nx) c.append(h("p", { class: "tag" }, "예정된 모임이 없어요."));
   else {
@@ -238,7 +248,7 @@ async function vNotice(id) {
     view.append(h("div", { style: "padding:14px 2px 2px" },
       n.pinned ? h("span", { class: "pin" }, "고정") : null,
       h("h2", { style: "font-size:19px;margin:6px 0" }, n.title),
-      h("div", { class: "mut" }, `${n.author || "운영진"} · ${fmt(n.created_at, false)}`),
+      h("div", { class: "mut" }, `${disp(n.author, n.author_role) || "운영진"} · ${fmt(n.created_at, false)}`),
       n.event_at ? h("div", { style: "margin-top:6px;font-weight:600" }, `📅 ${fmt(n.event_at)}${n.place ? " · " + n.place : ""}`) : null,
       n.body ? h("p", { style: "font-size:14.5px;margin:8px 0;white-space:pre-wrap" }, n.body) : null,
       n.deadline ? h("span", { class: "pill " + (n.expired ? "" : "bad") }, n.expired ? "투표 마감됨" : `마감 ${fmt(n.deadline)} · ${dday(n.deadline)}`) : null));
@@ -422,7 +432,7 @@ async function vMembers() {
     const rows = d.members.filter((m) => (f === "all" || (f === "staff" ? m.role !== "member" : f === "dormant" ? m.status === "dormant" : m.role === "member" && m.status === "active")) && (!q || m.name.toLowerCase().includes(q) || (m.email || "").toLowerCase().includes(q)));
     if (!rows.length) list.append(h("p", { class: "mut" }, "해당하는 회원이 없어요."));
     for (const m of rows) list.append(h("div", { class: "li", style: "display:flex;align-items:center;gap:10px" }, h("span", { class: "av", style: "margin:0" }, initial(m.name)),
-      h("div", {}, h("b", {}, m.name + " "), h("span", { class: "pill " + (m.role !== "member" ? "ok" : m.status === "dormant" ? "warn" : "") }, m.status === "dormant" ? "휴면" : ROLE[m.role]),
+      h("div", {}, h("b", {}, disp(m.name, m.role) + " "), m.status === "dormant" ? h("span", { class: "pill warn" }, "휴면") : null,
         staff ? h("div", { class: "mut" }, `${m.email}${m.avg_score != null ? " · 에버 " + m.avg_score : ""}`) : null)));
   }
   draw();

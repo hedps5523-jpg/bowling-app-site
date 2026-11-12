@@ -302,7 +302,8 @@ function renderClub() {
   if (pend) box.append(h("div", { class: "meta", style: "color:#b45309;font-weight:700;margin-bottom:6px" }, `가입 대기 ${pend}명 — 「승인」을 누르면 바로 클럽 메뉴가 열려요.`));
   for (const m of members) {
     const row = h("div", { class: "item" });
-    const info = h("div", {}, h("b", {}, m.name + " "), h("span", { class: "tag" }, m.status === "pending" ? "가입 대기" : ROLES[m.role] + (m.status === "dormant" ? " · 휴면" : "")),
+    const nm = m.role === "member" || m.status === "pending" ? m.name : (m.name && m.name !== ROLES[m.role] ? `${m.name} ${ROLES[m.role]}` : ROLES[m.role]);
+    const info = h("div", {}, h("b", {}, nm + " "), h("span", { class: "tag" }, m.status === "pending" ? "가입 대기" : m.status === "dormant" ? "휴면" : m.role === "member" ? "회원" : ""),
       h("div", { class: "meta" }, m.email + (m.avg_score != null ? " · 에버 " + m.avg_score : "")));
     const acts = h("div", { class: "row" });
     const cpBtn = h("button", { class: "ghost", type: "button" }, "안내문 복사");
@@ -318,7 +319,13 @@ function renderClub() {
       noBtn.onclick = async () => { if (!confirm(`${m.name} 님의 가입 신청을 거절(삭제)할까요?`)) return; const x = await sb.from("members").delete().eq("id", m.id); if (x.error) return toast("처리하지 못했어요."); loadMembers(); };
       acts.append(okBtn, noBtn); row.append(info, acts); box.append(row); continue;
     }
-    acts.append(cpBtn);
+    const nameBtn = h("button", { class: "ghost", type: "button" }, "이름 수정");
+    nameBtn.onclick = async () => {
+      const v = prompt("실명(닉네임)을 입력해 주세요. 직함(관리자·운영진)은 자동으로 붙어요.", m.name === ROLES[m.role] ? "" : m.name);
+      if (v == null) return; const name = v.trim().slice(0, 50); if (!name) return toast("이름을 입력해 주세요.");
+      const x = await sb.from("members").update({ name }).eq("id", m.id); if (x.error) return toast("변경하지 못했어요."); toast("이름을 바꿨어요."); loadMembers();
+    };
+    acts.append(nameBtn, cpBtn);
     if (m.role !== "admin") {
       const roleBtn = h("button", { class: "ghost", type: "button" }, m.role === "staff" ? "회원으로" : "운영진으로");
       roleBtn.onclick = async () => { const x = await sb.from("members").update({ role: m.role === "staff" ? "member" : "staff" }).eq("id", m.id); if (x.error) return toast("변경하지 못했어요."); loadMembers(); };
