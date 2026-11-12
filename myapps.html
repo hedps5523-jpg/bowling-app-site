@@ -13,7 +13,7 @@
 <div class="wrap">
   <div class="appbar">
     <div class="topbar">
-      <a class="tb-left" href="/home" aria-label="홈"><span class="lg">🎳</span></a>
+      <a class="tb-left" href="/" aria-label="홈"><span class="lg">🎳</span></a>
       <b class="tb-title" id="appName">Bowling APP</b>
       <button class="burger" id="burger" type="button" aria-label="메뉴" aria-expanded="false">☰</button>
     </div>
@@ -97,7 +97,7 @@ function applyBox() {
     const r = await fetch(fn("signup"), { method: "POST", headers, body: JSON.stringify({ token, action: "tester_apply", consent: true }) });
     const x = await r.json().catch(() => ({}));
     if (r.status === 401) return toLogin();
-    if (!r.ok && x.error === "need_join") { location.href = "/home"; return; }
+    if (!r.ok && x.error === "need_join") { location.href = "/"; return; }
     if (!r.ok) { go.disabled = false; m.className = "msg err"; m.textContent = x.error || "신청하지 못했어요."; return; }
     location.reload();
   };

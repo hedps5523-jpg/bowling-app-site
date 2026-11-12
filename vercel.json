@@ -46,10 +46,11 @@
       ]
     }
   ],
-  "rewrites": [
+  "redirects": [
     {
-      "source": "/",
-      "destination": "/home.html"
+      "source": "/home",
+      "destination": "/",
+      "permanent": false
     }
   ]
 }
