@@ -337,7 +337,7 @@ async function approve(t, btn) {
   if (!res.ok) { toast(d.error || "처리하지 못했어요."); btn.disabled = false; return; }
   if (d.mailSent) toast(`안내 메일을 보냈어요. (앱 ${d.count}개)`);
   else {
-    const why = { no_apps: "Play에 등록된 앱이 아직 없어요", mail_key_missing: "메일 발송 키가 설정되지 않았어요", mail_rejected: "메일 서비스가 발송을 거절했어요" }[d.reason] || "메일을 보내지 못했어요";
+    const why = { no_apps: "Play에 등록된 앱이 아직 없어요", mail_key_missing: "메일 발송 설정(Gmail)이 되어 있지 않아요", mail_error: "Gmail 발송에 실패했어요", mail_rejected: "메일 서비스가 발송을 거절했어요" }[d.reason] || "메일을 보내지 못했어요";
     toast("안내 완료로 표시했어요. " + why + (d.reason === "no_apps" ? "" : " → 「메일 앱으로 보내기」를 사용해 주세요."));
   }
   load();
