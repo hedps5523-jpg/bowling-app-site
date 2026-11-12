@@ -29,6 +29,8 @@
     <h2>내 앱 확인</h2>
     <p class="lead" id="stepLead">신청하신 <b>구글 계정 이메일</b>로 인증번호를 보내드려요.</p>
 
+    <div id="gBox"></div>
+    <div class="orline" id="gOr">또는 인증번호로 확인</div>
     <form id="reqForm" novalidate>
       <label for="lookupEmail">구글 계정 이메일</label>
       <input type="email" id="lookupEmail" maxlength="254" autocomplete="email" inputmode="email" placeholder="example@gmail.com">
@@ -59,6 +61,7 @@
   <footer>© Bowling APP · 테스트 버전 안내 페이지</footer>
 </div>
 <script src="/common.js"></script>
+<script src="/google.js"></script>
 <script>
 fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => { if (s.appName) $("appName").textContent = s.appName; }).catch(() => {});
 function auth(path, body) {
@@ -69,6 +72,11 @@ function auth(path, body) {
 const nextQ = new URLSearchParams(location.search).get("next");
 const DEST = nextQ && /^\/(home|myapps)$/.test(nextQ) ? nextQ : "/myapps";
 try { if (localStorage.getItem("authToken")) location.replace(DEST); } catch {}
+$("gBox").append(googleButton("Google 계정으로 바로 확인"));
+googleFinish().then((g) => {
+  if (g && g.token) location.replace(DEST);
+  else if (g && g.error) say("reqMsg", "err", googleErrorText(g.error));
+});
 
 let email = "", cool = 0, timer = null;
 const say = (id, cls, t) => { const m = $(id); m.className = "msg" + (cls ? " " + cls : ""); m.textContent = t; };

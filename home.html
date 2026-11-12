@@ -35,6 +35,7 @@
 </nav>
 <div class="toastc" id="toastc" hidden></div>
 <script src="/common.js"></script>
+<script src="/google.js"></script>
 <script>
 /* ---------- 도우미 ---------- */
 function h(tag, props = {}, ...kids) {
@@ -75,7 +76,7 @@ async function api(action, data = {}) {
   const r = await fetch(fn("club"), { method: "POST", headers, body: JSON.stringify({ token, action, ...data }) });
   const d = await r.json().catch(() => ({}));
   if (r.status === 401) { try { localStorage.removeItem("authToken"); } catch {} token = ""; guest("expired"); throw new Error("auth"); }
-  if (r.status === 403 && d.error === "not_member") { guest("not_member"); throw new Error("auth"); }
+  if (r.status === 403 && d.error === "not_member") { await onboard(); throw new Error("auth"); }
   return { ok: r.ok, status: r.status, d };
 }
 
@@ -95,12 +96,84 @@ function setNav(route) {
 function guest(reason) {
   $("bnav").hidden = true; setBar("Bowling APP");
   view.textContent = "";
-  const c = h("section", { class: "card" }, h("h2", {}, "볼링 클럽"),
-    h("p", { class: "lead" }, "회원 공지, 모임 투표, 볼링 강의를 한곳에서 확인해요."));
-  if (reason === "not_member") c.append(h("div", { class: "msg info", style: "display:block" }, "클럽 회원으로 등록된 이메일이 아니에요. 운영진에게 등록을 요청해 주세요."));
-  if (reason === "expired") c.append(h("div", { class: "msg info", style: "display:block" }, "인증이 만료되었어요. 다시 인증해 주세요."));
-  c.append(h("a", { class: "btn", href: "/apps?next=%2Fhome", style: "margin-top:12px" }, "회원 이메일 인증하기"));
-  c.append(h("a", { class: "btn ghost", href: "/", style: "margin-top:8px" }, "테스트 앱 신청하기"));
+  const c = h("section", { class: "card" }, h("h2", {}, "🎳 볼링 클럽 회원 가입"),
+    h("p", { class: "lead" }, "Google 계정으로 로그인하면 클럽 가입과 테스트 앱 신청을 한 번에 할 수 있어요."));
+  if (reason === "expired") c.append(h("div", { class: "msg info" }, "인증이 만료되었어요. 다시 로그인해 주세요."));
+  else if (reason) c.append(h("div", { class: "msg err" }, googleErrorText(reason)));
+  c.append(h("div", { style: "margin-top:14px" }, googleButton("Google로 시작하기")),
+    h("small", { class: "mut", style: "display:block;margin-top:8px;text-align:center" }, "처음이면 가입 신청, 이미 회원이면 바로 클럽 화면이 열려요."),
+    h("div", { class: "orline" }, "또는"),
+    h("a", { class: "btn ghost", href: "/apps?next=%2Fhome" }, "이메일 인증번호로 들어가기"));
+  view.append(c,
+    h("section", { class: "card" }, h("h2", {}, "가입하면 이렇게 진행돼요"),
+      h("ol", { class: "mut", style: "font-size:14px;line-height:1.9;padding-left:18px;margin:6px 0 0" },
+        h("li", {}, "Google 로그인 → 이름 입력 → 가입 신청"),
+        h("li", {}, "운영진이 승인하면 이 화면에서 바로 클럽 메뉴가 열려요"),
+        h("li", {}, "테스트 앱도 신청했다면 등록 후 ☰ → 내 앱 보기에서 설치해요"))));
+}
+
+/* ---------- 가입 신청 / 승인 대기 ---------- */
+async function signupApi(action, data = {}) {
+  const r = await fetch(fn("signup"), { method: "POST", headers, body: JSON.stringify({ token, action, ...data }) });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401) { try { localStorage.removeItem("authToken"); } catch {} token = ""; guest("expired"); throw new Error("auth"); }
+  return { ok: r.ok, d };
+}
+async function logout() {
+  try { await fetch(fn("auth-verify"), { method: "POST", headers, body: JSON.stringify({ action: "logout", token }) }); } catch {}
+  try { localStorage.removeItem("authToken"); } catch {}
+  token = ""; location.hash = ""; guest();
+}
+const T_STATUS = { pending: ["승인 대기", "warn"], registered: ["등록 완료", "ok"], rejected: ["제외됨", "bad"] };
+async function onboard(note) {
+  $("bnav").hidden = true; setBar("회원 가입");
+  const { d } = await signupApi("me");
+  view.textContent = "";
+  const m = d.member, t = d.tester;
+  if (!m) return joinForm(d);
+  const c = h("section", { class: "card" });
+  if (m.status === "pending") c.append(h("h2", {}, "가입 신청이 접수됐어요 🙌"), h("p", { class: "lead" }, "운영진이 승인하면 이 화면에서 바로 클럽 메뉴가 열려요. 잠시만 기다려 주세요."));
+  else c.append(h("h2", {}, "휴면 상태예요"), h("p", { class: "lead" }, "클럽 활동을 다시 시작하려면 운영진에게 말씀해 주세요."));
+  if (note) c.append(h("div", { class: "msg info" }, note));
+  const st = h("div", { style: "margin-top:12px" },
+    h("div", { class: "strow" }, h("span", {}, "👤 클럽 회원"), h("span", { class: "pill " + (m.status === "pending" ? "warn" : "") }, m.status === "pending" ? "승인 대기" : "휴면")),
+    h("div", { class: "strow" }, h("span", {}, "📲 테스트 앱"), t ? h("span", { class: "pill " + T_STATUS[t.status][1] }, T_STATUS[t.status][0]) : h("span", { class: "mut" }, "신청 안 함")));
+  c.append(st, h("small", { class: "mut", style: "display:block;margin-top:6px" }, "로그인한 계정: " + d.email));
+  if (t && t.status === "registered") c.append(h("a", { class: "btn", href: "/myapps", style: "margin-top:12px" }, "내 앱 보기 (설치 링크)"));
+  c.append(h("button", { class: "btn ghost", type: "button", style: "margin-top:10px", onclick: () => onboard() }, "상태 새로고침"),
+    h("button", { class: "btn ghost sm", type: "button", style: "margin-top:8px", onclick: logout }, "다른 계정으로 로그인"));
+  view.append(c);
+}
+function joinForm(d) {
+  let gName = ""; try { gName = sessionStorage.getItem("gName") || ""; } catch {}
+  const name = h("input", { type: "text", maxlength: "50", placeholder: "클럽에서 쓸 이름 (닉네임)", value: (d.tester && d.tester.name) || gName });
+  const avg = h("input", { type: "number", min: "0", max: "300", placeholder: "에버 (평균 점수, 선택)" });
+  const wantT = h("input", { type: "checkbox" }), dev = h("input", { type: "text", maxlength: "100", placeholder: "기기 모델 (선택, 예: 갤럭시 S24)" });
+  const devBox = h("div", { hidden: true }, dev);
+  wantT.onchange = () => devBox.hidden = !wantT.checked;
+  const agree = h("input", { type: "checkbox" });
+  const msg = h("div", { class: "msg" });
+  const go = h("button", { class: "btn", type: "button", style: "margin-top:14px" }, "가입 신청하기");
+  const c = h("section", { class: "card" }, h("h2", {}, "회원 가입"),
+    h("p", { class: "lead" }, "Google 계정 확인이 끝났어요. 이름만 입력하면 가입 신청이 돼요."),
+    h("label", {}, "Google 계정"), h("input", { type: "text", value: d.email, disabled: true }),
+    h("label", {}, "이름 *"), name, h("label", {}, "에버"), avg);
+  if (d.tester) c.append(h("div", { class: "msg info" }, `테스트 앱은 이미 신청되어 있어요 (${T_STATUS[d.tester.status][0]}).`));
+  else if (d.testerAccepting) c.append(h("label", { class: "check" }, wantT, h("span", {}, "테스트 앱도 함께 신청할게요 ", h("small", { class: "mut" }, "(안드로이드 전용)"))), devBox);
+  c.append(h("div", { class: "privacy" }, "수집 항목: 이름, Google 이메일, 에버(선택), 기기(선택)", h("br"), "이용 목적: 클럽 회원 관리, 공지·투표, 테스트 앱 배포", h("br"), "보관 기간: 탈퇴(삭제 요청) 시까지"),
+    h("label", { class: "check" }, agree, h("span", {}, "개인정보 수집·이용에 동의합니다 (필수)")), msg, go,
+    h("button", { class: "btn ghost sm", type: "button", style: "margin-top:8px", onclick: logout }, "다른 계정으로 로그인"));
+  go.onclick = async () => {
+    const say = (t) => { msg.className = "msg err"; msg.textContent = t; };
+    if (!name.value.trim()) return say("이름을 입력해 주세요.");
+    if (!agree.checked) return say("개인정보 수집·이용에 동의해 주세요.");
+    go.disabled = true;
+    try {
+      const r = await signupApi("join", { name: name.value, avg_score: avg.value, consent: true, tester: wantT.checked, device: dev.value });
+      if (!r.ok) { go.disabled = false; return say(r.d.error || "가입 신청을 하지 못했어요."); }
+      await onboard(r.d.testerNote || null);
+    } catch (e) { go.disabled = false; if (e.message !== "auth") say("잠시 후 다시 시도해 주세요."); }
+  };
   view.append(c);
 }
 
@@ -128,7 +201,7 @@ async function vHome() {
   const r = h("section", { class: "card" }, h("h2", {}, "최근 공지"));
   if (!d.recent.length) r.append(h("p", { class: "tag" }, "아직 공지가 없어요."));
   for (const n of d.recent) r.append(h("a", { class: "li", href: "#/notice/" + n.id }, n.pinned ? h("span", { class: "pin" }, "고정") : null, n.title));
-  view.append(r);
+  view.append(r, h("button", { class: "btn ghost sm", type: "button", style: "margin-top:14px", onclick: () => { if (confirm("이 기기에서 로그아웃할까요?")) logout(); } }, "로그아웃"));
 }
 
 /* ---------- 공지 · 투표 목록 ---------- */
@@ -388,8 +461,9 @@ async function vLessons() {
 }
 
 /* ---------- 라우터 ---------- */
+let gErr = null;
 async function route() {
-  if (!token) return guest();
+  if (!token) return guest(gErr);
   const hash = location.hash.replace(/^#/, "") || "/";
   const [, r, arg] = hash.split("/");
   window.scrollTo(0, 0);
@@ -405,7 +479,11 @@ async function route() {
   } catch (e) { if (e.message !== "auth") { view.textContent = ""; view.append(h("section", { class: "card" }, h("p", {}, "불러오지 못했어요. 잠시 후 새로고침해 주세요."))); } }
 }
 window.addEventListener("hashchange", () => { history.replaceState(null, ""); route(); });
-route();
+(async () => {
+  const g = await googleFinish();
+  if (g && g.token) token = g.token; else if (g && g.error) gErr = g.error;
+  route();
+})();
 </script>
 </body>
 </html>

@@ -132,7 +132,7 @@
     <!-- 앱별 Play 등록 -->
     <div id="tab-play" hidden>
       <div class="card">
-        <div class="meta">① 이메일 복사 → ② Play Console의 해당 앱 내부 테스트 → 테스터 목록에 붙여넣고 저장 → ③ 「Play에 추가함」 처리 → ④ 신청자 탭에서 「안내 메일 보내기」</div>
+        <div class="meta">① 이메일 복사 → ② Play Console의 해당 앱 내부 테스트 → 테스터 목록에 붙여넣고 저장 → ③ 「Play에 추가함」 처리 → ④ 신청자 탭에서 「안내문 복사」(카톡·문자) 또는 「안내 메일 보내기」</div>
       </div>
       <div id="playList"></div>
     </div>
@@ -259,6 +259,9 @@ async function load() {
   ]);
   if (t.error || a.error) { toast("권한이 없거나 불러오지 못했어요."); return; }
   testers = t.data; apps = a.data;
+  sb.from("members").select("id", { count: "exact", head: true }).eq("status", "pending").then((r) => {
+    const b = document.querySelector('[data-tab="club"]'); if (b) b.textContent = "클럽 회원" + (r.count ? ` (대기 ${r.count})` : "");
+  });
   const cfg = Object.fromEntries((s.data || []).map((r) => [r.key, r.value]));
   accepting = cfg.accepting === "true";
   $("sMax").textContent = parseInt(cfg.max_testers || "100", 10);
@@ -286,7 +289,8 @@ let members = [];
 async function loadMembers() {
   const r = await sb.from("members").select("*").order("role").order("name");
   if (r.error) { toast("회원을 불러오지 못했어요."); return; }
-  members = r.data; renderClub();
+  const rank = { pending: 0, active: 1, dormant: 2 };
+  members = r.data.sort((a, b) => rank[a.status] - rank[b.status]); renderClub();
 }
 function renderClub() {
   const box = $("memberList");
@@ -294,11 +298,27 @@ function renderClub() {
   box.textContent = "";
   if (!members.length) { box.append(h("div", { class: "meta" }, "등록된 회원이 없어요.")); return; }
   const ROLES = { admin: "관리자", staff: "운영진", member: "회원" };
+  const pend = members.filter((m) => m.status === "pending").length;
+  if (pend) box.append(h("div", { class: "meta", style: "color:#b45309;font-weight:700;margin-bottom:6px" }, `가입 대기 ${pend}명 — 「승인」을 누르면 바로 클럽 메뉴가 열려요.`));
   for (const m of members) {
     const row = h("div", { class: "item" });
-    const info = h("div", {}, h("b", {}, m.name + " "), h("span", { class: "tag" }, ROLES[m.role] + (m.status === "dormant" ? " · 휴면" : "")),
+    const info = h("div", {}, h("b", {}, m.name + " "), h("span", { class: "tag" }, m.status === "pending" ? "가입 대기" : ROLES[m.role] + (m.status === "dormant" ? " · 휴면" : "")),
       h("div", { class: "meta" }, m.email + (m.avg_score != null ? " · 에버 " + m.avg_score : "")));
     const acts = h("div", { class: "row" });
+    const cpBtn = h("button", { class: "ghost", type: "button" }, "안내문 복사");
+    cpBtn.onclick = async () => toast((await copyText(memberGuide(m))) ? "안내문을 복사했어요. 카톡·문자에 붙여 넣어 주세요." : "복사하지 못했어요.");
+    if (m.status === "pending") {
+      const okBtn = h("button", { class: "ok", type: "button" }, "승인");
+      okBtn.onclick = async () => {
+        const x = await sb.from("members").update({ status: "active" }).eq("id", m.id); if (x.error) return toast("승인하지 못했어요.");
+        const copied = await copyText(memberGuide(m));
+        toast(copied ? "승인했어요. 안내문도 복사됐어요 — 카톡·문자에 붙여 넣어 주세요." : "승인했어요."); loadMembers();
+      };
+      const noBtn = h("button", { class: "danger", type: "button" }, "거절");
+      noBtn.onclick = async () => { if (!confirm(`${m.name} 님의 가입 신청을 거절(삭제)할까요?`)) return; const x = await sb.from("members").delete().eq("id", m.id); if (x.error) return toast("처리하지 못했어요."); loadMembers(); };
+      acts.append(okBtn, noBtn); row.append(info, acts); box.append(row); continue;
+    }
+    acts.append(cpBtn);
     if (m.role !== "admin") {
       const roleBtn = h("button", { class: "ghost", type: "button" }, m.role === "staff" ? "회원으로" : "운영진으로");
       roleBtn.onclick = async () => { const x = await sb.from("members").update({ role: m.role === "staff" ? "member" : "staff" }).eq("id", m.id); if (x.error) return toast("변경하지 못했어요."); loadMembers(); };
@@ -322,6 +342,23 @@ $("addMemberBtn").onclick = async () => {
 };
 
 /* ---------- 신청자 ---------- */
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch {}
+  const ta = h("textarea", { style: "position:fixed;opacity:0" }); ta.value = text; document.body.append(ta); ta.select();
+  let ok = false; try { ok = document.execCommand("copy"); } catch {} ta.remove(); return ok;
+}
+const SITE = location.origin;
+function testerGuide(t) {
+  const list = apps.filter((a) => a.active && a.optin_url && PLAY_RE.test(a.optin_url)).filter((a) => { const x = taOf(t, a.id); return x && x.enabled && x.play_registered; });
+  return `[${SITE_NAME}] ${t.name}님, 테스트 앱 등록이 끝났어요 🎳\n\n` +
+    (list.length ? list.map((a) => `▶ ${a.name}\n${a.optin_url}`).join("\n\n") + "\n\n" : "") +
+    `신청한 구글 계정으로 Play 스토어에 로그인한 뒤 링크에서 "테스터 되기" → 설치해 주세요.\n` +
+    `설치 링크는 언제든 여기서 다시 볼 수 있어요: ${SITE}/apps`;
+}
+function memberGuide(m) {
+  return `[${SITE_NAME}] ${m.name}님, 볼링 클럽 가입이 승인됐어요 🎉\n\n` +
+    `${SITE}/home 에서 같은 구글 계정으로 로그인하면 공지·투표·강의를 볼 수 있어요.`;
+}
 function mailtoHref(t) {
   const list = apps.filter((a) => a.active && a.optin_url && PLAY_RE.test(a.optin_url)).filter((a) => { const x = taOf(t, a.id); return x && x.enabled && x.play_registered; });
   const lines = list.map((a) => `- ${a.name}\n  ${a.optin_url}`).join("\n");
@@ -366,6 +403,14 @@ function renderTesters() {
       const ok = h("button", { class: "ok" }, "안내 메일 보내기");
       ok.onclick = () => approve(t, ok);
       act.append(ok);
+      const cp = h("button", { class: "ghost", type: "button" }, "안내문 복사");
+      cp.onclick = async () => {
+        if (!(await copyText(testerGuide(t)))) return toast("복사하지 못했어요.");
+        if (t.status === "pending" && confirm("안내문을 복사했어요. 카톡·문자로 보내 주세요.\n이 신청자를 「안내 완료」로 표시할까요?")) {
+          await sb.from("testers").update({ status: "registered", registered_at: new Date().toISOString() }).eq("id", t.id); load();
+        } else toast("안내문을 복사했어요. 카톡·문자에 붙여 넣어 주세요.");
+      };
+      act.append(cp);
       if (t.status === "registered") act.append(h("a", { href: mailtoHref(t), style: "font-size:14px;color:#2f6bff" }, "메일 앱으로 보내기"));
       const no = h("button", { class: "danger" }, "제외");
       no.onclick = async () => {
