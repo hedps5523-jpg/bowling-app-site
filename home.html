@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Bowling APP 홈</title>
+<meta name="description" content="Bowling APP 테스트 센터 홈">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="appbar">
+    <div class="brand"><div class="logo" aria-hidden="true">🎳</div><h1 id="appName">Bowling APP</h1></div>
+    <nav class="top" aria-label="메뉴">
+      <a href="/home" aria-current="page">홈</a>
+      <a href="/">신청하기</a>
+      <a href="/apps">내 앱 보기</a>
+      <a href="/admin">로그인</a>
+    </nav>
+  </div>
+
+    <div class="pagehead">
+    <p class="tag">볼링 · 레포츠 앱을 먼저 써 보는 테스트 센터예요.</p>
+    <span class="badge" id="remainBadge">자리 확인 중…</span>
+  </div>
+
+  <section class="card">
+    <h2>이렇게 이용해요</h2>
+    <ol class="steps">
+      <li><b>신청</b> — 구글 계정 이메일로 한 번만 신청해요.</li>
+      <li><b>승인</b> — 관리자가 확인하고 안내 메일을 보내드려요.</li>
+      <li><b>설치</b> — <b>내 앱 보기</b>에서 이메일 인증 후 앱별 설치 링크를 확인해요.</li>
+    </ol>
+    <a class="btn" href="/" style="margin-top:6px">테스트 신청하기</a>
+    <a class="btn ghost" href="/apps" style="margin-top:8px">내 앱 보기</a>
+  </section>
+
+  <section class="card">
+    <h2>테스트 중인 앱</h2>
+    <div class="applist" id="appList"><span class="tag">앱 목록을 불러오는 중…</span></div>
+  </section>
+  <footer>© Bowling APP · 테스트 버전 안내 페이지</footer>
+</div>
+<script src="/common.js"></script>
+<script>
+fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => { if (s.appName) $("appName").textContent = s.appName; }).catch(() => {});
+function renderApps(list) {
+  const box = $("appList"); box.textContent = "";
+  if (!list.length) { box.append(el("span", "tag", "곧 테스트 앱이 추가될 예정이에요.")); return; }
+  for (const [g, items] of groupByGenre(list)) {
+    const head = el("div", "genre", g); head.append(el("span", "cnt", String(items.length))); box.append(head);
+    for (const a of items) {
+      const row = el("div", "row");
+      row.append(el("b", null, a.name));
+      if (a.description) row.append(el("span", null, a.description));
+      box.append(row);
+    }
+  }
+}
+fetch(fn("status"), { headers }).then((r) => r.json()).then((s) => {
+  renderApps(s.apps || []);
+  const b = $("remainBadge");
+  if (s.accepting) b.textContent = `남은 자리 ${s.remaining} / ${s.max}`;
+  else { b.textContent = "신청 마감"; b.classList.add("closed"); }
+}).catch(() => { $("remainBadge").textContent = "테스트 버전 안내"; renderApps([]); });
+</script>
+</body>
+</html>

@@ -80,3 +80,7 @@
   .genre{display:flex;align-items:center;gap:8px;margin:18px 0 4px;font-size:14px;font-weight:700;color:var(--brand-d)}
   .genre:first-child{margin-top:4px}
   .genre .cnt{font-weight:600;font-size:12px;background:#eaf0ff;border-radius:999px;padding:1px 8px}
+
+  /* 탭 4개가 한 줄에 들어가도록 */
+  nav.top{gap:6px}
+  nav.top a{padding:10px 6px;font-size:14px;max-width:none;white-space:nowrap}
