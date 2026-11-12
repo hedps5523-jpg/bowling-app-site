@@ -226,7 +226,7 @@
   .appbar .fix{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:2px 0 8px}
   .appbar .fix .hd,.appbar .fix h2{margin:0;font-size:17px;flex:0 0 auto}
   .appbar .fix>input{flex:1;min-width:0;margin:0!important;padding:8px 12px;font-size:15px}
-  .appbar .fix .chips{flex-basis:100%;margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+  .appbar .fix .chips{flex-basis:100%;margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:2px 2px 3px}
   .appbar .fix .chips::-webkit-scrollbar{display:none}
   .appbar .fix .chip2{white-space:nowrap;padding:5px 11px}
   .appbar .fix .msg{flex:1;min-width:0;margin:0;padding:7px 10px;font-size:13.5px;line-height:1.45}
