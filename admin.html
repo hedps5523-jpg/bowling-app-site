@@ -601,6 +601,7 @@ function renderApps() {
 
 /* ---------- 공통 버튼 ---------- */
 $("toggleBtn").onclick = async () => {
+  if (!confirm(accepting ? "테스트 앱 신청을 마감할까요?\n마감하면 신청하기·내 앱 보기·가입 화면에서 새 신청을 받지 않아요." : "테스트 앱 신청 접수를 다시 열까요?")) return;
   const { error } = await sb.from("settings").update({ value: accepting ? "false" : "true" }).eq("key", "accepting");
   toast(error ? "변경하지 못했어요." : "변경했어요."); load();
 };
