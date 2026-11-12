@@ -62,13 +62,38 @@ $("again").addEventListener("click", async (e) => {
   toLogin();
 });
 
+// 테스트 앱 (재)신청 — 클럽 회원/기존 신청자는 이름 입력 없이 바로
+function applyBox() {
+  const box = el("div"); box.style.marginTop = "12px";
+  const lb = el("label", "check"); const cb = document.createElement("input"); cb.type = "checkbox";
+  lb.append(cb, el("span", "", "개인정보(이름·이메일·기기) 수집·이용에 동의합니다 (필수)"));
+  const go = el("button", "btn", "테스트 앱 신청하기"); go.type = "button"; go.style.marginTop = "10px";
+  const m = el("div", "msg");
+  go.onclick = async () => {
+    if (!cb.checked) { m.className = "msg err"; m.textContent = "개인정보 수집·이용에 동의해 주세요."; return; }
+    go.disabled = true;
+    const r = await fetch(fn("signup"), { method: "POST", headers, body: JSON.stringify({ token, action: "tester_apply", consent: true }) });
+    const x = await r.json().catch(() => ({}));
+    if (r.status === 401) return toLogin();
+    if (!r.ok && x.error === "need_join") { location.href = "/home"; return; }
+    if (!r.ok) { go.disabled = false; m.className = "msg err"; m.textContent = x.error || "신청하지 못했어요."; return; }
+    location.reload();
+  };
+  box.append(lb, go, m);
+  return box;
+}
+
 if (!token) toLogin();
 else post("myapps").then(({ status, d }) => {
   if (status === 401) return toLogin();
   const msg = $("resMsg"), out = $("resList");
   msg.style.display = "block";
-  if (d.found === false) { msg.textContent = "앱 테스트 신청 이력이 없어요. 테스트 앱을 쓰려면 먼저 신청해 주세요."; const g = el("a", "btn", "신청하러 가기"); g.href = "/"; g.style.marginTop = "10px"; out.append(g); $("who").textContent = d.email ? `인증된 이메일: ${d.email}` : ""; return; }
-  if (!d.approved) { msg.textContent = "신청이 접수되어 승인을 기다리고 있어요. 승인되면 안내 메일을 보내드려요. 이 화면은 나중에 다시 열어도 인증이 유지돼요."; return; }
+  if (d.email) $("who").textContent = `인증된 이메일: ${d.email}`;
+  if (d.found === false || d.rejected) {
+    msg.textContent = d.rejected ? "테스트 앱 신청이 보류(제외)된 상태예요. 아래 버튼으로 다시 신청할 수 있어요." : "테스트 앱 신청 이력이 없어요. 아래 버튼으로 바로 신청할 수 있어요.";
+    out.append(applyBox()); return;
+  }
+  if (!d.approved) { msg.textContent = "신청이 접수되어 승인을 기다리고 있어요. 운영진이 Play 등록을 마치면 이 화면에 설치 링크가 나타나요. 인증은 이 기기에서 유지돼요."; return; }
   if (!d.apps || !d.apps.length) {
     msg.textContent = d.waiting ? `승인되었어요. 앱 등록이 아직 끝나지 않았어요. (등록 준비 중 ${d.waiting}개) 잠시 후 다시 확인해 주세요.` : "승인되었어요. 설치 가능한 앱이 생기면 안내해 드려요.";
   } else {

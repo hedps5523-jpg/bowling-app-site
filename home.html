@@ -158,7 +158,7 @@ function joinForm(d) {
     h("p", { class: "lead" }, "Google 계정 확인이 끝났어요. 이름만 입력하면 가입 신청이 돼요."),
     h("label", {}, "Google 계정"), h("input", { type: "text", value: d.email, disabled: true }),
     h("label", {}, "이름 *"), name, h("label", {}, "에버"), avg);
-  if (d.tester) c.append(h("div", { class: "msg info" }, `테스트 앱은 이미 신청되어 있어요 (${T_STATUS[d.tester.status][0]}).`));
+  if (d.tester && d.tester.status !== "rejected") c.append(h("div", { class: "msg info" }, `테스트 앱은 이미 신청되어 있어요 (${T_STATUS[d.tester.status][0]}).`));
   else if (d.testerAccepting) c.append(h("label", { class: "check" }, wantT, h("span", {}, "테스트 앱도 함께 신청할게요 ", h("small", { class: "mut" }, "(안드로이드 전용)"))), devBox);
   c.append(h("div", { class: "privacy" }, "수집 항목: 이름, Google 이메일, 에버(선택), 기기(선택)", h("br"), "이용 목적: 클럽 회원 관리, 공지·투표, 테스트 앱 배포", h("br"), "보관 기간: 탈퇴(삭제 요청) 시까지"),
     h("label", { class: "check" }, agree, h("span", {}, "개인정보 수집·이용에 동의합니다 (필수)")), msg, go,
