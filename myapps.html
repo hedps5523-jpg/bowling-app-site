@@ -29,7 +29,7 @@
     <h2>내 앱</h2>
     <div class="msg info" id="resMsg" role="status"></div>
     <div id="resList"></div>
-    <div class="note">버튼을 눌러 <b>"테스터 되기"</b>를 수락한 뒤 Play 스토어에서 설치해 주세요. 신청한 계정으로 로그인되어 있어야 해요.</div>
+    <div class="note"><b>처음 한 번만</b> ① 테스터 참여 → Play 화면의 파란 버튼 <b>「Download test app」</b>(테스트 앱 다운로드)을 누르면 끝나요. 다음부터는 <b>② 바로 설치</b>만 누르면 돼요.<br>※ 신청한 구글 계정으로 Play에 로그인되어 있어야 해요.</div>
     <div class="hint" id="who" style="margin-top:10px"></div>
     <a class="btn ghost" href="/apps" id="again" style="margin-top:8px">로그아웃 (이 기기에서 인증 해제)</a>
   </section>
@@ -61,6 +61,29 @@ $("again").addEventListener("click", async (e) => {
   try { await fetch(fn("auth-verify"), { method: "POST", headers, body: JSON.stringify({ action: "logout", token }) }); } catch {}
   toLogin();
 });
+
+// ① 테스터 참여(처음 한 번) / ② 바로 설치(Play 스토어 앱)
+const PKG_RE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/;
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+const storeUrl = (p) => IS_ANDROID ? `market://details?id=${p}` : `https://play.google.com/store/apps/details?id=${encodeURIComponent(p)}`;
+const joined = (p) => { try { return localStorage.getItem("joined:" + p) === "1"; } catch { return false; } };
+const setJoined = (p, v) => { try { v ? localStorage.setItem("joined:" + p, "1") : localStorage.removeItem("joined:" + p); } catch {} };
+function appButtons(box, a) {
+  box.textContent = "";
+  const opt = typeof a.url === "string" && a.url.startsWith(PLAY_PREFIX) ? a.url : null;
+  const pkg = typeof a.package === "string" && PKG_RE.test(a.package) ? a.package : null;
+  if (!pkg) { if (opt) { const l = el("a", "btn", "테스터 되기 · 설치하러 가기"); l.href = opt; l.target = "_blank"; l.rel = "noopener"; box.append(l); } return; }
+  const join = el("a", "btn", "① 테스터 참여 (처음 한 번)");
+  if (opt) { join.href = opt; join.target = "_blank"; join.rel = "noopener"; join.onclick = () => { setJoined(pkg, true); setTimeout(() => appButtons(box, a), 400); }; }
+  const inst = el("a", "btn", "② 바로 설치"); inst.href = storeUrl(pkg); if (!IS_ANDROID) { inst.target = "_blank"; inst.rel = "noopener"; }
+  if (joined(pkg) || !opt) {
+    box.append(inst);
+    if (opt) { const again = el("a", "mut", "설치 화면에 '항목을 찾을 수 없음'이 나오면 → ① 테스터 참여 다시 하기"); again.href = opt; again.target = "_blank"; again.rel = "noopener"; again.style.cssText = "display:block;text-align:center;margin-top:8px;font-size:12.5px"; box.append(again); }
+  } else {
+    inst.className = "btn ghost"; inst.style.marginTop = "8px";
+    const tip = el("div", "hint", "① Play 화면이 열리면 파란 「Download test app」 버튼을 누르면 끝나요. 이후엔 ②만 누르면 돼요."); tip.style.margin = "0 0 8px"; box.append(tip, join, inst);
+  }
+}
 
 // 테스트 앱 (재)신청 — 클럽 회원/기존 신청자는 이름 입력 없이 바로
 function applyBox() {
@@ -104,9 +127,7 @@ else post("myapps").then(({ status, d }) => {
         const card = el("div", "appitem");
         card.append(el("b", null, a.name));
         if (a.description) card.append(el("div", "d", a.description));
-        if (typeof a.url === "string" && a.url.startsWith(PLAY_PREFIX)) {
-          const l = el("a", "btn", "테스터 되기 · 설치하러 가기"); l.href = a.url; l.target = "_blank"; l.rel = "noopener"; card.append(l);
-        }
+        const act = el("div"); card.append(act); appButtons(act, a);
         out.append(card);
       }
     }
