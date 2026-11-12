@@ -160,3 +160,57 @@
 .appbar .fix .msg{margin-top:6px}
 .appbar .fix .chips{margin:6px 0 0}
 .appbar .dd{top:var(--tb,62px)}
+
+/* ===== 가로 화면 (8인치·12.4인치 태블릿, 갤럭시 Z 폴드 펼침) — 세로 화면은 그대로 ===== */
+@media (orientation: landscape) and (min-width: 760px) {
+  .wrap{max-width:1240px;padding-left:24px;padding-right:24px}
+  .topbar{padding:6px 0}
+  .topbar .lg{width:30px;height:30px;font-size:16px}
+  .topbar .tb-title{font-size:17px}
+  .burger{height:34px;width:40px;font-size:18px}
+  .card{padding:16px;margin-top:12px}
+  .pagehead{margin:10px 0 0}
+  /* 고정 영역: 한 줄로 납작하게 */
+  .appbar .fix{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:4px 0 8px;max-height:40vh}
+  .appbar .fix .hd,.appbar .fix h2{margin:0;font-size:18px}
+  .appbar .fix>input{width:260px;margin:0!important;padding:8px 12px}
+  .appbar .fix .chips{margin:0}
+  .appbar .fix .msg{margin:0;flex:1;min-width:280px;padding:8px 12px}
+  /* 하단 메뉴: 얇게 */
+  .bnav{padding:4px 0 6px}
+  .bnav a span{font-size:18px}
+  .wrap{padding-bottom:64px}
+  /* 홈 대시보드: 2단 */
+  #view.r-home{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
+  #view.r-home>.pagehead,#view.r-home>button{grid-column:1/-1}
+  #view.r-home>.pagehead{display:flex;justify-content:center;align-items:center;gap:12px}
+  #view.r-home>.pagehead .badge{margin:0}
+  /* 회원: 여러 칸 */
+  .mlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+  .mlist>.li{margin-top:0}
+  /* 공지 목록: 2~3칸 */
+  #view.r-notices{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:8px;align-items:start;padding-top:8px}
+  #view.r-notices>.li{margin-top:0}
+  #view.r-notices>.btn,#view.r-notices>.card{grid-column:1/-1}
+  /* 공지 상세: 투표 카드 2단 */
+  #view.r-notice{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;align-items:start}
+  #view.r-notice>*{grid-column:1/-1}
+  #view.r-notice>.poll{grid-column:auto}
+  /* 미투표 현황·강의·공지 만들기 */
+  #view.r-waiting{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start}
+  #view.r-waiting>*{grid-column:1/-1}
+  #view.r-waiting>.li{grid-column:auto}
+  .llist{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:8px}
+  .llist>.vid,.llist>.card{margin-top:0}
+  #view.r-new{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
+  #view.r-new>.hd{grid-column:1/-1}
+  /* 내 앱: 앱 카드 여러 칸 */
+  #resList{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;align-items:start}
+  #resList>.genre{grid-column:1/-1;margin:8px 0 0}
+  #resList>.appitem{margin-top:0}
+  #resList>.msg,#resList>div:not(.appitem):not(.genre){grid-column:1/-1}
+  /* 신청하기: 앱 목록 2칸 */
+  .applist{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+  .applist>.genre{grid-column:1/-1}
+  .applist .row:nth-child(2){border-top:0}
+}

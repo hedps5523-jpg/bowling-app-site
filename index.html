@@ -420,7 +420,7 @@ async function vMembers() {
   setBar("회원"); setNav("members");
   const { d } = await api("members");
   const staff = staffOf(d.role); let f = "all", q = "";
-  const list = h("div", {});
+  const list = h("div", { class: "mlist" });
   const search = h("input", { type: "text", placeholder: "이름 검색", style: "margin:6px 0", oninput: () => { q = search.value.trim().toLowerCase(); draw(); } });
   const chipBox = h("div", { class: "chips" });
   view.textContent = "";
@@ -444,7 +444,7 @@ async function vLessons() {
   const { d } = await api("lessons");
   const staff = staffOf(d.role); let cat = "전체";
   view.textContent = "";
-  const chipBox = h("div", { class: "chips" }), list = h("div", {});
+  const chipBox = h("div", { class: "chips" }), list = h("div", { class: "llist" });
   view.append(h("div", { class: "hd" }, "볼링 강의"), chipBox, list);
   function draw() {
     const cats = ["전체", ...new Set(d.lessons.map((l) => l.category))];
@@ -473,6 +473,7 @@ async function vLessons() {
 /* ---------- 라우터 ---------- */
 let gErr = null;
 async function route() {
+  { const k = (location.hash.replace(/^#/, "") || "/").split("/")[1] || "home"; view.className = token ? "r-" + k : "r-guest"; }
   if (!token) return guest(gErr);
   const hash = location.hash.replace(/^#/, "") || "/";
   const [, r, arg] = hash.split("/");
