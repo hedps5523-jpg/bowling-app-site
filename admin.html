@@ -75,6 +75,7 @@
     <a class="it" href="/apps"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
     <a class="it" href="/admin" aria-current="page"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
   </div>
+  <div class="fix" id="fix"></div>
 </div>
 <div class="wrap">
 
@@ -90,12 +91,12 @@
 
   <!-- 관리 화면 -->
   <div id="app" hidden>
-    <div class="row" style="justify-content:space-between">
+    <div class="row" id="adminHead" style="justify-content:space-between">
       <h1>관리자</h1>
       <button class="ghost" id="logoutBtn">로그아웃</button>
     </div>
 
-    <div class="card">
+    <div class="card" id="adminStats">
       <div class="stats">
         <div class="stat"><b id="sPending">0</b>접수 대기</div>
         <div class="stat"><b id="sReg">0</b>안내 완료</div>
@@ -107,7 +108,7 @@
       </div>
     </div>
 
-    <div class="row" style="margin-bottom:12px">
+    <div class="row" id="adminTabs" style="margin-bottom:12px">
       <button class="ghost" data-tab="testers">신청자</button>
       <button class="ghost" data-tab="play">앱별 Play 등록</button>
       <button class="ghost" data-tab="apps">앱 관리</button>
@@ -248,7 +249,11 @@ $("loginBtn").onclick = async () => {
 };
 $("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
-async function showApp() { $("loginCard").hidden = true; $("app").hidden = false; await load(); }
+async function showApp() {
+  $("loginCard").hidden = true; $("app").hidden = false;
+  $("fix").append($("adminHead"), $("adminStats"), $("adminTabs"));  // 메뉴 아래 고정
+  await load();
+}
 
 /* ---------- 데이터 ---------- */
 async function load() {

@@ -22,6 +22,7 @@
       <a class="it" href="/apps"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
       <a class="it" href="/admin"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
     </div>
+  <div class="fix" id="fix"></div>
   </div>
 
       <main id="view"><section class="card"><p class="tag">불러오는 중…</p></section></main>
@@ -90,6 +91,7 @@ async function api(action, data = {}) {
 
 /* ---------- 상단 바 / 하단 메뉴 ---------- */
 function setBar(title, back) {
+  $("fix").textContent = "";
   const left = document.querySelector(".tb-left");
   $("appName").textContent = title || "Bowling APP";
   if (back) { left.innerHTML = ""; left.append(h("span", {}, "‹ " + back.label)); left.setAttribute("href", back.href); }
@@ -219,7 +221,7 @@ async function vNotices() {
   setBar("공지 · 투표"); setNav("notices");
   const { d } = await api("notices");
   view.textContent = "";
-  view.append(h("div", { class: "hd" }, "공지 · 투표"));
+  $("fix").append(h("div", { class: "hd" }, "공지 · 투표"));
   if (staffOf(d.role)) view.append(h("a", { class: "btn ghost sm", href: "#/new" }, "+ 공지·투표 올리기 (운영진)"));
   if (!d.notices.length) view.append(h("section", { class: "card" }, h("p", { class: "tag" }, "아직 공지가 없어요.")));
   for (const n of d.notices) {
@@ -422,7 +424,7 @@ async function vMembers() {
   const search = h("input", { type: "text", placeholder: "이름 검색", style: "margin:6px 0", oninput: () => { q = search.value.trim().toLowerCase(); draw(); } });
   const chipBox = h("div", { class: "chips" });
   view.textContent = "";
-  view.append(h("div", { class: "hd" }, "회원"), search, chipBox, list);
+  $("fix").append(h("div", { class: "hd" }, "회원"), search, chipBox); view.append(list);
   function draw() {
     const cnt = (fn2) => d.members.filter(fn2).length;
     const tabs = [["all", `전체 ${d.members.length}`], ["staff", `운영진 ${cnt((m) => m.role !== "member")}`], ["member", `정회원 ${cnt((m) => m.role === "member" && m.status === "active")}`], ["dormant", `휴면 ${cnt((m) => m.status === "dormant")}`]];

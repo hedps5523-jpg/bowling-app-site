@@ -150,3 +150,13 @@
 .strow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
 .strow:first-of-type{border-top:0}
 .privacy{font-size:12.5px;color:var(--sub);background:#f6f8fc;border-radius:10px;padding:10px 12px;margin-top:10px;line-height:1.6}
+
+/* 상단 고정 영역: 메뉴 바로 아래까지 스크롤해도 움직이지 않아요 */
+.appbar .fix{padding:0 0 8px;max-height:55vh;overflow-y:auto;overscroll-behavior:contain}
+.appbar .fix:empty{display:none}
+.appbar .fix h2{margin:6px 0}
+.appbar .fix .hd{margin:6px 0 4px}
+.appbar .fix .card{margin-top:8px;padding:14px}
+.appbar .fix .msg{margin-top:6px}
+.appbar .fix .chips{margin:6px 0 0}
+.appbar .dd{top:var(--tb,62px)}

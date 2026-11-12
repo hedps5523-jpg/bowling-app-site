@@ -26,6 +26,7 @@ function groupByGenre(list) {
 function initMenu() {
   const b = document.getElementById("burger"), dd = document.getElementById("dd"), dim = document.getElementById("dim");
   if (!b || !dd || !dim) return;
+  const tb = document.querySelector(".appbar .topbar"); if (tb) document.documentElement.style.setProperty("--tb", tb.offsetHeight + "px");
   const set = (open) => { dd.hidden = !open; dim.hidden = !open; b.setAttribute("aria-expanded", open ? "true" : "false"); b.textContent = open ? "✕" : "☰"; };
   b.addEventListener("click", () => set(dd.hidden));
   dim.addEventListener("click", () => set(false));
