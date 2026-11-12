@@ -18,7 +18,7 @@
     </div>
     <div class="dim" id="dim" hidden></div>
     <div class="dd" id="dd" hidden>
-      <a class="it" href="/"><span>📝</span><div><b>신청하기</b><small>테스트 앱 사용 신청</small></div></a>
+      <a class="it" href="/join"><span>📝</span><div><b>신청하기</b><small>테스트 앱 사용 신청</small></div></a>
       <a class="it" href="/apps"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
       <a class="it" href="/admin"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
     </div>
@@ -71,7 +71,7 @@ const staffOf = (role) => role === "admin" || role === "staff";
 const ROLE = { admin: "관리자", staff: "운영진", member: "회원" };
 // 실명 + 직함 (예: 홍길동 관리자). 이름이 비었거나 직함과 같으면 직함만.
 function disp(name, role) {
-  const r = role === "admin" ? "관리자" : role === "staff" ? "운영진" : "";
+  const r = role === "admin" ? "관리자" : role === "staff" ? "운영진" : role === "member" ? "정회원" : "";
   name = (name || "").trim();
   if (!r) return name;
   if (!name || name === r) return r;
@@ -419,21 +419,19 @@ async function vMembers() {
   const { d } = await api("members");
   const staff = staffOf(d.role); let f = "all", q = "";
   const list = h("div", {});
-  const search = h("input", { type: "text", placeholder: staff ? "이름·이메일 검색" : "이름 검색", style: "margin:6px 0", oninput: () => { q = search.value.trim().toLowerCase(); draw(); } });
+  const search = h("input", { type: "text", placeholder: "이름 검색", style: "margin:6px 0", oninput: () => { q = search.value.trim().toLowerCase(); draw(); } });
   const chipBox = h("div", { class: "chips" });
   view.textContent = "";
-  view.append(h("div", { class: "hd" }, "회원 ", staff ? h("small", {}, "운영진") : null), search, chipBox, list);
-  if (staff) view.append(h("p", { class: "mut" }, "※ 회원 등록·역할 변경·삭제는 ☰ 메뉴 → 로그인(관리자) → 클럽 회원 탭에서 해요."));
+  view.append(h("div", { class: "hd" }, "회원"), search, chipBox, list);
   function draw() {
     const cnt = (fn2) => d.members.filter(fn2).length;
-    const tabs = [["all", `전체 ${d.members.length}`], ["staff", `운영진 ${cnt((m) => m.role !== "member")}`], ["member", `회원 ${cnt((m) => m.role === "member" && m.status === "active")}`], ["dormant", `휴면 ${cnt((m) => m.status === "dormant")}`]];
+    const tabs = [["all", `전체 ${d.members.length}`], ["staff", `운영진 ${cnt((m) => m.role !== "member")}`], ["member", `정회원 ${cnt((m) => m.role === "member" && m.status === "active")}`], ["dormant", `휴면 ${cnt((m) => m.status === "dormant")}`]];
     chipBox.textContent = ""; tabs.forEach(([k, t]) => chipBox.append(h("button", { class: "chip2" + (f === k ? " on" : ""), type: "button", onclick: () => { f = k; draw(); } }, t)));
     list.textContent = "";
-    const rows = d.members.filter((m) => (f === "all" || (f === "staff" ? m.role !== "member" : f === "dormant" ? m.status === "dormant" : m.role === "member" && m.status === "active")) && (!q || m.name.toLowerCase().includes(q) || (m.email || "").toLowerCase().includes(q)));
+    const rows = d.members.filter((m) => (f === "all" || (f === "staff" ? m.role !== "member" : f === "dormant" ? m.status === "dormant" : m.role === "member" && m.status === "active")) && (!q || m.name.toLowerCase().includes(q)));
     if (!rows.length) list.append(h("p", { class: "mut" }, "해당하는 회원이 없어요."));
     for (const m of rows) list.append(h("div", { class: "li", style: "display:flex;align-items:center;gap:10px" }, h("span", { class: "av", style: "margin:0" }, initial(m.name)),
-      h("div", {}, h("b", {}, disp(m.name, m.role) + " "), m.status === "dormant" ? h("span", { class: "pill warn" }, "휴면") : null,
-        staff ? h("div", { class: "mut" }, `${m.email}${m.avg_score != null ? " · 에버 " + m.avg_score : ""}`) : null)));
+      h("div", {}, h("b", {}, disp(m.name, m.role) + " "), m.status === "dormant" ? h("span", { class: "pill warn" }, "휴면") : null)));
   }
   draw();
 }
