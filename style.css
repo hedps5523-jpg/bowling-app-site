@@ -214,3 +214,59 @@
   .applist>.genre{grid-column:1/-1}
   .applist .row:nth-child(2){border-top:0}
 }
+
+/* ===== 세로 화면 최적화 (휴대폰 · 태블릿 세로 · 폴드 세로) ===== */
+@media (orientation: portrait) {
+  /* 상단 바: 낮게 */
+  .topbar{padding:6px 0}
+  .topbar .lg{width:30px;height:30px;font-size:16px;border-radius:9px}
+  .topbar .tb-title{font-size:17px}
+  .burger{width:40px;height:34px;font-size:18px}
+  /* 고정 영역: 제목과 입력을 한 줄, 칩은 옆으로 넘기기 */
+  .appbar .fix{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:2px 0 8px}
+  .appbar .fix .hd,.appbar .fix h2{margin:0;font-size:17px;flex:0 0 auto}
+  .appbar .fix>input{flex:1;min-width:0;margin:0!important;padding:8px 12px;font-size:15px}
+  .appbar .fix .chips{flex-basis:100%;margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+  .appbar .fix .chips::-webkit-scrollbar{display:none}
+  .appbar .fix .chip2{white-space:nowrap;padding:5px 11px}
+  .appbar .fix .msg{flex:1;min-width:0;margin:0;padding:7px 10px;font-size:13.5px;line-height:1.45}
+  /* 본문: 여백 줄이기 */
+  .wrap{padding-left:12px;padding-right:12px;padding-bottom:66px}
+  .card{padding:14px;margin-top:10px}
+  .pagehead{margin:8px 0 0;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap}
+  .pagehead .badge{margin:0;padding:4px 12px}
+  .li{padding:10px 12px;margin-top:6px}
+  .q{padding:8px 0} .q b{font-size:19px}
+  .grid4{gap:6px}
+  /* 하단 메뉴: 얇게 */
+  .bnav{padding:4px 0 6px}
+  .bnav a span{font-size:18px}
+  /* 회원: 휴대폰 2칸, 태블릿 세로 3칸 이상 */
+  .mlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px}
+  .mlist>.li{margin-top:0;padding:8px 10px}
+  .mlist .av{width:26px;height:26px}
+  /* 내 앱: 카드 여백 줄이기, 넓으면 2칸 */
+  .appitem{padding:10px}
+  .appitem .hint{font-size:12.5px}
+  .appitem .btn{padding:11px 12px}
+  #resList{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;align-items:start}
+  #resList>.genre{grid-column:1/-1;margin:10px 0 0}
+  #resList>.appitem{margin-top:0}
+  #resList>div:not(.appitem):not(.genre){grid-column:1/-1}
+}
+/* 태블릿 세로 · 폴드 세로처럼 넓은 세로 화면 */
+@media (orientation: portrait) and (min-width: 600px) {
+  .wrap{max-width:900px;padding-left:20px;padding-right:20px}
+  #view.r-home{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start}
+  #view.r-home>.pagehead,#view.r-home>button{grid-column:1/-1}
+  #view.r-notices{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:start;padding-top:6px}
+  #view.r-notices>.li{margin-top:0}
+  #view.r-notices>.btn,#view.r-notices>.card{grid-column:1/-1}
+  #view.r-notice{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start}
+  #view.r-notice>*{grid-column:1/-1}
+  #view.r-notice>.poll{grid-column:auto}
+  .llist{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .llist>.vid{margin-top:0}
+  .applist{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+  .applist>.genre{grid-column:1/-1}
+}

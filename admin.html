@@ -84,6 +84,30 @@
     #memberList>.meta{grid-column:1/-1}
     #tab-apps>.card:first-child,#tab-club>.card:first-child,#tab-files>.card:first-child{margin-bottom:10px}
   }
+  /* ===== 세로 화면 최적화 ===== */
+  @media (orientation: portrait) {
+    .appbar{padding:0 12px} .wrap{padding:10px 12px}
+    .topbar{padding:6px 0} .topbar .lg{width:30px;height:30px;font-size:16px} .topbar .tb-title{font-size:17px}
+    #adminHead{margin:0 0 6px} #adminHead h1{margin:0;font-size:18px} #adminHead button{padding:6px 12px}
+    #adminStats{padding:8px;margin-bottom:6px}
+    #adminStats .stats{gap:6px}
+    #adminStats .stat{padding:5px 4px;font-size:12.5px;display:flex;align-items:baseline;justify-content:center;gap:5px}
+    #adminStats .stat b{display:inline;font-size:17px}
+    #adminStats .row{margin-top:6px!important;flex-wrap:nowrap}
+    #adminStats .row button{padding:7px 10px;font-size:13.5px;white-space:nowrap}
+    #adminStats #toggleBtn{flex:1;overflow:hidden;text-overflow:ellipsis}
+    #adminTabs{margin:0!important;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+    #adminTabs::-webkit-scrollbar{display:none}
+    #adminTabs button{white-space:nowrap;padding:7px 12px;font-size:14px}
+    .card{padding:12px}
+    .item{padding:10px 0}
+  }
+  @media (orientation: portrait) and (min-width: 700px) {
+    .wrap,.appbar>.topbar,.appbar>.dd,.appbar>.fix{max-width:960px}
+    #list,#memberList,#appList,#fileList{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+    #list>.item,#memberList>.item,#appList>.item,#fileList>.item{border:1px solid var(--line);border-radius:12px;padding:12px}
+    #memberList>.meta{grid-column:1/-1}
+  }
 </style>
 </head>
 <body>
