@@ -270,3 +270,10 @@
   .applist{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
   .applist>.genre{grid-column:1/-1}
 }
+
+/* 홈: 로그아웃·하단 문구를 하단 메뉴 바로 위로, 간격 최소 */
+body.club .wrap{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
+body.club .wrap>main{flex:0 0 auto}
+body.club footer.clubfoot{margin-top:auto;padding-top:10px;display:flex;flex-direction:column;align-items:stretch;gap:2px}
+body.club footer.clubfoot .btn{padding:9px 12px;font-size:14px}
+body.club footer.clubfoot div{line-height:1.4;font-size:12px}

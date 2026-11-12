@@ -33,3 +33,24 @@ function initMenu() {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") set(false); });
 }
 document.addEventListener("DOMContentLoaded", initMenu);
+
+/* ---------- 하단 메뉴 (모든 화면) : 회원 · 내 앱 · 홈 · 강의 · 공지·투표 ---------- */
+const BNAV = [["members", "/#/members", "👥", "회원"], ["myapps", "/myapps", "📲", "내 앱"], ["home", "/#/", "🏠", "홈"], ["lessons", "/#/lessons", "🎓", "강의"], ["notices", "/#/notices", "📣", "공지·투표"]];
+function setBnav(active) {
+  let nav = document.getElementById("bnav");
+  if (!nav) {
+    nav = document.createElement("nav"); nav.className = "bnav"; nav.id = "bnav"; nav.setAttribute("aria-label", "메뉴");
+    for (const [r, href, ic, label] of BNAV) {
+      const a = document.createElement("a"); a.href = href; a.dataset.r = r;
+      const sp = document.createElement("span"); sp.textContent = ic; a.append(sp, label); nav.append(a);
+    }
+    document.body.append(nav);
+  }
+  nav.hidden = false;
+  nav.querySelectorAll("a").forEach((a) => { const on = a.dataset.r === active; a.classList.toggle("on", on); on ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"); });
+}
+document.addEventListener("DOMContentLoaded", () => {
+  const p = location.pathname.replace(/\.html$/, "");
+  if (p === "/" || p === "/index" || p === "/home") return; // 홈은 자체 라우터가 표시
+  setBnav(p === "/myapps" || p === "/apps" ? "myapps" : "");
+});

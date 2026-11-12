@@ -8,7 +8,7 @@
 <meta name="description" content="Bowling APP 테스트 센터 홈">
 <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body class="club">
 <div class="wrap">
   <div class="appbar">
     <div class="topbar">
@@ -18,22 +18,14 @@
     </div>
     <div class="dim" id="dim" hidden></div>
     <div class="dd" id="dd" hidden>
-      <a class="it" href="/join"><span>📝</span><div><b>신청하기</b><small>테스트 앱 사용 신청</small></div></a>
-      <a class="it" href="/apps"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
-      <a class="it" href="/admin"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
+      <a class="it" href="/admin"><span>🔐</span><div><b>관리</b><small>관리자 전용</small></div></a>
     </div>
   <div class="fix" id="fix"></div>
   </div>
 
       <main id="view"><section class="card"><p class="tag">불러오는 중…</p></section></main>
-  <footer>© Bowling APP · 볼링 클럽</footer>
+  <footer class="clubfoot"><button class="btn ghost sm" id="logoutFoot" type="button" hidden>로그아웃</button><div>© Bowling APP · 볼링 클럽</div></footer>
 </div>
-<nav class="bnav" id="bnav" hidden aria-label="클럽 메뉴">
-  <a href="#/" data-r="home"><span>🏠</span>홈</a>
-  <a href="#/members" data-r="members"><span>👥</span>회원</a>
-  <a href="#/lessons" data-r="lessons"><span>🎓</span>강의</a>
-  <a href="#/notices" data-r="notices"><span>📣</span>공지·투표</a>
-</nav>
 <div class="toastc" id="toastc" hidden></div>
 <script src="/common.js"></script>
 <script src="/google.js"></script>
@@ -98,13 +90,13 @@ function setBar(title, back) {
   else { left.innerHTML = '<span class="lg">🎳</span>'; left.setAttribute("href", "#/"); }
 }
 function setNav(route) {
-  $("bnav").hidden = !token;
-  document.querySelectorAll("#bnav a").forEach((a) => a.classList.toggle("on", a.dataset.r === route));
+  setBnav(route);
+  $("logoutFoot").hidden = !token;
 }
 
 /* ---------- 비회원 화면 ---------- */
 function guest(reason) {
-  $("bnav").hidden = true; setBar("Bowling APP");
+  setNav("home"); setBar("Bowling APP");
   view.textContent = "";
   const c = h("section", { class: "card" }, h("h2", {}, "🎳 볼링 클럽 회원 가입"),
     h("p", { class: "lead" }, "Google 계정으로 로그인하면 클럽 가입과 테스트 앱 신청을 한 번에 할 수 있어요."));
@@ -136,7 +128,7 @@ async function logout() {
 }
 const T_STATUS = { pending: ["승인 대기", "warn"], registered: ["등록 완료", "ok"], rejected: ["제외됨", "bad"] };
 async function onboard(note) {
-  $("bnav").hidden = true; setBar("회원 가입");
+  setNav("home"); setBar("회원 가입");
   const { d } = await signupApi("me");
   view.textContent = "";
   const m = d.member, t = d.tester;
@@ -193,11 +185,6 @@ async function vHome() {
   const { d } = await api("home");
   view.textContent = "";
   view.append(h("div", { class: "pagehead" }, h("p", { class: "tag" }, `${disp(d.me.name, d.me.role)}님, 안녕하세요 👋`), h("span", { class: "badge" }, `클럽 회원 ${d.memberCount}명`)));
-  view.append(h("section", { class: "card" }, h("h2", {}, "빠른 메뉴"), h("div", { class: "grid4" },
-    h("a", { class: "q", href: "#/members" }, h("b", {}, "👥"), "회원"), h("a", { class: "q", href: "#/lessons" }, h("b", {}, "🎓"), "강의"),
-    h("a", { class: "q", href: "#/notices" }, h("b", {}, "📣"), "공지"), h("a", { class: "q", href: "#/notices" }, h("b", {}, "🗳️"), "투표")),
-    h("div", { class: "grid4", style: "margin-top:8px" }, h("a", { class: "q", href: "/myapps" }, h("b", {}, "📲"), "내 앱"),
-      d.me.role === "admin" ? h("a", { class: "q", href: "/admin" }, h("b", {}, "🔐"), "관리") : null)));
   const nx = d.next, c = h("section", { class: "card" }, h("h2", {}, "다음 모임"));
   if (!nx) c.append(h("p", { class: "tag" }, "예정된 모임이 없어요."));
   else {
@@ -213,7 +200,7 @@ async function vHome() {
   const r = h("section", { class: "card" }, h("h2", {}, "최근 공지"));
   if (!d.recent.length) r.append(h("p", { class: "tag" }, "아직 공지가 없어요."));
   for (const n of d.recent) r.append(h("a", { class: "li", href: "#/notice/" + n.id }, n.pinned ? h("span", { class: "pin" }, "고정") : null, n.title));
-  view.append(r, h("button", { class: "btn ghost sm", type: "button", style: "margin-top:14px", onclick: () => { if (confirm("이 기기에서 로그아웃할까요?")) logout(); } }, "로그아웃"));
+  view.append(r);
 }
 
 /* ---------- 공지 · 투표 목록 ---------- */
@@ -489,6 +476,7 @@ async function route() {
     else await vHome();
   } catch (e) { if (e.message !== "auth") { view.textContent = ""; view.append(h("section", { class: "card" }, h("p", {}, "불러오지 못했어요. 잠시 후 새로고침해 주세요."))); } }
 }
+$("logoutFoot").onclick = () => { if (confirm("이 기기에서 로그아웃할까요?")) logout(); };
 window.addEventListener("hashchange", () => { history.replaceState(null, ""); route(); });
 (async () => {
   const g = await googleFinish();

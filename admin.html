@@ -47,6 +47,11 @@
   .grid3 input{min-width:0}
   .grid3 input[type=number]{text-align:center;padding-left:4px;padding-right:4px}
   .appbar{position:sticky;top:0;z-index:50;background:var(--bg);padding:0 16px;border-bottom:1px solid var(--line)}
+  .bnav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;background:#fff;border-top:1px solid var(--line);padding:4px 0 6px}
+  .bnav[hidden]{display:none}
+  .bnav a{flex:1;max-width:140px;margin:0 auto;text-align:center;text-decoration:none;font-size:12px;color:var(--sub);font-weight:600}
+  .bnav a span{display:block;font-size:18px}
+  body{padding-bottom:64px}
   .appbar>.topbar,.appbar>.dd,.appbar>.fix{max-width:900px;margin-left:auto;margin-right:auto}
   .appbar .fix{padding:0 0 8px;max-height:55vh;overflow-y:auto;overscroll-behavior:contain}
   .appbar .fix:empty{display:none}
@@ -119,9 +124,7 @@
   </div>
   <div class="dim" id="dim" hidden></div>
   <div class="dd" id="dd" hidden>
-    <a class="it" href="/join"><span>📝</span><div><b>신청하기</b><small>테스트 앱 사용 신청</small></div></a>
-    <a class="it" href="/apps"><span>📲</span><div><b>내 앱 보기</b><small>이메일 인증 · 설치 링크</small></div></a>
-    <a class="it" href="/admin" aria-current="page"><span>🔐</span><div><b>로그인</b><small>관리자 전용</small></div></a>
+      <a class="it" href="/admin" aria-current="page"><span>🔐</span><div><b>관리</b><small>관리자 전용</small></div></a>
   </div>
   <div class="fix" id="fix"></div>
 </div>
@@ -275,9 +278,16 @@ const fmt = (d) => d ? new Date(d).toLocaleString("ko-KR", { dateStyle: "short",
 let testers = [], apps = [], files = [], tab = "testers", filter = "pending", accepting = true;
 
 /* ---------- 로그인 ---------- */
+// 관리자만: 로그인한 계정이 클럽 회원 표에서 '관리자'인지 확인 (아니면 바로 로그아웃)
+async function isAdmin(email) {
+  const r = await sb.from("members").select("role,status").eq("email", String(email || "").toLowerCase()).maybeSingle();
+  return !!(r.data && r.data.role === "admin" && r.data.status === "active");
+}
 async function init() {
   const { data } = await sb.auth.getSession();
-  data.session ? showApp() : ($("loginCard").hidden = false);
+  if (data.session && await isAdmin(data.session.user.email)) return showApp();
+  if (data.session) await sb.auth.signOut();
+  $("loginCard").hidden = false;
 }
 $("showPw").onchange = (e) => { $("pw").type = e.target.checked ? "text" : "password"; };
 $("loginBtn").onclick = async () => {
@@ -288,6 +298,12 @@ $("loginBtn").onclick = async () => {
     if (error) {
       const detail = [error.code, error.message].filter(Boolean).join(" / ");
       errEl.textContent = "로그인에 실패했어요. (" + (detail || "알 수 없는 오류") + ")";
+      return;
+    }
+    const { data: s } = await sb.auth.getSession();
+    if (!s.session || !(await isAdmin(s.session.user.email))) {
+      await sb.auth.signOut();
+      errEl.textContent = "관리자만 로그인할 수 있어요.";
       return;
     }
     showApp();
@@ -682,5 +698,12 @@ const set=(o)=>{dd.hidden=!o;dim.hidden=!o;b.setAttribute("aria-expanded",o?"tru
 b.addEventListener("click",()=>set(dd.hidden));dim.addEventListener("click",()=>set(false));
 document.addEventListener("keydown",(e)=>{if(e.key==="Escape")set(false)});})();
 </script>
+<nav class="bnav" id="bnav" aria-label="메뉴">
+  <a href="/#/members"><span>👥</span>회원</a>
+  <a href="/myapps"><span>📲</span>내 앱</a>
+  <a href="/#/"><span>🏠</span>홈</a>
+  <a href="/#/lessons"><span>🎓</span>강의</a>
+  <a href="/#/notices"><span>📣</span>공지·투표</a>
+</nav>
 </body>
 </html>
