@@ -26,7 +26,7 @@
 
     <section class="card">
     <div id="resList"></div>
-    <div class="note"><b>처음 한 번만</b> ① 테스터 참여 → Play 화면의 파란 버튼 <b>「Download test app」</b>(테스트 앱 다운로드)을 누르면 끝나요. 다음부터는 <b>② 바로 설치</b>만 누르면 돼요.<br>※ 신청한 구글 계정으로 Play에 로그인되어 있어야 해요.</div>
+    <div class="note"><b>⬇ 설치 · 업데이트</b> → Play 화면의 파란 버튼 <b>「Download test app」</b>(테스트 앱 다운로드)을 누르면 처음 설치와 새 버전 업데이트가 모두 돼요.<br>※ 신청한 구글 계정으로 Play에 로그인되어 있어야 해요.<br>※ Play 스토어에 「업데이트」 대신 「열기」만 보이면, 새 버전이 퍼지는 중이에요. 몇 분 뒤 다시 눌러 주세요.</div>
     <div class="hint" id="who" style="margin-top:10px"></div>
     <a class="btn ghost" href="/apps" id="again" style="margin-top:8px">로그아웃 (이 기기에서 인증 해제)</a>
   </section>
@@ -69,16 +69,17 @@ function appButtons(box, a) {
   box.textContent = "";
   const opt = typeof a.url === "string" && a.url.startsWith(PLAY_PREFIX) ? a.url : null;
   const pkg = typeof a.package === "string" && PKG_RE.test(a.package) ? a.package : null;
-  if (!pkg) { if (opt) { const l = el("a", "btn", "테스터 되기 · 설치하러 가기"); l.href = opt; l.target = "_blank"; l.rel = "noopener"; box.append(l); } return; }
-  const join = el("a", "btn", "① 테스터 참여 (처음 한 번)");
-  if (opt) { join.href = opt; join.target = "_blank"; join.rel = "noopener"; join.onclick = () => { setJoined(pkg, true); setTimeout(() => appButtons(box, a), 400); }; }
-  const inst = el("a", "btn", "② 바로 설치"); inst.href = storeUrl(pkg); if (!IS_ANDROID) { inst.target = "_blank"; inst.rel = "noopener"; }
-  if (joined(pkg) || !opt) {
-    box.append(inst);
-    if (opt) { const again = el("a", "mut", "설치 화면에 '항목을 찾을 수 없음'이 나오면 → ① 테스터 참여 다시 하기"); again.href = opt; again.target = "_blank"; again.rel = "noopener"; again.style.cssText = "display:block;text-align:center;margin-top:8px;font-size:12.5px"; box.append(again); }
-  } else {
-    inst.className = "btn ghost"; inst.style.marginTop = "8px";
-    const tip = el("div", "hint", "① Play 화면이 열리면 파란 「Download test app」 버튼을 누르면 끝나요. 이후엔 ②만 누르면 돼요."); tip.style.margin = "0 0 8px"; box.append(tip, join, inst);
+  // 설치·업데이트는 항상 Play 테스트 페이지를 거쳐요 (거기서 최신 테스트 버전이 받아져요)
+  if (opt) {
+    const tip = el("div", "hint", "Play 화면에서 파란 「Download test app」을 누르면 최신 버전이 설치·업데이트돼요."); tip.style.margin = "0 0 8px";
+    const go = el("a", "btn", "⬇ 설치 · 업데이트"); go.href = opt; go.target = "_blank"; go.rel = "noopener";
+    box.append(tip, go);
+  }
+  if (pkg) {
+    const open = el("a", opt ? "mut" : "btn", opt ? "Play 스토어 앱에서 보기" : "Play 스토어에서 설치");
+    open.href = storeUrl(pkg); if (!IS_ANDROID) { open.target = "_blank"; open.rel = "noopener"; }
+    if (opt) open.style.cssText = "display:block;text-align:center;margin-top:8px;font-size:12.5px";
+    box.append(open);
   }
 }
 
