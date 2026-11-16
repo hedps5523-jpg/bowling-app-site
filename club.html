@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>클럽관리</title>
+<meta name="description" content="볼링클럽 관리 (PC 볼링클럽 웹 버전)">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/club.css">
+</head>
+<body class="pc">
+<div class="wrap">
+  <div class="appbar">
+    <div class="topbar">
+      <a class="tb-left" href="/" aria-label="홈"><span class="lg">🎳</span></a>
+      <b class="tb-title" id="appName">클럽관리</b>
+      <button class="burger" id="burger" type="button" aria-label="메뉴" aria-expanded="false">☰</button>
+    </div>
+    <div class="dim" id="dim" hidden></div>
+    <div class="dd" id="dd" hidden>
+      <a class="it" href="/club" aria-current="page"><span>🎳</span><div><b>클럽관리</b><small>회원·게임·회계·회비 (PC 볼링클럽)</small></div></a>
+      <a class="it" href="/admin"><span>🔐</span><div><b>관리</b><small>관리자 전용</small></div></a>
+    </div>
+    <div class="fix" id="fix">
+      <div class="pchead" id="pchead" hidden>
+        <div class="pcnav" id="pcnav"></div>
+        <div class="pcwho"><span id="authStatus"></span><button type="button" class="pcbtn" id="logoutBtn">로그아웃</button></div>
+      </div>
+    </div>
+  </div>
+  <main id="view"><section class="card"><p class="tag">불러오는 중…</p></section></main>
+</div>
+<div class="pcmodal" id="modal" hidden><div class="pcdlg" role="dialog" aria-modal="true"><div class="pcdlg-h" id="modalTitle"></div><div class="pcdlg-b" id="modalBody"></div><div class="pcdlg-f" id="modalFoot"></div></div></div>
+<div class="pcmenu" id="fileMenu" hidden></div>
+<div class="toastc" id="toastc" hidden></div>
+<script src="/common.js"></script>
+<script src="/club.js"></script>
+</body>
+</html>

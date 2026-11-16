@@ -1,0 +1,62 @@
+/* ===== 클럽관리 (PC 볼링클럽 화면을 웹으로 옮김) ===== */
+body.pc .wrap{max-width:1240px}
+.pchead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;width:100%}
+.pcnav{display:flex;gap:5px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:3px 2px}
+.pcnav::-webkit-scrollbar{display:none}
+.pcwho{display:flex;align-items:center;gap:8px;font-size:12px;color:#465262;margin-left:auto}
+.pcbtn{appearance:none;font:inherit;font-size:13px;font-weight:700;color:#1c2333;background:#e9f0fa;border:1px solid #c3d2e2;border-radius:3px;padding:5px 11px;cursor:pointer;white-space:nowrap}
+.pcbtn:hover{background:#dce8f8}
+.pcbtn.on{background:#d6e5f8;border-color:#2f6bff}
+.pcbtn:disabled{opacity:.45;cursor:not-allowed}
+.pcbtn.file{min-width:56px}
+.pcbtn.sm{font-size:12px;padding:3px 8px;font-weight:600}
+.pcbox{background:#fff;border:1px solid #dfe5ee;border-radius:4px;padding:8px 10px;margin-top:8px}
+.pcform{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.pcform label{font-size:13.5px;font-weight:600;color:#1c2333;white-space:nowrap}
+.pcin,.pcsel{font:inherit;font-size:14px;border:1px solid #b9c4d3;border-radius:2px;padding:5px 8px;background:#fff;color:#1c2333;text-align:center;min-width:0}
+.pcsel{background:#eef1f6}
+.pcin.w5{width:64px}.pcin.w8{width:110px}.pcin.w10{width:130px}.pcin.w12{width:150px}.pcin.w20{width:220px}
+.pcin[type=date]{width:150px}
+.pctable-wrap{margin-top:8px;border:1px solid #cfd8e3;background:#fff;overflow:auto;max-height:calc(100vh - 230px);max-height:calc(100dvh - 230px)}
+table.pct{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+table.pct th{position:sticky;top:0;z-index:1;background:#dbe6f6;border:1px solid #c3d0e2;padding:7px 6px;font-weight:700;white-space:nowrap}
+table.pct td{border-bottom:1px solid #e7ecf3;padding:5px 6px;text-align:center;white-space:nowrap}
+table.pct tbody tr:nth-child(even) td{background:#f7f9fc}
+table.pct tbody tr{cursor:pointer}
+table.pct tbody tr.sel td{background:#cfe0fb !important}
+table.pct tbody tr.out td{color:#8a93a3}
+table.pct td.l{text-align:left}table.pct td.r{text-align:right}
+.pctitle{font-size:20px;font-weight:800;color:#1f4fd1;margin:6px 0}
+.pcnote{font-size:12.5px;color:#5b6478;margin-top:6px}
+.pcro{display:inline-block;font-size:12px;font-weight:700;color:#c97a00;background:#fff0d6;border-radius:99px;padding:1px 8px;margin-left:6px}
+/* 메뉴(FILE) */
+.pcmenu{position:fixed;z-index:80;background:#fff;border:1px solid #b9c4d3;box-shadow:0 6px 18px rgba(0,0,0,.18);min-width:190px;padding:3px 0}
+.pcmenu[hidden]{display:none}
+.pcmenu button{display:block;width:100%;text-align:left;appearance:none;border:0;background:none;font:inherit;font-size:14px;padding:8px 16px;cursor:pointer;color:#1c2333}
+.pcmenu button:hover{background:#dce8f8}
+.pcmenu hr{border:0;border-top:1px solid #e3e8f1;margin:3px 0}
+/* 대화상자 */
+.pcmodal{position:fixed;inset:0;z-index:90;background:rgba(20,28,48,.35);display:flex;align-items:center;justify-content:center;padding:12px}
+.pcmodal[hidden]{display:none}
+.pcdlg{background:#f5f7fb;border:1px solid #9fb0c6;border-radius:6px;box-shadow:0 12px 40px rgba(0,0,0,.3);width:min(520px,100%);max-height:calc(100dvh - 24px);display:flex;flex-direction:column}
+.pcdlg-h{font-weight:800;padding:10px 14px;border-bottom:1px solid #dfe5ee;background:#e9f0fa;border-radius:6px 6px 0 0}
+.pcdlg-b{padding:12px 14px;overflow:auto}
+.pcdlg-f{display:flex;justify-content:flex-end;gap:6px;padding:10px 14px;border-top:1px solid #dfe5ee}
+.pcgrid{display:grid;grid-template-columns:auto 1fr;gap:7px 10px;align-items:center}
+.pcgrid>label{font-size:13.5px;font-weight:600;text-align:right}
+.pcgrid .pcin,.pcgrid .pcsel{width:100%;text-align:left}
+.pcgrid .chk{display:flex;align-items:center;gap:6px;font-size:14px}
+/* 로그인 */
+.pclogin{max-width:420px;margin:24px auto}
+.pclogin .pcin{width:100%;text-align:left;margin-top:6px}
+.pclogin .btn{margin-top:10px}
+@media (orientation: portrait){
+  .pctable-wrap{max-height:none}
+  table.pct{font-size:13px}
+}
+/* 공통 입력칸 규칙(가로 100%)보다 우선 */
+.pcform .pcin,.pcform .pcsel{width:auto;padding:5px 8px;font-size:14px;border-radius:2px;border-width:1px}
+.pcform .pcsel{min-width:96px}
+.pcform .pcin.w5{width:64px}.pcform .pcin.w8{width:110px}.pcform .pcin.w10{width:130px}.pcform .pcin.w12{width:150px}.pcform .pcin.w20{width:220px}
+.pcform .pcin[type=date]{width:150px}
+.pcgrid .pcin,.pcgrid .pcsel{padding:6px 9px;font-size:14px;border-radius:3px;border-width:1px}
