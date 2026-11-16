@@ -784,6 +784,14 @@
   const pcard = (title, ...kids) => h("section", { class: "phcard" }, title ? h("b", { class: "phct" }, title) : null, ...kids.filter(Boolean));
   const psel = (opts, value, onchange, cls = "") => { const s = sel(opts, value, onchange, "phfs " + cls); return s; };
   const pbtn = (t, onclick, cls = "") => h("button", { type: "button", class: "phbtn " + cls, onclick }, t);
+  /* 앞의 n개는 고정, 나머지는 아래에서만 스크롤 (세로 입력모드) */
+  function phRootF(n, ...kids) {
+    const ks = kids.filter(Boolean), sc = h("div", { class: "phscroll" }, ...ks.slice(n));
+    const r = h("div", { class: "tbroot phroot phfixroot" }, h("div", { class: "phfixed" }, ...ks.slice(0, n)), sc);
+    view.textContent = ""; view.append(r);
+    const size = () => { const top = r.getBoundingClientRect().top, bn = document.querySelector(".bnav"), bh = bn && !bn.hidden ? bn.offsetHeight : 0; r.style.setProperty("--phh", Math.max(240, window.innerHeight - top - bh - 4) + "px"); };
+    size(); requestAnimationFrame(size); window.onresize = size; return r;
+  }
   function phRoot(...kids) { const r = h("div", { class: "tbroot phroot" }, ...kids.filter(Boolean)); view.textContent = ""; view.append(r); fit(); return r; }
 
   /* ---- 점수관리: 점수 입력 ---- */
@@ -818,7 +826,7 @@
     const rows = list.map((g) => h("tr", { class: g.recordId === GS.editing ? "sel" : "", onclick: () => { GS.editing = g.recordId; GS.date = g.gameDate; GS.type = gtype(g); GS.member = g.memberId; GS.scores = sc(g).map((v) => (v > 0 ? String(v) : "")); GS.note = g.note || ""; phGames(); window.scrollTo({ top: 0, behavior: "smooth" }); } },
       h("td", { class: "nm" }, nameWithAvg(mm.get(g.memberId), g.gameDate)), ...sc(g).map((v) => h("td", {}, v > 0 ? String(v) : "")), h("td", { class: "nt" }, g.note || "")));
     const tbl = h("div", { class: "phtable" }, h("table", {}, h("thead", {}, h("tr", {}, ["회원명(에버)", "1G", "2G", "3G", "4G", "비고"].map((x) => h("th", {}, x)))), h("tbody", {}, rows)));
-    phRoot(pcard("점수 입력", h("div", { class: "phrow3" }, dSel, tSel, mSel), h("div", { class: "phrow4" }, scoreIn), sumBar, noteIn, h("div", { class: "phbtns" }, del, sv)),
+    phRootF(2, pcard("점수 입력", h("div", { class: "phrow3" }, dSel, tSel, mSel), h("div", { class: "phrow4" }, scoreIn), sumBar, noteIn, h("div", { class: "phbtns" }, del, sv)),
       h("div", { class: "phpreview" }, `입력 중 미리보기: ${weekLabel(GS.date)} / ${list.length}건${GS.editing > 0 ? " · 수정 중" : ""}`), list.length ? tbl : h("div", { class: "phempty" }, "등록된 게임 기록이 없습니다."));
     function clear() { GS.editing = 0; GS.scores = ["", "", "", ""]; GS.note = ""; }
     async function saveIt() {
@@ -877,7 +885,7 @@
       list.append(item);
     });
     const qs = psel(qOpts.map((o) => [o[0], o[0]]), GS.linked, (v) => { GS.linked = v; phQuarter(); }, "big");
-    phRoot(h("div", { class: "phqbar" }, qs, pbtn("조회", phQuarter, "ghost sm")),
+    phRootF(2, h("div", { class: "phqbar" }, qs, pbtn("조회", phQuarter, "ghost sm")),
       h("div", { class: "phqcap" }, h("b", {}, `전회원 · 조정 ${open ? "입력 가능" : `${mnum(from)}/${dnum(from)}부터`}`), h("span", {}, `${months[0]}~${months[2]}월`)),
       list, h("div", { class: "phsticky" }, pbtn("저장", saveQ, "pri")));
     async function saveQ() {
@@ -925,7 +933,7 @@
       return h("div", { class: "phtile " + cls }, h("b", {}, `${mo}월`), h("span", {}, txt));
     });
     const pct = req ? Math.round(Math.min(paid, req) / req * 100) : 0;
-    phRoot(pcard("회비 납부 등록",
+    phRootF(1, pcard("회비 납부 등록",
       psel(members.map((x) => [x.memberId, x.name]), FS.member, (v) => { FS.member = +v; phFees(); }, "center"),
       h("div", { class: "phfeerow" }, h("label", { class: "phchk" }, pre, "선납"), h("label", { class: "phlab" }, h("small", {}, "시작 월"), sSel), h("label", { class: "phlab" }, h("small", {}, "종료 월"), eSel)),
       h("div", { class: "phrow2" }, h("label", { class: "phout" }, h("small", {}, "납부일"), dIn), nIn), calc,
@@ -957,7 +965,7 @@
     const no = (m) => { const l = lockerOf(m.memberId); return l ? String(l.locker_number) : "-"; };
     const ms = activeMembers().sort((a, b) => { const x = no(a) === "-" ? "9999" : no(a), y = no(b) === "-" ? "9999" : no(b); return (x < y ? -1 : x > y ? 1 : 0) || ko.compare(a.name, b.name); });
     const rows = ms.map((m) => h("div", { class: "phlrow" + (m.memberId === KS.sel ? " sel" : ""), onclick: () => { KS.sel = m.memberId; edit(m); } }, h("span", {}, m.name), h("span", {}, no(m)), h("span", {}, m.joinDate ? m.joinDate.slice(2) : "-")));
-    phRoot(h("section", { class: "phcard" }, h("b", { class: "phct big" }, "락카 현황")), h("div", { class: "phlhead" }, h("span", {}, "회원명"), h("span", {}, "번호"), h("span", {}, "가입일")), h("div", { class: "phllist" }, rows));
+    phRootF(2, h("section", { class: "phcard" }, h("b", { class: "phct big" }, "락카 현황")), h("div", { class: "phlhead" }, h("span", {}, "회원명"), h("span", {}, "번호"), h("span", {}, "가입일")), h("div", { class: "phllist" }, rows));
     async function edit(m) {
       if (!canIn()) return;
       const l = lockerOf(m.memberId) || {};
@@ -1149,7 +1157,7 @@
     const rows = list.map((m) => { const lk = lockerOf(m.memberId), b = qBase(m);
       return h("tr", { class: m.memberId === MS.sel ? "sel" : "", onclick: () => { MS.sel = MS.sel === m.memberId ? 0 : m.memberId; phMembers(); }, ondblclick: () => editMember(m) },
         h("td", { class: "nm" }, m.name), h("td", {}, m.phone || "-"), h("td", {}, m.grade || "-"), h("td", {}, b > 0 ? String(b) : "-"), h("td", {}, lk ? lk.locker_number : "-")); });
-    phRoot(h("section", { class: "phcard" }, qIn,
+    phRootF(1, h("section", { class: "phcard" }, qIn,
       h("div", { class: "phbtns three" }, pbtn("팝업", () => (window.contactView ? contactView() : toast("연락처를 열 수 없어요."))), pbtn("추가", () => memberForm(null)),
         pbtn("수정", () => { const m = all.find((x) => x.memberId === MS.sel); m ? editMember(m) : toast("수정할 회원을 먼저 선택하세요."); }, "pri"))),
       h("div", { class: "phtable phmem" }, h("table", {}, h("thead", {}, h("tr", {}, ["회원명", "연락처", "구분", "기준에버", "락카번호"].map((x) => h("th", {}, x)))),
@@ -1187,7 +1195,7 @@
       if (!(await confirmBox("선택한 내역을 삭제하시겠습니까?"))) return;
       clear(); await save([op("ledger_entries", "delete", ledgerPayload(e), S.rv.ledger[e.ledgerId])], "장부가 삭제되었습니다.");
     }
-    phRoot(h("section", { class: "phcard" }, h("b", { class: "phct" }, "장부 입력"),
+    phRootF(2, h("section", { class: "phcard" }, h("b", { class: "phct" }, "장부 입력"),
       h("div", { class: "phrow2e" }, dIn, tSel), cSel, h("div", { class: "phrow2e" }, aIn, nIn),
       h("div", { class: "phbtns three" }, LS.editing > 0 ? pbtn("삭제", delP) : pbtn("초기화", () => { clear(); phLedger(); }), pbtn("수정", () => saveP(true)), pbtn("저장", () => saveP(false), "pri"))),
       h("div", { class: "phpreview" }, `입력 중 월별 미리보기: ${+mk.slice(5)}월 / ${list.length}건`),
@@ -1226,8 +1234,6 @@
       secSel.onchange = () => go(secSel.value);
       nav.append(h("b", { class: "phclub" }, mgr || "클럽관리"), secSel);
       const tools = h("span", { class: "phtools", id: "tbpill" });
-      if (canIn()) tools.append(h("button", { type: "button", class: "phmodebtn" + (inputMode() ? " in" : ""), title: inputMode() ? "조회모드로 전환" : "입력모드로 전환",
-        onclick: () => { TB.input = !inputMode(); if (!phList().some(([k]) => k === current)) current = "games"; render(); } }, inputMode() ? "✎" : "🔍"));
       tools.append(h("button", { type: "button", class: "phmenu pcbtn file", title: "메뉴", onclick: (e) => openFileMenu(e.currentTarget) }, "☰"));
       $("authStatus").before(tools);
       $("authStatus").textContent = "";

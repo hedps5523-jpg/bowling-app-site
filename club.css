@@ -633,3 +633,27 @@ body.phmode .phle{padding:6px 12px}body.phmode .phle .l1 b{font-size:15px}body.p
 body.phmode .phtable.phmem th:first-child{width:19%}body.phmode .phtable.phmem th:nth-child(2){width:31%}body.phmode .phtable.phmem th:nth-child(3){width:19%}body.phmode .phtable.phmem th:nth-child(4){width:16%}body.phmode .phtable.phmem th:last-child{width:15%}
 body.phmode .phtable.phmem td{font-size:13px;padding:0 1px}body.phmode .phtable.phmem td.nm{font-size:14px}
 body.phmode .phtable.phmem th{font-size:12.5px;padding:0}
+
+/* ===== 세로 입력모드: 상단 고정 + 아래 영역만 스크롤 ===== */
+body.phmode.phlock{overflow:hidden}
+.phfixroot{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+.phfixed{flex:none}
+.phscroll{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:8px}
+.phscroll .phtable{border-radius:0}
+.phscroll .phtable th{position:sticky;top:0;z-index:2}
+.phscroll .phllist2,.phscroll .phqlist{max-height:none;overflow:visible;padding-bottom:4px}
+.phscroll .phsticky{bottom:6px;margin-top:-58px}
+.phfixed .phlhead{padding:4px 0 4px;background:#F1F5FB}
+/* 점수 입력 영역 높이 줄이기 */
+body.phmode .phfixed .phcard{padding:8px;gap:4px;margin-bottom:4px}
+body.phmode .phfixed .phin{height:36px;font-size:15px}
+body.phmode .phfixed .phfs{height:36px!important;font-size:15px!important}
+body.phmode .phfixed .phbtn{height:38px;font-size:15px}
+body.phmode .phfixed .phsumbar{height:28px;font-size:12.5px;gap:18px}
+body.phmode .phfixed .phpreview{padding:4px 12px;margin-bottom:4px}
+body.phmode .phfixed .phrow3,body.phmode .phfixed .phrow4{gap:4px}
+body.phmode .phfixed .phct{font-size:15px}
+body.phmode .phfixed .phqbar{padding:2px 6px 2px 12px;margin-bottom:2px}
+body.phmode .tbroot.phfixroot{height:var(--phh,auto)!important}
+body.phmode:has(.phfixroot),html:has(body.phmode .phfixroot){overflow:hidden}
+.phscroll .phtable{overflow:visible}.phscroll .phtable table{border-collapse:separate;border-spacing:0}
