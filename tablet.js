@@ -337,7 +337,7 @@
         return span;
       };
       body = table({ headers: ["순번", "회원명(에버)", "누적에버", "출석일수", ...gs.map((g) => g.label.replace("월", "월 "))],
-        rows: ids.map((id) => { const l = yearGames.get(id); return [String(id), nameWithAvg(mm.get(id), yearEndRef(year)), fmt1(recAvg(l)), String(new Set(l.map((g) => g.gameDate)).size), ...gs.map(() => "")]; }),
+        rows: ids.map((id, i) => { const l = yearGames.get(id); return [String(i + 1), nameWithAvg(mm.get(id), yearEndRef(year)), fmt1(recAvg(l)), String(new Set(l.map((g) => g.gameDate)).size), ...gs.map(() => "")]; }),
         weights: [60, 150, 100, 90, ...gs.map(() => (n <= 4 ? 260 : 200))], aligns: [0, 0, 0, 0, ...gs.map(() => 2)], cls: n >= 5 ? "small" : "",
         custom: (r, c) => (c >= 4 ? cellOf(ids[r], c - 4) : null) }) || empty("조회된 자료가 없습니다.");
     } else if (report === "순위표") {
