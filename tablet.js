@@ -1234,7 +1234,13 @@
       secSel.onchange = () => go(secSel.value);
       nav.append(h("b", { class: "phclub" }, mgr || "클럽관리"), secSel);
       const tools = h("span", { class: "phtools", id: "tbpill" });
-      if (inputMode()) tools.append(h("button", { type: "button", class: "phmenu pcbtn file", title: "메뉴", onclick: (e) => openFileMenu(e.currentTarget) }, "☰"));
+      tools.append(h("button", { type: "button", class: "phmenu pcbtn file", title: "메뉴", onclick: (e) => {
+        if (inputMode()) return openFileMenu(e.currentTarget);
+        const m = $("fileMenu"); if (!m.hidden) { m.hidden = true; return; }
+        m.textContent = ""; const it = (t, href) => h("button", { type: "button", onclick: () => { m.hidden = true; location.href = href; } }, t);
+        m.append(it("🎳 클럽관리", "/club"), it("🔐 관리", "/admin"), it("🏠 홈으로", "/"));
+        const r = e.currentTarget.getBoundingClientRect(); m.style.left = Math.max(8, r.right - 170) + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
+      } }, "☰"));
       $("authStatus").before(tools);
       $("authStatus").textContent = "";
       $("appName").textContent = mgr || (VIEWONLY ? "기록 조회" : "클럽관리");
