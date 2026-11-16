@@ -871,15 +871,10 @@
           h("span", { class: "acc" }, h("small", {}, "총 누적에버"), h("b", {}, r.recs.some((g) => cnt(g) > 0) ? r.avg.toFixed(1) : "-")), h("i", { class: "chev" }, isOpen ? "︿" : "﹀")));
       if (isOpen) {
         const det = h("div", { class: "phqdet" });
-        months.forEach((mo) => {
-          const mr = r.recs.filter((g) => mnum(g.gameDate) === mo);
-          det.append(h("div", { class: "tbmh" }, h("b", {}, `${mo}월`), h("b", { class: "blue" }, "에버 : " + (mr.some((g) => cnt(g) > 0) ? recAvg(mr).toFixed(1) : "-"))));
-          const wc = mr.some((g) => Math.floor((dnum(g.gameDate) - 1) / 7) >= 4) ? 5 : 4;
-          const summ = (lbl, rs) => { const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "-", "-", "-", "-"]; const av = recAvg(rs), bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return [lbl, String(c), av.toFixed(1), String(Math.max(...rs.map(smax))), bw > 0 ? sgn1(av - bw) : "-"]; };
-          const tr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v) => h("td", {}, v)));
-          det.append(h("table", { class: "tbmini" }, h("tbody", {}, tr(["구분", "게임수", "총에버", "최고게임", "편차"], "hd"),
-            ...Array.from({ length: wc }, (_, w) => tr(summ(`${w + 1}주`, mr.filter((g) => Math.floor((dnum(g.gameDate) - 1) / 7) === w)), w % 2 ? "alt" : "")), tr(summ("Total", mr), "tot"))));
-        });
+        const summ = (lbl, rs) => { const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "—", "—", "—", "—"]; const av = recAvg(rs), bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return [lbl, String(c), av.toFixed(1), String(Math.max(...rs.map(smax))), bw > 0 ? sgn1(av - bw) : "—"]; };
+        const tr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { style: i === 4 && /^[-−]\d/.test(v) ? "color:#C0392B" : "" }, v)));
+        det.append(h("div", { class: "phrd" }, h("table", { class: "phst" }, h("tbody", {}, tr(["구분", "게임수", "총에버", "최고게임", "편차"], "hd"),
+          ...months.map((mo) => tr(summ(`${mo}월`, r.recs.filter((g) => mnum(g.gameDate) === mo)))), tr(summ("Total", r.recs), "tot")))));
         item.append(det);
       }
       list.append(item);
@@ -1209,7 +1204,7 @@
   const PC = {}; TB_KEYS.forEach((k) => { PC[k] = TABS[k]; TABS[k] = { render() { TB.wasOn = MODE_KEY(); RENDER[k](); } }; });
   const pcHeader = drawHeader;
   /* 세로 화면 구역 목록 (모바일 볼링클럽: 입력모드 / 조회모드 선택목록) */
-  const PH_INPUT = [["members", "회원관리"], ["games", "점수관리"], ["quarter", "분기에버"], ["ledger", "장부관리"], ["fees", "회비관리"], ["lockers", "락카관리"]];
+  const PH_INPUT = [["games", "점수관리"], ["quarter", "분기에버"], ["ledger", "장부관리"], ["fees", "회비관리"]];
   const PH_QUERY = [["members", "회원"], ["games", "게임기록"], ["ledger", "장부"], ["fees", "회비"], ["lockers", "락카"]];
   const phList = () => (inputMode() ? PH_INPUT : PH_QUERY);
   drawHeader = function () {
@@ -1228,6 +1223,7 @@
     if (phone) {
       // 조회모드에는 분기에버 구역이 없어요 → 게임기록의 분기에버 보고서로 보여 줘요
       if (!inputMode() && current === "quarter") { current = "games"; GS.report = "분기에버"; GS.linked = null; }
+      if (inputMode() && (current === "members" || current === "lockers")) current = "games";
       const list = phList();
       const secSel = h("select", { class: "phsec", "aria-label": "구역 선택" }, list.map(([k, t]) => h("option", { value: k }, t)));
       secSel.value = list.some(([k]) => k === current) ? current : "games";

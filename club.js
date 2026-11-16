@@ -335,7 +335,8 @@ function openFileMenu(btn) {
   m.textContent = "";
   const item = (t, fn) => h("button", { type: "button", onclick: () => { m.hidden = true; fn(); } }, t);
   const view1 = VIEWONLY;
-  m.append(item("회원관리", () => go("members")), ...(view1 ? [] : [item("락카 사용현황", () => go("lockers")), item("연락처(뷰)", contactView)]), h("hr"),
+  const ph = document.body.classList.contains("phmode");
+  m.append(...(ph ? [] : [item("회원관리", () => go("members"))]), ...(view1 ? [] : [...(ph ? [] : [item("락카 사용현황", () => go("lockers"))]), item("연락처(뷰)", contactView)]), ...(ph ? [] : [h("hr")]),
     item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
     ...(Conn.mode === "site" ? [item("클럽 계정 연결 해제", unlinkClub)] : []),
     item(view1 ? "홈으로" : "로그아웃", logout));

@@ -677,3 +677,4 @@ body.phmode .phfixed .phqt{margin:2px 0}
 body.phmode .phfixed .phlbar .phpillbtn{height:34px}body.phmode .phfixed .phlbar .phfsel{height:34px!important}
 .phfixroot>.phsettle .phti{padding:6px 8px;gap:6px;min-width:0}.phfixroot>.phsettle .phti b{font-size:13.5px;white-space:nowrap}.phfixroot>.phsettle .phti small{font-size:11px}
 .phfixroot>.phsettle .phti i{width:30px;height:30px;font-size:15px;flex:none}
+.phqdet{padding:0 12px 6px}.phqdet .phrd{margin:0}
