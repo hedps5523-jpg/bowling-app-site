@@ -98,11 +98,23 @@ const Conn = {
     }
     if (this.siteToken()) {
       const r = await this.bridge("whoami");
-      if (r.ok) { this.mode = "site"; this.me = { ...r.d.me, canRead: true, canWrite: true }; return { ok: true }; }
+      if (r.ok) {
+        if (!r.d.linked) return { need: "link", site: r.d.site };
+        if (!r.d.me) return { need: "link", site: r.d.site, reason: "not_approved", club: r.d.club };
+        this.mode = "site"; this.me = r.d.me; return { ok: true };
+      }
       if (r.status === 403) return { need: "login", reason: "site_member" };
     }
     return { need: "login" };
   },
+  async linkClub(loginId, password) {
+    const r = await this.bridge("link", { login_id: loginId, password });
+    if (!r.ok) {
+      const e = r.d.error;
+      throw new Error(e === "locked" ? "시도 횟수를 넘었어요. 15분 뒤에 다시 시도해 주세요." : e === "already_linked" ? "이 클럽 계정은 이미 다른 홈페이지 계정에 연결되어 있어요." : e === "not_approved" ? "아직 승인되지 않은 클럽 계정이에요. 관리자 승인 후 연결할 수 있어요." : e === "expired" ? "홈페이지 인증이 만료되었어요. 다시 인증해 주세요." : "클럽 아이디 또는 비밀번호가 맞지 않아요.");
+    }
+  },
+  async unlinkClub() { const r = await this.bridge("unlink"); if (!r.ok) throw new Error("연결을 해제하지 못했어요."); },
   async logout() { this.saveMobile(null); this.mode = null; this.me = null; },
 
   async snapshot() {
@@ -275,7 +287,8 @@ function drawHeader() {
   nav.append(h("button", { class: "pcbtn file", type: "button", onclick: (e) => openFileMenu(e.currentTarget) }, "FILE"));
   for (const k of HEADER_TABS) nav.append(h("button", { class: "pcbtn" + (current === k ? " on" : ""), type: "button", onclick: () => go(k) }, TITLES[k]));
   const me = Conn.me;
-  $("authStatus").textContent = me ? `${me.source === "site" ? "홈페이지 " + (me.role === "admin" ? "관리자" : "운영진") : (me.isAdmin ? "관리자" : me.canWrite ? "조회+입력" : "조회 전용")}: ${me.name} · 서버 v${S.dataVersion}` : "";
+  const permTxt = (m) => m.isAdmin ? "관리자" : m.canWrite ? "조회+입력" : "조회 전용";
+  $("authStatus").textContent = me ? (me.source === "site" ? `홈페이지 ${me.siteRole === "admin" ? "관리자" : "운영진"} ${me.siteName} · 클럽계정 ${me.loginId}(${permTxt(me)}) · 서버 v${S.dataVersion}` : `${permTxt(me)}: ${me.name} · 서버 v${S.dataVersion}`) : "";
   $("pchead").hidden = false;
   $("appName").textContent = TITLES[current] || "클럽관리";
 }
@@ -284,7 +297,7 @@ function openFileMenu(btn) {
   const item = (t, fn) => h("button", { type: "button", onclick: () => { m.hidden = true; fn(); } }, t);
   m.append(item("회원관리", () => go("members")), item("락카 사용현황", () => go("lockers")), item("연락처(뷰)", () => go("contacts")), h("hr"),
     item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
-    item("로그아웃", logout));
+    ...(Conn.mode === "site" ? [item("클럽 계정 연결 해제", unlinkClub)] : []), item("로그아웃", logout));
   const r = btn.getBoundingClientRect(); m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
   setTimeout(() => document.addEventListener("click", function off(e) { if (!m.contains(e.target)) { m.hidden = true; document.removeEventListener("click", off); } }), 0);
 }
@@ -1546,6 +1559,29 @@ function loginView(reason) {
   if (!Conn.siteToken()) box.append(h("div", { class: "orline" }, "또는"), h("a", { class: "btn ghost", href: "/apps?next=%2Fhome" }, "홈페이지 관리자·운영진 인증하기"), h("small", { class: "mut", style: "display:block;margin-top:6px" }, "인증 후 다시 클럽관리를 열면 바로 들어와요."));
   view.append(box);
 }
+function linkView(st) {
+  $("pchead").hidden = true; $("appName").textContent = "클럽관리"; view.textContent = "";
+  const id = h("input", { class: "pcin", placeholder: "클럽(모바일 볼링클럽) 아이디", autocomplete: "off", autocapitalize: "off", maxlength: "20" });
+  const pw = h("input", { class: "pcin", type: "password", placeholder: "클럽 비밀번호", autocomplete: "off" });
+  const msg = h("div", { class: "msg" + (st.reason ? " err" : "") }, st.reason === "not_approved" ? "연결된 클럽 계정이 아직 승인되지 않았어요. 관리자 승인 후 다시 열어 주세요." : "");
+  const btn = h("button", { class: "btn", type: "button" }, "연결하기");
+  btn.onclick = async () => {
+    if (!id.value.trim() || !pw.value) { msg.className = "msg err"; msg.textContent = "클럽 아이디와 비밀번호를 입력해 주세요."; return; }
+    btn.disabled = true;
+    try { await Conn.linkClub(id.value.trim(), pw.value); pw.value = ""; await boot(); }
+    catch (e) { msg.className = "msg err"; msg.textContent = e.message; btn.disabled = false; }
+  };
+  pw.onkeydown = (e) => { if (e.key === "Enter") btn.click(); };
+  view.append(h("section", { class: "card pclogin" }, h("h2", {}, "🔗 클럽 계정 연결"),
+    h("p", { class: "lead" }, `${st.site ? st.site.name + "님, " : ""}홈페이지 관리자·운영진 계정으로 확인되었어요. 클럽관리를 쓰려면 본인의 클럽(모바일 볼링클럽) 계정을 한 번 연결해 주세요.`),
+    h("p", { class: "pcnote" }, "• 연결하면 다음부터는 홈페이지 로그인만으로 들어와요.", h("br"), "• 읽기·입력 권한은 연결한 클럽 계정의 권한(관리자 / 조회+입력 / 조회 전용)이 그대로 적용돼요.", h("br"), "• 비밀번호는 연결 확인에만 쓰이고 저장되지 않아요."),
+    id, pw, msg, btn,
+    h("div", { class: "orline" }, "또는"), h("button", { class: "btn ghost", type: "button", onclick: () => { sessionStorage.setItem("clubSkipSite", "1"); loginView(); } }, "클럽 계정으로만 로그인")));
+}
+async function unlinkClub() {
+  if (!(await confirmBox("이 홈페이지 계정과 클럽 계정의 연결을 해제할까요?\n해제하면 다시 클럽 비밀번호로 연결해야 해요."))) return;
+  try { await Conn.unlinkClub(); await Conn.logout(); sessionStorage.removeItem("clubSkipSite"); await boot(); } catch (e) { toast(e.message); }
+}
 async function logout() {
   if (Conn.mode === "site") { if (!(await confirmBox("홈페이지 계정으로 들어와 있어요.\n클럽관리에서만 나가고, 모바일 계정으로 로그인 화면을 열까요?"))) return; }
   await Conn.logout(); sessionStorage.setItem("clubSkipSite", "1"); loginView();
@@ -1555,6 +1591,7 @@ async function boot() {
   let st;
   if (sessionStorage.getItem("clubSkipSite") && !Conn.mobile()) st = { need: "login" };
   else st = await Conn.start();
+  if (st.need === "link") return linkView(st);
   if (st.need) return loginView(st.reason);
   try { await reload(); } catch (e) { if (e.message === "login") return loginView("expired"); view.textContent = ""; view.append(h("section", { class: "card" }, "자료를 불러오지 못했어요: " + e.message)); return; }
   const k = location.hash.replace("#", ""); if (TITLES[k]) current = k;
