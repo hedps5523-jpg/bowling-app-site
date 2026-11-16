@@ -213,80 +213,151 @@ function cbBaseAvg(t, m, y, q) {
   return best ? cbInt(best.average) : cbInt(m.current_base_average);
 }
 
-function cbGames(t, st) {
-  const y = new Date().getFullYear(), q = Math.floor(new Date().getMonth() / 3) + 1;
-  const mem = new Map((t.members || []).map((m) => [m.member_id, m]));
+/* 작은 선택 버튼 줄 (모임기록/분기에버/순위표 …) */
+function cbSeg(opts, val, on) {
+  const row = h("div", { class: "cbseg" });
+  for (const [k, n] of opts) row.append(h("button", { type: "button", class: k === val ? "on" : "", onclick: () => on(k) }, n));
+  return row;
+}
+const cbSelect = (opts, val, on) => { const s = h("select", {}, opts.map(([k, n]) => h("option", { value: k }, n))); s.value = val; s.onchange = () => on(s.value); return s; };
+const cbSumRow = (pairs) => h("div", { class: "cbsum" }, pairs.map(([k, v]) => h("div", {}, h("small", {}, k), h("b", {}, v))));
+const cbTable = (cols, rows, cls) => h("div", { class: "cbscroll" }, h("table", { class: "cbt " + (cls || "") }, h("thead", {}, h("tr", {}, cols.map((c) => h("th", {}, c)))), h("tbody", {}, rows)));
+const cbEmpty = (t) => h("p", { class: "tag" }, t);
+
+/* 같은 회원+날짜+구분은 최신 기록 1건만 (PC·모바일과 같은 규칙) */
+function cbGameRows(t) {
   const latest = new Map();
   for (const r of t.games || []) { const d = cbDate(r.game_date); if (!d) continue; const k = `${r.member_id}|${d}|${(r.meeting_type || "정모").trim()}`; const ex = latest.get(k); if (!ex || r.record_id >= ex.record_id) latest.set(k, r); }
-  const groups = new Map();
-  for (const r of latest.values()) { const d = cbDate(r.game_date), k = `${d}|${(r.meeting_type || "정모").trim()}`; if (!groups.has(k)) groups.set(k, { date: d, type: (r.meeting_type || "정모").trim(), rows: [] }); groups.get(k).rows.push(r); }
-  const list = [...groups.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0) || (a.type < b.type ? -1 : 1));
+  return [...latest.values()].map((r) => ({ mid: r.member_id, d: cbDate(r.game_date), type: (r.meeting_type || "정모").trim(), sc: [r.score1, r.score2, r.score3, r.score4].map(cbInt) }));
+}
+const cbAvgOf = (sc) => { const p = sc.filter((v) => v > 0); return p.length ? p.reduce((a, b) => a + b, 0) / p.length : 0; };
+const cbDev = (d) => h("td", { class: d == null ? "" : d >= 0 ? "cup" : "cdn" }, d == null ? "" : (d >= 0 ? "+" : "") + d.toFixed(1));
+
+function cbGames(t, st) {
+  const now = new Date(), qNow = Math.floor(now.getMonth() / 3) + 1;
+  const mem = new Map((t.members || []).map((m) => [m.member_id, m]));
+  const rows = cbGameRows(t);
   const box = h("div", { class: "cbbody" });
-  if (!list.length) { box.append(h("p", { class: "tag" }, "게임 기록이 아직 없어요.")); return box; }
-  if (st.game == null || !groups.has(st.game)) st.game = `${list[0].date}|${list[0].type}`;
-  const sel = h("select", {}, list.map((g) => h("option", { value: `${g.date}|${g.type}` }, `${g.date.replace(/-/g, ".")} ${g.type}`)));
-  sel.value = st.game;
+  st.gsub = st.gsub || "meeting";
+  const years = [...new Set(rows.map((r) => +r.d.slice(0, 4)).concat([now.getFullYear()]))].sort((a, b) => b - a);
+  if (!st.gy) st.gy = years[0];
   const out = h("div", { class: "cbout" });
+  const nm = (m) => (m && m.name || "").trim() || "(알 수 없음)";
+
+  const meeting = () => {
+    const groups = new Map();
+    for (const r of rows) { const k = `${r.d}|${r.type}`; if (!groups.has(k)) groups.set(k, { d: r.d, type: r.type, rows: [] }); groups.get(k).rows.push(r); }
+    const list = [...groups.values()].sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0) || (a.type < b.type ? -1 : 1));
+    if (!list.length) return out.append(cbEmpty("게임 기록이 아직 없어요."));
+    if (!st.game || !groups.has(st.game)) st.game = `${list[0].d}|${list[0].type}`;
+    const body = h("div", { class: "cbout" });
+    const draw = () => {
+      body.textContent = "";
+      const g = groups.get(st.game), y = +g.d.slice(0, 4), q = Math.floor((+g.d.slice(5, 7) - 1) / 3) + 1;
+      const rs = g.rows.map((r) => { const m = mem.get(r.mid) || {}, avg = cbAvgOf(r.sc), base = cbBaseAvg(t, m, y, q); return { name: nm(m), base, sc: r.sc, avg, dev: avg && base ? avg - base : null }; }).sort((a, b) => b.avg - a.avg);
+      const all = rs.flatMap((r) => r.sc.filter((v) => v > 0)), tot = all.reduce((a, b) => a + b, 0);
+      body.append(cbSumRow([["참가", `${rs.length}명`], ["모임 평균", all.length ? (tot / all.length).toFixed(1) : "-"], ["최고 점수", all.length ? Math.max(...all) : "-"], ["200+ 게임", `${all.filter((v) => v >= 200).length}회`]]),
+        cbTable(["순번", "회원명(에버)", "1G", "2G", "3G", "4G", "평균", "에버편차"], rs.map((r, i) => h("tr", {}, h("td", {}, i + 1), h("td", { class: "nm" }, `${r.name}${r.base ? `(${r.base})` : ""}`), r.sc.map((v) => h("td", { class: v >= 200 ? "hi" : "" }, v || "")), h("td", {}, r.avg ? r.avg.toFixed(1) : ""), cbDev(r.dev)))));
+    };
+    out.append(h("div", { class: "cbflt" }, h("b", {}, "모임"), cbSelect(list.map((g) => [`${g.d}|${g.type}`, `${g.d.replace(/-/g, ".")} ${g.type}`]), st.game, (v) => { st.game = v; draw(); })), body); draw();
+  };
+
+  const quarter = () => {
+    const y = st.gy, cur = y === now.getFullYear() ? qNow : 4;
+    const ms = (t.members || []).filter((m) => !m.deleted_at && !(m.withdrawal_date && cbDate(m.withdrawal_date) <= now.toISOString().slice(0, 10) && !m.rejoin_date))
+      .map((m) => ({ m, v: [1, 2, 3, 4].map((q) => (q <= cur ? cbBaseAvg(t, m, y, q) : 0)) })).sort((a, b) => (b.v[cur - 1] - a.v[cur - 1]) || nm(a.m).localeCompare(nm(b.m), "ko"));
+    out.append(cbTable(["순번", "회원명", "1분기", "2분기", "3분기", "4분기", "변동"], ms.map((r, i) => { const d = cur > 1 && r.v[cur - 1] && r.v[0] ? r.v[cur - 1] - r.v[0] : null; return h("tr", {}, h("td", {}, i + 1), h("td", { class: "nm" }, nm(r.m)), r.v.map((v, k) => h("td", { class: k + 1 === cur ? "cur" : "" }, v || "-")), cbDev(d)); })));
+  };
+
+  const rank = () => {
+    const y = st.gy, agg = new Map();
+    for (const r of rows) { if (+r.d.slice(0, 4) !== y) continue; const a = agg.get(r.mid) || { mid: r.mid, n: 0, sum: 0, hi: 0, h200: 0 }; for (const v of r.sc) if (v > 0) { a.n++; a.sum += v; a.hi = Math.max(a.hi, v); if (v >= 200) a.h200++; } agg.set(r.mid, a); }
+    const q = y === now.getFullYear() ? qNow : 4;
+    const list = [...agg.values()].filter((a) => a.n).map((a) => { const m = mem.get(a.mid) || {}, avg = a.sum / a.n, base = cbBaseAvg(t, m, y, q); return { ...a, name: nm(m), avg, base, dev: base ? avg - base : null }; }).sort((a, b) => b.avg - a.avg || b.n - a.n);
+    if (!list.length) return out.append(cbEmpty(`${y}년 게임 기록이 없어요.`));
+    out.append(cbTable(["순위", "회원명(에버)", "게임수", "평균", "최고", "200+", "에버편차"], list.map((r, i) => h("tr", {}, h("td", {}, i + 1), h("td", { class: "nm" }, `${r.name}${r.base ? `(${r.base})` : ""}`), h("td", {}, r.n), h("td", {}, r.avg.toFixed(1)), h("td", {}, r.hi), h("td", {}, r.h200), cbDev(r.dev)))));
+  };
+
   const draw = () => {
     out.textContent = "";
-    const g = groups.get(sel.value), rows = g.rows.map((r) => {
-      const sc = [r.score1, r.score2, r.score3, r.score4].map(cbInt), played = sc.filter((v) => v > 0), m = mem.get(r.member_id) || {};
-      const avg = played.length ? played.reduce((a, b) => a + b, 0) / played.length : 0, base = cbBaseAvg(t, m, y, q);
-      return { name: (m.name || "").trim() || "(알 수 없음)", base, sc, avg, dev: avg && base ? avg - base : null };
-    }).sort((a, b) => b.avg - a.avg);
-    const all = rows.flatMap((r) => r.sc.filter((v) => v > 0));
-    const tot = all.reduce((a, b) => a + b, 0);
-    out.append(h("div", { class: "cbsum" },
-      [["참가", `${rows.length}명`], ["모임 평균", all.length ? (tot / all.length).toFixed(1) : "-"], ["최고 점수", all.length ? Math.max(...all) : "-"], ["200+ 게임", `${all.filter((v) => v >= 200).length}회`]].map(([k, v]) => h("div", {}, h("small", {}, k), h("b", {}, v)))));
-    const tb = h("table", { class: "cbt" }, h("thead", {}, h("tr", {}, ["순번", "회원명(에버)", "1G", "2G", "3G", "4G", "평균", "에버편차"].map((c) => h("th", {}, c)))),
-      h("tbody", {}, rows.map((r, i) => h("tr", {}, h("td", {}, i + 1), h("td", { class: "nm" }, `${r.name}${r.base ? `(${r.base})` : ""}`),
-        r.sc.map((v) => h("td", { class: v >= 200 ? "hi" : "" }, v || "")), h("td", {}, r.avg ? r.avg.toFixed(1) : ""),
-        h("td", { class: r.dev == null ? "" : r.dev >= 0 ? "cup" : "cdn" }, r.dev == null ? "" : (r.dev >= 0 ? "+" : "") + r.dev.toFixed(1))))));
-    out.append(h("div", { class: "cbscroll" }, tb));
+    if (st.gsub === "meeting") meeting(); else if (st.gsub === "quarter") quarter(); else rank();
   };
-  sel.onchange = () => { st.game = sel.value; draw(); };
-  box.append(h("div", { class: "cbflt" }, h("b", {}, "모임"), sel), out); draw();
+  const bar = h("div", { class: "cbflt" });
+  const drawBar = () => {
+    bar.textContent = "";
+    bar.append(cbSeg([["meeting", "모임기록"], ["quarter", "분기에버"], ["rank", "순위표"]], st.gsub, (k) => { st.gsub = k; drawBar(); draw(); }));
+    if (st.gsub !== "meeting") bar.append(cbSelect(years.map((y) => [y, `${y}년`]), st.gy, (v) => { st.gy = +v; draw(); }));
+  };
+  drawBar(); draw();
+  box.append(bar, out);
   return box;
 }
 
-function cbLedger(t) {
+function cbLedger(t, st) {
   const rows = (t.ledger_entries || []).filter((r) => cbDate(r.entry_date)).map((r) => ({ id: r.ledger_id, d: cbDate(r.entry_date), type: r.type || "", cat: r.category || "", amt: cbInt(r.amount), note: r.note || "" }))
     .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0) || a.id - b.id);
   const box = h("div", { class: "cbbody" });
-  if (!rows.length) { box.append(h("p", { class: "tag" }, "회계 내역이 아직 없어요.")); return box; }
+  if (!rows.length) { box.append(cbEmpty("회계 내역이 아직 없어요.")); return box; }
   let bal = 0; for (const r of rows) { bal += r.type === "수입" ? r.amt : r.type === "지출" ? -r.amt : 0; r.bal = bal; }
-  const inc = rows.filter((r) => r.type === "수입").reduce((a, r) => a + r.amt, 0), exp = rows.filter((r) => r.type === "지출").reduce((a, r) => a + r.amt, 0);
-  const ym = new Date().toISOString().slice(0, 7), mInc = rows.filter((r) => r.type === "수입" && r.d.startsWith(ym)).reduce((a, r) => a + r.amt, 0);
-  box.append(h("div", { class: "cbsum" }, [["수입 합계", inc], ["지출 합계", exp], ["잔액", inc - exp], ["이번 달 수입", mInc]].map(([k, v]) => h("div", {}, h("small", {}, k), h("b", {}, cbMoney(v))))));
-  const rev = [...rows].reverse();
-  box.append(h("div", { class: "cbscroll" }, h("table", { class: "cbt" }, h("thead", {}, h("tr", {}, ["날짜", "구분", "내역", "금액", "잔액", "비고"].map((c) => h("th", {}, c)))),
-    h("tbody", {}, rev.map((r) => h("tr", {}, h("td", {}, cbMD(r.d)), h("td", { class: r.type === "수입" ? "cup" : "cdn" }, r.type), h("td", {}, r.cat), h("td", {}, cbMoney(r.amt)), h("td", {}, cbMoney(r.bal)), h("td", { class: "nt" }, r.note)))))));
+  const inOf = (l) => l.filter((r) => r.type === "수입").reduce((a, r) => a + r.amt, 0), exOf = (l) => l.filter((r) => r.type === "지출").reduce((a, r) => a + r.amt, 0);
+  const months = [...new Set(rows.map((r) => r.d.slice(0, 7)))].sort();
+  st.lsub = st.lsub || "month";
+  if (!st.lm || !months.includes(st.lm)) st.lm = months[months.length - 1];
+  const out = h("div", { class: "cbout" }), bar = h("div", { class: "cbflt" });
+  const entryTable = (l) => cbTable(["날짜", "구분", "내역", "금액", "잔액", "비고"], l.map((r) => h("tr", {}, h("td", {}, cbMD(r.d)), h("td", { class: r.type === "수입" ? "cup" : "cdn" }, r.type), h("td", {}, r.cat), h("td", {}, cbMoney(r.amt)), h("td", {}, cbMoney(r.bal)), h("td", { class: "nt" }, r.note))));
+  const draw = () => {
+    out.textContent = "";
+    if (st.lsub === "month") {
+      const l = rows.filter((r) => r.d.startsWith(st.lm)), i = inOf(l), e = exOf(l), last = l.length ? l[l.length - 1].bal : 0;
+      out.append(cbSumRow([["월 수입", cbMoney(i)], ["월 지출", cbMoney(e)], ["월 잔액", cbMoney(i - e)], ["총 잔액", cbMoney(last)]]), entryTable(l));
+    } else {
+      let run = 0;
+      const mrows = months.map((m) => { const l = rows.filter((r) => r.d.startsWith(m)), i = inOf(l), e = exOf(l); run += i - e; return { m, i, e, b: i - e, run }; });
+      out.append(cbSumRow([["총 수입", cbMoney(inOf(rows))], ["총 지출", cbMoney(exOf(rows))], ["총 잔액", cbMoney(bal)], ["기간", `${months.length}개월`]]),
+        cbTable(["월", "월 수입", "월 지출", "월 잔액", "총 잔액"], mrows.map((r) => h("tr", {}, h("td", {}, r.m.replace("-", ".")), h("td", { class: "cup" }, cbMoney(r.i)), h("td", { class: "cdn" }, cbMoney(r.e)), h("td", {}, cbMoney(r.b)), h("td", { class: "tot" }, cbMoney(r.run))))));
+    }
+  };
+  const drawBar = () => {
+    bar.textContent = "";
+    bar.append(cbSeg([["month", "월별"], ["all", "전체"]], st.lsub, (k) => { st.lsub = k; drawBar(); draw(); }));
+    if (st.lsub === "month") bar.append(cbSelect([...months].reverse().map((m) => [m, `${m.slice(0, 4)}년 ${+m.slice(5)}월`]), st.lm, (v) => { st.lm = v; draw(); }));
+  };
+  drawBar(); draw(); box.append(bar, out);
   return box;
 }
 
-function cbFees(t, settings) {
-  const y = new Date().getFullYear(), cm = new Date().getMonth() + 1, today = new Date().toISOString().slice(0, 10);
-  const paid = new Map(); for (const r of t.fee_payments || []) if (r.fee_year === y) paid.set(`${r.member_id}|${r.fee_month}`, r);
-  const fee = cbInt((settings || {}).key_fee_amount) || 20000;
-  const members = (t.members || []).filter((m) => !m.deleted_at && !(m.withdrawal_date && today >= cbDate(m.withdrawal_date) && !(m.rejoin_date && today < cbDate(m.rejoin_date))));
+function cbFees(t, settings, st) {
+  const now = new Date(), today = now.toISOString().slice(0, 10), fee = cbInt((settings || {}).key_fee_amount) || 20000;
+  const members = (t.members || []).filter((m) => !m.deleted_at && !(m.withdrawal_date && today >= cbDate(m.withdrawal_date) && !(m.rejoin_date && today < cbDate(m.rejoin_date)))).sort((a, b) => a.member_id - b.member_id);
   const box = h("div", { class: "cbbody" });
-  if (!members.length) { box.append(h("p", { class: "tag" }, "회원이 없어요.")); return box; }
-  const cell = (m, mo) => {
-    const p = paid.get(`${m.member_id}|${mo}`); if (p) return { t: cbMD(cbDate(p.paid_date)) || "납부", c: "cok" };
+  if (!members.length) { box.append(cbEmpty("회원이 없어요.")); return box; }
+  const years = [...new Set((t.fee_payments || []).map((r) => r.fee_year).concat([now.getFullYear()]))].sort((a, b) => b - a);
+  if (!st.fy) st.fy = now.getFullYear();
+  if (!members.some((m) => m.member_id === st.fm)) st.fm = members[0].member_id;
+  const state = (m, y, mo, p) => {
+    if (p) return { t: "납부", c: "cok" };
     if (m.fee_exempt) return { t: "면제", c: "cex" };
     const fy = cbInt(m.fee_start_year), fm = cbInt(m.fee_start_month) || 1;
-    if (fy > 0 && (y < fy || (y === fy && mo < fm))) return { t: "-", c: "" };
+    if (fy > 0 && (y < fy || (y === fy && mo < fm))) return { t: "해당 없음", c: "cex" };
     if (m.executive_three_month_exempt && mo >= 10) return { t: "면제", c: "cex" };
-    const wd = cbDate(m.withdrawal_date); if (wd && `${y}-${String(mo).padStart(2, "0")}-01` >= wd && !m.rejoin_date) return { t: "-", c: "" };
-    return mo < cm ? { t: "미납", c: "cno" } : { t: "", c: "" };
+    const wd = cbDate(m.withdrawal_date); if (wd && `${y}-${String(mo).padStart(2, "0")}-01` >= wd && !m.rejoin_date) return { t: "해당 없음", c: "cex" };
+    const due = y < now.getFullYear() || (y === now.getFullYear() && mo <= now.getMonth() + 1);
+    return due ? (y === now.getFullYear() && mo === now.getMonth() + 1 ? { t: "예정", c: "cpd" } : { t: "미납", c: "cno" }) : { t: "-", c: "" };
   };
-  let done = 0, miss = 0, total = 0; for (const r of paid.values()) total += cbInt(r.amount);
-  const st = new Map(members.map((m) => [m.member_id, cell(m, cm)]));
-  for (const v of st.values()) { if (v.c === "cok" || v.c === "cex") done++; else if (v.c === "cno") miss++; }
-  box.append(h("div", { class: "cbsum" }, [["월회비", `${cbMoney(fee)}원`], [`${cm}월 완납·면제`, `${done}명`], [`${cm}월 미납`, `${miss}명`], [`${y}년 총 납부`, cbMoney(total)]].map(([k, v]) => h("div", {}, h("small", {}, k), h("b", {}, v)))));
-  const sorted = [...members].sort((a, b) => a.member_id - b.member_id);
-  box.append(h("div", { class: "cbscroll" }, h("table", { class: "cbt cbfee" }, h("thead", {}, h("tr", {}, h("th", {}, "회원명"), h("th", {}, "등급"), Array.from({ length: 12 }, (_, i) => h("th", {}, `${i + 1}월`)))),
-    h("tbody", {}, sorted.map((m) => h("tr", {}, h("td", { class: "nm" }, (m.name || "").trim()), h("td", {}, m.grade || ""), Array.from({ length: 12 }, (_, i) => { const c = cell(m, i + 1); return h("td", { class: c.c + (i + 1 === cm ? " cur" : "") }, c.t); })))))));
+  const list = h("div", { class: "cbmem" }), detail = h("div", { class: "cbout" });
+  const drawList = () => { list.textContent = ""; for (const m of members) list.append(h("button", { type: "button", class: m.member_id === st.fm ? "on" : "", onclick: () => { st.fm = m.member_id; drawList(); drawDetail(); } }, h("span", {}, (m.name || "").trim()), h("small", {}, m.grade || ""))); };
+  const drawDetail = () => {
+    detail.textContent = "";
+    const m = members.find((x) => x.member_id === st.fm), y = st.fy, paid = new Map();
+    for (const r of t.fee_payments || []) if (r.member_id === m.member_id && r.fee_year === y) paid.set(r.fee_month, r);
+    const ms = Array.from({ length: 12 }, (_, i) => ({ mo: i + 1, p: paid.get(i + 1) })).map((x) => ({ ...x, s: state(m, y, x.mo, x.p) }));
+    const n = ms.filter((x) => x.s.c === "cok").length, miss = ms.filter((x) => x.s.c === "cno").length, tot = ms.reduce((a, x) => a + (x.p ? cbInt(x.p.amount) : 0), 0);
+    detail.append(h("div", { class: "cbflt" }, h("b", {}, `${(m.name || "").trim()} ${m.grade || ""}`), cbSelect(years.map((v) => [v, `${v}년`]), y, (v) => { st.fy = +v; drawDetail(); })),
+      cbSumRow([["월회비", `${cbMoney(fee)}원`], ["납부", `${n}개월`], ["미납", `${miss}개월`], [`${y}년 납부 합계`, `${cbMoney(tot)}원`]]),
+      cbTable(["월", "상태", "납부일", "금액", "비고"], ms.map((x) => h("tr", {}, h("td", {}, `${x.mo}월`), h("td", { class: x.s.c }, x.s.t), h("td", {}, x.p ? cbMD(cbDate(x.p.paid_date)) : ""), h("td", {}, x.p ? cbMoney(x.p.amount) : ""), h("td", { class: "nt" }, x.p ? x.p.note || "" : "")))));
+  };
+  drawList(); drawDetail();
+  box.append(h("div", { class: "cbfeewrap" }, list, detail));
   return box;
 }
 
@@ -302,7 +373,7 @@ function clubPanel() {
     body.textContent = "";
     if (!data) return;
     const t = data.tables || {};
-    body.append(st.tab === "games" ? cbGames(t, st) : st.tab === "ledger" ? cbLedger(t) : cbFees(t, Object.fromEntries((t.app_settings || []).map((r) => [r.setting_key, r.setting_value]))),
+    body.append(st.tab === "games" ? cbGames(t, st) : st.tab === "ledger" ? cbLedger(t, st) : cbFees(t, Object.fromEntries((t.app_settings || []).map((r) => [r.setting_key, r.setting_value])), st),
       h("p", { class: "cbro" }, "※ 홈에서는 조회만 가능해요. 입력·수정은 ", h("a", { href: "/club" }, "클럽관리"), "에서 해요."));
   };
   const load = async (force) => {
