@@ -1247,6 +1247,63 @@ TABS.quarter = {
 };
 
 /* =====================================================================
+   4-7) 락카 사용현황 (PC createLockerPanel / getLockerRows / editLockerDialog)
+   ===================================================================== */
+const sharedAmount = (k) => { const n = parseInt(String(S.settings[k] ?? "0").replace(/,/g, "").trim(), 10); return Number.isFinite(n) ? Math.max(0, n) : 0; };
+const sharedMD = (k, def) => { const v = String(S.settings[k] ?? def ?? "").trim(); const m = v.match(/^(\d{1,2})-(\d{1,2})$/); return m ? `${S.year}-${pad2(m[1])}-${pad2(m[2])}` : null; };
+Object.assign(Svc, {
+  lockerRows() {
+    const dep = sharedAmount("key_locker_deposit"), fee = sharedAmount("key_locker_yearly_fee"), cd = sharedMD("key_locker_contract_date", "01-01"), ed = sharedMD("key_locker_expiry_date", "12-31");
+    const all = this.getMembers(), rows = [];
+    all.forEach((m, idx) => {
+      if (this.isWithdrawn(m)) return;
+      const l = S.lockers[m.memberId] || { mainLocker: "", deposit: 0, yearFee: 0, contractDate: "", expireDate: "" };
+      rows.push({ memberId: m.memberId, seq: idx + 1, name: m.name, base: this.effectiveBaseAverage(m), phone: m.phone, main: l.mainLocker || "", deposit: l.deposit > 0 ? l.deposit : dep, yearFee: l.yearFee > 0 ? l.yearFee : fee,
+        contract: normDate(l.contractDate) || cd, expire: normDate(l.expireDate) || ed, join: m.rejoinDate && todayStr() >= m.rejoinDate ? m.rejoinDate : m.joinDate });
+    });
+    return rows.sort((a, b) => b.base - a.base || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) || a.memberId - b.memberId);
+  },
+});
+const blank0 = (n) => n ? money(n) : "";
+function lockerOps(memberId, number, deposit, yearFee, contract, expire) {
+  const ex = S.lockerRows.find((r) => int(r.member_id) === memberId);
+  if (number) { const dup = S.lockerRows.find((r) => int(r.member_id) !== memberId && String(r.locker_number || "").trim().toLowerCase() === number.toLowerCase()); if (dup) throw new Error(`락카번호 ${number}은(는) 이미 사용 중입니다.`); }
+  const payload = { locker_number: number, member_id: memberId, deposit, yearly_fee: yearFee, contract_date: contract || "", expiry_date: expire || "", status: number ? "사용중" : "사용 가능", note: "" };
+  if (!number) return ex ? [op("lockers", "delete", { ...payload, locker_id: ex.locker_id }, ex.row_version)] : [];
+  if (!ex) return [op("lockers", "insert", payload)];
+  const same = String(ex.locker_number || "").trim() === number && int(ex.deposit) === deposit && int(ex.yearly_fee) === yearFee && String(ex.contract_date || "") === (contract || "") && String(ex.expiry_date || "") === (expire || "") && String(ex.status || "").trim() === payload.status && String(ex.note || "").trim() === "";
+  return same ? [] : [op("lockers", "update", { ...payload, locker_id: ex.locker_id }, ex.row_version)];
+}
+const LK = { sel: null };
+TABS.lockers = {
+  render() {
+    const rows = Svc.lockerRows();
+    const cols = [{ t: "순번", get: (r, i) => i + 1 }, { t: "회원명", get: (r) => r.name }, { t: "에버", get: (r) => r.base }, { t: "연락처", get: (r) => r.phone }, { t: "메인락커", get: (r) => r.main },
+      { t: "보증금", cls: "r", get: (r) => blank0(r.deposit) }, { t: "1년사용료", cls: "r", get: (r) => blank0(r.yearFee) }, { t: "계약일", get: (r) => yymmdd(r.contract) }, { t: "만료일", get: (r) => yymmdd(r.expire) }, { t: "가입일", get: (r) => yymmdd(r.join) }];
+    const table = pcTable(cols, rows, { onSelect: (r, i, dbl) => { LK.sel = r; if (dbl) editLocker(r); } });
+    if (LK.sel) { const k = rows.findIndex((r) => r.memberId === LK.sel.memberId); if (k >= 0) table.querySelectorAll("tbody tr")[k].classList.add("sel"); }
+    const rep = h("button", { class: "pcbtn", type: "button" }, "보고서"); rep.onclick = () => reportModal("락카 사용 현황", "", pcTable(cols, rows));
+    const edit = h("button", { class: "pcbtn", type: "button" }, "수정"); edit.onclick = () => LK.sel ? editLocker(LK.sel) : toast("수정할 회원을 선택하세요.");
+    view.append(h("section", { class: "pcbox" }, h("div", { class: "pcform", style: "justify-content:space-between" }, h("span", { class: "pctitle", style: "margin:0" }, `${S.year}년 한가람 B.C 락카 사용현황`), h("span", {}, rep, " ", edit, " ", roBadge()))), table);
+  },
+};
+async function editLocker(r) {
+  const mk = (v, cls = "pcin") => h("input", { class: cls, value: v ?? "" });
+  const main = mk(r.main), dep = mk(r.deposit ? String(r.deposit) : ""), fee = mk(r.yearFee ? String(r.yearFee) : ""), con = mk(r.contract || ""), exp = mk(r.expire || "");
+  const g = h("div", { class: "pcgrid" }, h("label", {}, "메인락커"), main, h("label", {}, "보증금"), dep, h("label", {}, "1년사용료"), fee, h("label", {}, "계약일"), con, h("label", {}, "만료일"), exp);
+  const res = await modal(`락카 정보 수정 · ${r.name}`, g, canWrite() ? [["확인", "ok"], ["취소", "cancel"]] : [["닫기", "cancel"]]);
+  if (res !== "ok") return;
+  const num = (v, label) => { const s = v.trim().replace(/,/g, ""); if (!s) return 0; if (!/^-?\d+$/.test(s)) { toast(`${label}을 숫자로 입력하세요.`); return null; } return parseInt(s, 10); };
+  const deposit = num(dep.value, "보증금"), yearFee = num(fee.value, "1년사용료"); if (deposit == null || yearFee == null) return;
+  if (deposit < 0 || yearFee < 0) return toast("보증금과 1년사용료는 0 이상이어야 합니다.");
+  const number = main.value.trim(), cd = con.value.trim() ? smartDate(con.value) : null, ed = exp.value.trim() ? smartDate(exp.value) : null;
+  if (!number && (deposit || yearFee || cd || ed)) return toast("보증금·사용료·계약일을 입력하려면 메인락커 번호도 입력하세요.");
+  let ops; try { ops = lockerOps(r.memberId, number, deposit, yearFee, cd, ed); } catch (e) { return toast(e.message, 4200); }
+  if (!ops.length) return toast("락카 정보가 수정되었습니다.");
+  if (await save(ops, "락카 정보가 수정되었습니다.")) { LK.sel = Svc.lockerRows().find((x) => x.memberId === r.memberId) || null; render(); }
+}
+
+/* =====================================================================
    5) 로그인 화면 · 시작
    ===================================================================== */
 function loginView(reason) {
