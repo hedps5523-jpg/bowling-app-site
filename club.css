@@ -60,3 +60,16 @@ table.pct td.l{text-align:left}table.pct td.r{text-align:right}
 .pcform .pcin.w5{width:64px}.pcform .pcin.w8{width:110px}.pcform .pcin.w10{width:130px}.pcform .pcin.w12{width:150px}.pcform .pcin.w20{width:220px}
 .pcform .pcin[type=date]{width:150px}
 .pcgrid .pcin,.pcgrid .pcsel{padding:6px 9px;font-size:14px;border-radius:3px;border-width:1px}
+/* 게임기록 강조 (PC와 같은 색) */
+.sc.orange{color:#e68418;font-weight:700}
+.sc.red{color:#b22222;font-weight:700}
+.sc.shi,.sc.sev{display:inline-block;min-width:38px;padding:1px 6px;border-radius:3px;font-weight:800;font-size:15px}
+.sc.shi{background:#ffb300;color:#8b0000}.sc.sev{background:#1565c0;color:#fff}
+table.pct tbody tr.mk-hi td{background:#ffe08a !important}
+table.pct tbody tr.mk-ev td{background:#bbdefb !important}
+table.pct tbody tr.mk-all td{background:#c8e6c9 !important}
+table.pct td.note{text-align:center;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.pcmodal.wide .pcdlg{width:min(1100px,100%)}
+.rpt-h{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}.rpt-h b{font-size:20px;color:#1f4fd1}.rpt-h span{color:#465262;font-weight:600}
+.rpt .pctable-wrap{max-height:calc(100dvh - 220px)}
+body.print{background:#fff;padding:16px}body.print .pctable-wrap{max-height:none;overflow:visible}

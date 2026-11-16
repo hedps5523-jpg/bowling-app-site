@@ -256,7 +256,7 @@ const Svc = {
 
 async function reload(msg) {
   const snap = await Conn.snapshot();
-  Svc._seeded = new Set();
+  Svc._seeded = new Set(); Svc._weeks = {};
   buildSnapshot(snap);
   if (msg) toast(msg);
 }
@@ -399,6 +399,306 @@ async function editMember(m) {
     }
     toast("서버 회원 자료는 삭제하지 않아요. (PC·모바일과 같은 규칙: 탈퇴일자로 관리)", 3600);
   }
+}
+
+/* =====================================================================
+   5) 게임기록 (PC createGamePanel · addGame · editGameDialog · 보고서)
+   ===================================================================== */
+const gsum = (g) => [g.s1, g.s2, g.s3, g.s4].filter((x) => x > 0).reduce((a, b) => a + b, 0);
+const gcnt = (g) => [g.s1, g.s2, g.s3, g.s4].filter((x) => x > 0).length;
+const gavg = (g) => gcnt(g) ? gsum(g) / gcnt(g) : 0;
+const gbest = (g) => Math.max(g.s1, g.s2, g.s3, g.s4);
+const fmt1 = (d) => (Math.round(d * 10 + (d >= 0 ? 1e-9 : -1e-9)) / 10).toFixed(1);
+const signed1 = (d) => (d >= 0 ? "+" : "") + fmt1(d);
+const scoreDisplay = (n) => n > 0 ? String(n) : "";
+const meetingOf = (g) => (g.meetingType || "").trim() || "정모";
+const noteHas = (g, w) => (g.note || "").replace(/\s+/g, "").includes(w);
+function noteForDisplay(g, base) {
+  const note = g.note || ""; const m = note.match(/에버\s*하이(\s*:\s*[+-]?\d+)?/);
+  if (!m) return note;
+  const diff = gbest(g) - base;
+  return note.slice(0, m.index) + "에버하이 : " + (diff >= 0 ? "+" : "-") + Math.abs(diff) + note.slice(m.index + m[0].length);
+}
+Object.assign(Svc, {
+  _weeks: {},
+  basicWeeks(y) {
+    if (this._weeks[y]) return this._weeks[y];
+    const out = [];
+    for (let mo = 1; mo <= 12; mo++) {
+      const d = new Date(y, mo - 1, 1); while (d.getDay() !== 3) d.setDate(d.getDate() + 1);
+      let n = 0; while (d.getMonth() === mo - 1) { n++; out.push({ date: `${y}-${pad2(mo)}-${pad2(d.getDate())}`, label: `${mo}월 ${n}주차` }); d.setDate(d.getDate() + 7); }
+    }
+    return (this._weeks[y] = out);
+  },
+  weekSortKey(l) { const m = String(l).match(/^(\d+)월\s*(\d+)주차$/); return m ? +m[1] * 10 + +m[2] : 1e9; },
+  resolveWeekLabel(d) { const ws = this.basicWeeks(yearOf(d)).filter((w) => w.date <= d); if (ws.length) return ws[ws.length - 1].label; const all = this.basicWeeks(yearOf(d)); return all.length ? all[0].label : d; },
+  displayGameDate(d) { return this.resolveWeekLabel(d); },
+  findWeekDateByLabel(l) {
+    if (!l) return null;
+    const hit = (y) => (this.basicWeeks(y).find((w) => w.label === l) || {}).date || null;
+    const cur = hit(S.year); if (cur) return cur;
+    const ys = new Set([S.year, ...S.games.map((g) => yearOf(g.gameDate)), ...S.quarterAdjustments.map((q) => q.year)]);
+    for (const y of ys) { const f = hit(y); if (f) return f; }
+    return null;
+  },
+  resolveReferenceDateFromWeekLabel(l) {
+    if (!l || l === "주차 없음") return `${S.year}-01-01`;
+    const f = this.findWeekDateByLabel(l); if (f) return f;
+    const m = String(l).match(/(\d{1,2})\s*월/); const mo = Math.max(1, Math.min(12, m ? +m[1] : 1));
+    return `${S.year}-${pad2(mo)}-01`;
+  },
+  recordedWeekLabels() { return [...new Set(S.games.filter((g) => yearOf(g.gameDate) === S.year).map((g) => this.displayGameDate(g.gameDate)))].sort((a, b) => this.weekSortKey(a) - this.weekSortKey(b)); },
+  suggestNextGameWeekLabel() {
+    const weeks = this.basicWeeks(S.year); if (!weeks.length) return "";
+    const ys = S.games.filter((g) => yearOf(g.gameDate) === S.year);
+    if (ys.length) {
+      const latest = ys.reduce((a, b) => b.recordId > a.recordId ? b : a).gameDate;
+      const ref = this.findWeekDateByLabel(this.displayGameDate(latest)) || latest;
+      const nx = weeks.find((w) => w.date > ref); if (nx) return nx.label;
+    }
+    return this.resolveWeekLabel(todayStr());
+  },
+  gameInputWeekLabels(work = todayStr()) {
+    const avail = this.basicWeeks(yearOf(work)).filter((w) => w.date <= work).map((w) => w.label).sort((a, b) => this.weekSortKey(a) - this.weekSortKey(b));
+    const out = []; const nx = this.suggestNextGameWeekLabel(); if (nx) out.push(nx);
+    const cur = this.resolveWeekLabel(work); if (avail.includes(cur) && !out.includes(cur)) out.push(cur);
+    for (let i = avail.length - 1; i >= 0; i--) if (!out.includes(avail[i])) out.push(avail[i]);
+    return out;
+  },
+  displaySeq(id) { const l = this.getMembers(); const i = l.findIndex((m) => m.memberId === id); return i < 0 ? 0 : i + 1; },
+  weeklyGames(label) {
+    const rows = S.games.filter((g) => yearOf(g.gameDate) === S.year && this.displayGameDate(g.gameDate) === label && this.findMember(g.memberId));
+    return rows.sort((a, b) => gavg(b) - gavg(a) || (this.displaySeq(a.memberId) || 1e9) - (this.displaySeq(b.memberId) || 1e9) || b.recordId - a.recordId);
+  },
+  allGamesInInputOrder() { return S.games.filter((g) => this.findMember(g.memberId)).sort((a, b) => a.recordId - b.recordId); },
+  gamesByMember(id) { return this.findMember(id) ? S.games.filter((g) => g.memberId === id).sort((a, b) => a.recordId - b.recordId) : []; },
+  recordedMemberIdsForMeeting(d, type) { const t = (type || "").trim() || "정모"; return new Set(S.games.filter((g) => g.gameDate === d && meetingOf(g) === t).map((g) => g.memberId)); },
+  gamesForMeeting(d, type) { const t = (type || "").trim() || "정모"; return S.games.filter((g) => g.gameDate === d && meetingOf(g) === t).sort((a, b) => a.recordId - b.recordId); },
+  canonicalRankingGames(y) {
+    const map = new Map();
+    for (const g of S.games) { if (yearOf(g.gameDate) !== y) continue; const t = meetingOf(g); if (t !== "정모" && t !== "비모") continue; const k = `${g.memberId}|${g.gameDate}|${t}`; const ex = map.get(k); if (!ex || g.recordId >= ex.recordId) map.set(k, g); }
+    return [...map.values()];
+  },
+  aggregateAverage(rows) { let s = 0, c = 0; for (const g of rows) { s += gsum(g); c += gcnt(g); } return c ? s / c : 0; },
+  cumulativeAverage(id, y, q) { const st = (Math.max(1, q) - 1) * 3 + 1, en = st + 2; if (!this.findMember(id)) return 0; return this.aggregateAverage(this.canonicalRankingGames(y).filter((g) => g.memberId === id && monthOf(g.gameDate) >= st && monthOf(g.gameDate) <= en)); },
+  recent4WeekLabels() { const l = [...new Set(S.games.filter((g) => yearOf(g.gameDate) === S.year).map((g) => this.resolveWeekLabel(g.gameDate)))].sort((a, b) => this.weekSortKey(a) - this.weekSortKey(b)); return l.length <= 4 ? l : l.slice(l.length - 4); },
+  cumulativeRows(target) {
+    const labels = [...target]; while (labels.length < 4) labels.push("");
+    const refs = labels.filter(Boolean).map((l) => this.resolveReferenceDateFromWeekLabel(l)).filter(Boolean).sort();
+    const ref = refs.length ? refs[refs.length - 1] : `${S.year}-01-01`; const q = this.quarterFromDate(ref), ty = yearOf(ref);
+    const rows = [];
+    for (const m of this.getMembers()) {
+      if (this.isWithdrawn(m)) continue;
+      const mg = S.games.filter((g) => g.memberId === m.memberId && yearOf(g.gameDate) === S.year).sort((a, b) => a.gameDate < b.gameDate ? -1 : a.gameDate > b.gameDate ? 1 : 0);
+      if (!mg.length) continue;
+      const byWeek = new Map(); for (const g of mg) byWeek.set(this.resolveWeekLabel(g.gameDate), g);
+      const cells = labels.map((l) => l ? byWeek.get(l) || null : null);
+      rows.push({ seq: this.displaySeq(m.memberId), name: m.name, base: this.quarterBaseAverage(m, ty, q), qavg: this.cumulativeAverage(m.memberId, ty, q), att: mg.length, cells });
+    }
+    return rows;
+  },
+});
+const weekCellText = (g) => { if (!g) return ""; const p = [g.s1, g.s2, g.s3, g.s4].filter((x) => x > 0); const a = gcnt(g) ? `(${gavg(g).toFixed(1)})` : ""; return [p.join(" / "), a].filter(Boolean).join(" "); };
+
+/* 점수 칸 강조 (PC ScoreHighlightState 와 같은 규칙) */
+function highlights(rows, mode, memberId) {
+  const orange = new Set(), red = new Set(), rowColor = {}, strong = {};
+  const key = (i, c) => i + ":" + c, cols = ["s1", "s2", "s3", "s4"];
+  rows.forEach((g, i) => cols.forEach((c) => { if (g[c] >= 200) orange.add(key(i, c)); }));
+  const markMax = (cand, filterRow) => { const mx = Math.max(0, ...cand.map(gbest)); if (mx <= 0) return; rows.forEach((g, i) => { if (filterRow && !filterRow(g)) return; cols.forEach((c) => { if (g[c] === mx) red.add(key(i, c)); }); }); };
+  if (mode === "member" && memberId != null) {
+    const lim = S.year < new Date().getFullYear() ? 12 : new Date().getMonth() + 1;
+    const inRange = (g) => yearOf(g.gameDate) === S.year && monthOf(g.gameDate) <= lim;
+    markMax(Svc.gamesByMember(memberId).filter(inRange), inRange);
+  } else if (mode === "simple") markMax(rows);
+  else if (mode === "weekly") {
+    const nonReg = rows.every((g) => meetingOf(g).includes("비모"));
+    const prim = nonReg ? rows : rows.filter((g) => (g.note || "").replace(/ /g, "").includes("최고하이"));
+    const hasHigh = !nonReg && prim.length > 0;
+    markMax(hasHigh ? prim : rows, hasHigh ? (g) => (g.note || "").replace(/ /g, "").includes("최고하이") : null);
+    // 모임기록 표시룰: 최고하이(노랑) > 에버하이(파랑) > 올카(초록) — 정모만
+    const reg = [], baseOf = {};
+    rows.forEach((g, i) => { if (meetingOf(g) !== "정모") return; reg.push(i); const m = Svc.findMember(g.memberId); baseOf[i] = m ? Svc.effectiveBaseAverage(m, g.gameDate) : 0; });
+    let hi = -1, ev = -1;
+    if (reg.length) {
+      const marked = reg.filter((i) => noteHas(rows[i], "최고하이")); const pool = marked.length ? marked : reg.filter((i) => gbest(rows[i]) > 0);
+      for (const i of pool) { if (hi < 0) { hi = i; continue; } const bi = gbest(rows[i]), bh = gbest(rows[hi]); if (bi > bh || (bi === bh && baseOf[i] > baseOf[hi])) hi = i; }
+      const hm = hi < 0 ? null : rows[hi].memberId;
+      const me = reg.filter((i) => rows[i].memberId !== hm && noteHas(rows[i], "에버하이")); const ep = me.length ? me : reg.filter((i) => rows[i].memberId !== hm && gbest(rows[i]) > 0 && baseOf[i] > 0);
+      for (const i of ep) { if (ev < 0) { ev = i; continue; } const di = gbest(rows[i]) - baseOf[i], de = gbest(rows[ev]) - baseOf[ev]; if (di > de || (di === de && baseOf[i] > baseOf[ev])) ev = i; }
+    }
+    const hm = hi < 0 ? null : rows[hi].memberId, em = ev < 0 ? null : rows[ev].memberId;
+    for (const i of reg) {
+      const g = rows[i], isH = i === hi, isA = i === ev, isAll = noteHas(g, "올카") && g.memberId !== hm && g.memberId !== em;
+      if (isH) rowColor[i] = "hi"; else if (isA) rowColor[i] = "ev"; else if (isAll) rowColor[i] = "all";
+      if (isH || isA) { const b = gbest(g); cols.forEach((c) => { if (b > 0 && g[c] === b) strong[key(i, c)] = isH ? "shi" : "sev"; }); }
+    }
+  }
+  return { cell: (i, c) => strong[key(i, c)] || (red.has(key(i, c)) ? "red" : orange.has(key(i, c)) ? "orange" : ""), row: (i) => rowColor[i] ? "mk-" + rowColor[i] : "" };
+}
+function gameRowsTable(rows, mode, memberId, { includeMember = true, includeDate = true, seq = true, onSelect } = {}) {
+  const hl = highlights(rows, mode, memberId);
+  const base = (g) => { const m = Svc.findMember(g.memberId); return m ? Svc.effectiveBaseAverage(m, g.gameDate) : 0; };
+  const cols = [];
+  if (seq) cols.push({ t: "순번", get: (g, i) => i + 1 });
+  if (includeMember) cols.push({ t: "회원명(에버)", get: (g) => `${(Svc.findMember(g.memberId) || {}).name || ""}(${base(g)})` });
+  if (includeDate) cols.push({ t: "게임일", get: (g) => Svc.displayGameDate(g.gameDate) });
+  ["s1", "s2", "s3", "s4"].forEach((c, k) => cols.push({ t: `${k + 1}G`, get: (g, i) => h("span", { class: "sc " + hl.cell(i, c) }, scoreDisplay(g[c])) }));
+  cols.push({ t: "평균", get: (g) => fmt1(gavg(g)) }, { t: "에버편차", get: (g) => signed1(gavg(g) - base(g)) }, { t: "비고", get: (g) => noteForDisplay(g, base(g)), cls: "note" });
+  return pcTable(cols, rows, { onSelect, rowClass: (g, i) => hl.row(i) });
+}
+function reportModal(title, subtitle, content) {
+  const body = h("div", { class: "rpt" }, h("div", { class: "rpt-h" }, h("b", {}, title), subtitle ? h("span", {}, subtitle) : null), content);
+  $("modal").classList.add("wide");
+  return modal(title, body, [["인쇄", "print"], ["닫기", "close"]]).then((r) => { $("modal").classList.remove("wide"); if (r === "print") printNode(body); });
+}
+function printNode(node) {
+  const w = window.open("", "_blank"); if (!w) return toast("팝업이 막혀 있어요.");
+  w.document.write(`<html><head><title>인쇄</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/club.css"></head><body class="pc print">${node.outerHTML}</body></html>`);
+  w.document.close(); setTimeout(() => w.print(), 400);
+}
+
+const GV = { mode: "all", memberId: null, week: "", inputWeek: null, meeting: null, inMember: null, searchMember: null, sel: null };
+function gamePayload(g) { return { record_id: g.recordId || 0, member_id: g.memberId, game_date: g.gameDate, score1: g.s1, score2: g.s2, score3: g.s3, score4: g.s4, note: g.note || "", meeting_type: g.meetingType || "정모" }; }
+function parseScore(v, label) { v = String(v || "").trim(); if (!v) return 0; if (!/^\d+$/.test(v)) { toast(`${label} 점수를 숫자로 입력하세요.`); return null; } const n = +v; if (n < 0 || n > 300) { toast(`${label} 점수는 0~300 사이여야 합니다.`); return null; } return n; }
+
+TABS.games = {
+  render() {
+    const labels = Svc.gameInputWeekLabels();
+    if (!GV.inputWeek || !labels.includes(GV.inputWeek)) GV.inputWeek = Svc.suggestNextGameWeekLabel() && labels.includes(Svc.suggestNextGameWeekLabel()) ? Svc.suggestNextGameWeekLabel() : labels[0] || "주차 없음";
+    const defMeeting = (l) => /1주차|3주차/.test((l || "").replace(/ /g, "")) ? "정모" : "비모";
+    if (!GV.meeting) GV.meeting = defMeeting(GV.inputWeek);
+    const weekSel = selectEl(labels.length ? labels : ["주차 없음"], GV.inputWeek);
+    const meetOpts = [...S.meetingTypes]; if (!meetOpts.includes(GV.meeting)) meetOpts.push(GV.meeting);
+    const meet = h("input", { class: "pcin w8", list: "meetList", value: GV.meeting });
+    const dl = h("datalist", { id: "meetList" }, meetOpts.map((x) => h("option", { value: x })));
+    const memSel = h("select", { class: "pcsel" });
+    const fillMembers = () => {
+      const d = Svc.findWeekDateByLabel(weekSel.value) || (weekSel.value !== "주차 없음" ? Svc.resolveReferenceDateFromWeekLabel(weekSel.value) : null);
+      const rec = d ? Svc.recordedMemberIdsForMeeting(d, meet.value) : new Set();
+      const items = Svc.activeInputMembers().filter((m) => !rec.has(m.memberId));
+      memSel.textContent = ""; items.forEach((m) => memSel.append(h("option", { value: m.memberId }, m.name)));
+      if (GV.inMember && items.some((m) => m.memberId === GV.inMember)) memSel.value = GV.inMember;
+    };
+    weekSel.onchange = () => { GV.inputWeek = weekSel.value; meet.value = GV.meeting = defMeeting(weekSel.value); fillMembers(); };
+    meet.onchange = () => { GV.meeting = meet.value.trim() || "정모"; fillMembers(); };
+    memSel.onchange = () => GV.inMember = +memSel.value;
+    fillMembers();
+    const sc = [1, 2, 3, 4].map(() => h("input", { class: "pcin w5", inputmode: "numeric", maxlength: "3" }));
+    sc.forEach((x, i) => x.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); (sc[i + 1] || note).focus(); } });
+    const note = h("input", { class: "pcin w20", maxlength: "100" });
+    note.onkeydown = (e) => { if (e.key === "Enter") addBtn.click(); };
+    const addBtn = h("button", { class: "pcbtn", type: "button", disabled: !canWrite() }, "등록");
+    addBtn.onclick = async () => {
+      const mid = +memSel.value; if (!mid) return toast("회원명을 선택하세요.");
+      const s = sc.map((x, i) => parseScore(x.value, `${i + 1}G`)); if (s.some((x) => x == null)) return;
+      const d = weekSel.value === "주차 없음" ? null : (Svc.findWeekDateByLabel(weekSel.value) || Svc.resolveReferenceDateFromWeekLabel(weekSel.value));
+      if (!d) return toast("게임일 주차를 선택하세요.");
+      const mt = meet.value.trim() || "정모";
+      const opts = [...memSel.options]; const idx = opts.findIndex((o) => +o.value === mid); const next = opts[idx + 1] || (opts.length > 1 ? opts[0] : null);
+      addBtn.disabled = true;
+      const g = { recordId: 0, memberId: mid, gameDate: d, s1: s[0], s2: s[1], s3: s[2], s4: s[3], note: note.value.trim(), meetingType: mt };
+      if (await save([op("games", "insert", gamePayload(g))], "게임 기록이 저장되었습니다.")) {
+        GV.inMember = next && +next.value !== mid ? +next.value : null; GV.mode = "weekly"; GV.week = weekSel.value; GV.meeting = mt;
+        render(); setTimeout(() => { const f = view.querySelector("input.pcin.w5"); f && f.focus(); }, 50);
+      } else addBtn.disabled = false;
+    };
+    const editBtn = h("button", { class: "pcbtn", type: "button" }, "수정");
+    editBtn.onclick = () => GV.sel ? editGame(GV.sel) : toast("수정할 기록을 선택하세요.");
+
+    const allMembers = Svc.getMembers();
+    if (GV.searchMember == null && allMembers.length) GV.searchMember = allMembers[0].memberId;
+    const searchSel = selectEl(allMembers.map((m) => [String(m.memberId), m.name]), String(GV.searchMember)); searchSel.onchange = () => GV.searchMember = +searchSel.value;
+    const wl = [...Svc.recordedWeekLabels()].reverse();
+    if (!GV.week || !wl.includes(GV.week)) { const cur = Svc.resolveWeekLabel(todayStr()); GV.week = wl.includes(GV.inputWeek) ? GV.inputWeek : wl.includes(cur) ? cur : wl[0] || "주차 없음"; }
+    const weekly = selectEl(wl.length ? wl : ["주차 없음"], GV.week); weekly.onchange = () => { GV.week = weekly.value; if (wl.length) { GV.mode = "weekly"; render(); } };
+    const b = (t, fn) => h("button", { class: "pcbtn", type: "button", onclick: fn }, t);
+    view.append(h("section", { class: "pcbox" }, dl, h("div", { class: "pcform" },
+      h("label", {}, "게임일"), weekSel, h("label", {}, "모임 구분"), meet, h("label", {}, "회원명"), memSel,
+      ...sc.flatMap((x, i) => [h("label", {}, `${i + 1}G`), x]), h("label", {}, "비고"), note, addBtn, editBtn, roBadge())),
+      h("section", { class: "pcbox" }, h("div", { class: "pcform" },
+        h("label", {}, "회원명 조회"), searchSel, h("label", {}, "주차별"), weekly,
+        b("회원별 조회", () => { GV.mode = "member"; GV.memberId = +searchSel.value; render(); }),
+        b("주차별 조회", () => { if (!wl.length) return toast("조회할 주차를 선택하세요."); if (!Svc.weeklyGames(weekly.value).length) return toast("선택한 주차의 게임기록이 없습니다."); GV.mode = "weekly"; GV.week = weekly.value; render(); }),
+        b("전체 조회", () => { GV.mode = "all"; render(); }),
+        h("span", { style: "width:10px" }), h("label", {}, "보고서"),
+        b("개인 기록", () => memberReport(+searchSel.value)), b("모임 기록", () => meetingReport(weekly.value)), b("누적 조회", cumulativeReport),
+        b("모임구분 일괄변경", changeMeetingType))));
+    let rows, mode = GV.mode;
+    const byDateDesc = (a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : 0) || b.recordId - a.recordId;
+    if (mode === "member") rows = Svc.gamesByMember(GV.memberId).sort(byDateDesc);
+    else if (mode === "weekly") { rows = Svc.weeklyGames(GV.week); if (!rows.length) { mode = "all"; } }
+    if (mode === "all") rows = Svc.allGamesInInputOrder().sort(byDateDesc);
+    GV.rows = rows; GV.sel = null;
+    view.append(gameRowsTable(rows, mode, GV.memberId, { onSelect: (g, i, dbl) => { GV.sel = g; if (dbl) editGame(g); } }));
+  },
+};
+
+async function editGame(rec) {
+  const ms = Svc.getMembers();
+  const f = { member: selectEl(ms.map((m) => [String(m.memberId), m.name]), String(rec.memberId)), date: h("input", { class: "pcin", type: "date", value: rec.gameDate }),
+    meeting: selectEl([...new Set([...S.meetingTypes, meetingOf(rec)])], meetingOf(rec)), s: [rec.s1, rec.s2, rec.s3, rec.s4].map((v) => h("input", { class: "pcin", value: scoreDisplay(v), inputmode: "numeric" })), note: h("input", { class: "pcin", value: rec.note || "" }) };
+  const ro = !canWrite(); if (ro) [f.member, f.date, f.meeting, f.note, ...f.s].forEach((x) => x.disabled = true);
+  const body = h("div", { class: "pcgrid" }, h("label", {}, "회원명"), f.member, h("label", {}, "게임일"), f.date, h("label", {}, "모임구분"), f.meeting,
+    ...f.s.flatMap((x, i) => [h("label", {}, `${i + 1}G`), x]), h("label", {}, "비고"), f.note);
+  const r = await modal("기록 수정", body, ro ? [["닫기", "c"]] : [["수정", "save"], ["취소", "c"], ["삭제", "del"]]);
+  const rv = S.rv.games[rec.recordId];
+  if (r === "save") {
+    const s = f.s.map((x, i) => parseScore(x.value, `${i + 1}G`)); if (s.some((x) => x == null)) return;
+    if (!f.date.value) return toast("게임일을 입력하세요.");
+    const n = { ...rec, memberId: +f.member.value, gameDate: f.date.value, s1: s[0], s2: s[1], s3: s[2], s4: s[3], note: f.note.value.trim(), meetingType: f.meeting.value || meetingOf(rec) };
+    await save([op("games", "update", gamePayload(n), rv)], "기록이 수정되었습니다.");
+  } else if (r === "del") {
+    if (!(await confirmBox("선택한 게임 기록을 삭제하시겠습니까?"))) return;
+    await save([op("games", "delete", gamePayload(rec), rv)], "게임 기록이 삭제되었습니다.");
+  }
+}
+async function changeMeetingType() {
+  if (!canWrite()) return toast("입력 권한이 없어요. (조회 전용 계정)");
+  const sel = GV.sel, weekly = !sel && GV.mode === "weekly" && GV.rows && GV.rows.length;
+  if (!sel && !weekly) return toast("모임구분을 바꿀 기록을 한 줄 선택하거나, 주차별 리스트에서 주차를 선택하세요.", 4000);
+  const from = [], dates = [];
+  if (sel) { from.push(meetingOf(sel)); dates.push(sel.gameDate); }
+  else for (const g of GV.rows) { if (!from.includes(meetingOf(g))) from.push(meetingOf(g)); if (!dates.includes(g.gameDate)) dates.push(g.gameDate); }
+  const opts = [...S.meetingTypes]; from.forEach((t) => { if (!opts.includes(t)) opts.push(t); });
+  const fromSel = selectEl(from, from[0]), toSel = selectEl(opts);
+  const sug = () => { toSel.value = opts.find((v) => v !== fromSel.value) || fromSel.value; }; sug(); fromSel.onchange = sug;
+  const dateText = dates.length === 1 ? dates[0] : `${dates.length}개 게임일`;
+  const body = h("div", { class: "pcgrid" }, h("label", {}, "게임일"), h("span", {}, dateText), h("label", {}, "대상 범위"), h("span", {}, sel ? "선택 기록과 같은 모임" : `${GV.week} 전체`),
+    h("label", {}, "현재 모임구분"), from.length > 1 ? fromSel : h("span", {}, from[0]), h("label", {}, "바꿀 모임구분"), toSel);
+  if ((await modal("모임구분 일괄변경", body, [["일괄 변경", "ok"], ["취소", "c"]])) !== "ok") return;
+  const ft = from.length > 1 ? fromSel.value : from[0], tt = toSel.value;
+  if (!tt || tt === ft) return toast("현재 모임구분과 같아 변경할 내용이 없습니다.");
+  const ops = [];
+  for (const d of dates) {
+    const targets = Svc.gamesForMeeting(d, ft); if (!targets.length) continue;
+    const already = new Set(Svc.gamesForMeeting(d, tt).map((g) => g.memberId));
+    const dup = [...new Set(targets.filter((g) => already.has(g.memberId)).map((g) => (Svc.findMember(g.memberId) || {}).name || "ID " + g.memberId))];
+    if (dup.length) return toast(`${d} '${tt}' 모임에 이미 기록이 있는 회원이 있어 변경할 수 없습니다: ${dup.join(", ")}`, 5000);
+    for (const g of targets) ops.push(op("games", "update", gamePayload({ ...g, meetingType: tt }), S.rv.games[g.recordId]));
+  }
+  if (!ops.length) return toast("선택한 모임의 기록을 찾을 수 없습니다.");
+  await save(ops, `${dateText} ${ft} 모임의 기록 ${ops.length}건을 '${tt}'(으)로 변경했습니다.`);
+}
+function memberReport(id) {
+  const m = Svc.findMember(id); if (!m) return toast("조회할 회원을 선택하세요.");
+  const rows = Svc.gamesByMember(id).sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : 0) || b.recordId - a.recordId);
+  if (!rows.length) return toast("선택한 회원의 게임기록이 없습니다.");
+  const cnt = rows.reduce((a, g) => a + gcnt(g), 0);
+  reportModal("개인 기록", `${m.name}(${cnt}게임 / ${fmt1(Svc.aggregateAverage(rows))})`, gameRowsTable(rows, "simple", null, { includeMember: false, seq: false }));
+}
+function meetingReport(label) {
+  if (!label || label === "주차 없음") return toast("조회할 주차를 선택하세요.");
+  const rows = Svc.weeklyGames(label).filter((g) => { const m = Svc.findMember(g.memberId); return m && !Svc.isWithdrawn(m); }).sort((a, b) => gavg(b) - gavg(a) || b.recordId - a.recordId);
+  if (!rows.length) return toast("선택한 주차의 게임기록이 없습니다.");
+  reportModal("모임 기록", label, gameRowsTable(rows, "weekly", null, { includeDate: false, seq: false }));
+}
+function cumulativeReport() {
+  const labels = Svc.recent4WeekLabels(); const rows = Svc.cumulativeRows(labels);
+  if (!rows.length) return toast("누적 조회할 게임기록이 없습니다.");
+  while (labels.length < 4) labels.push("");
+  reportModal("모임 누적 현황", "", pcTable([{ t: "순번", get: (r) => r.seq }, { t: "회원명(에버)", get: (r) => `${r.name}(${r.base})` }, { t: "누적에버", get: (r) => fmt1(r.qavg) }, { t: "출석일수", get: (r) => r.att },
+    ...labels.map((l, i) => ({ t: l || " ", cls: "r", get: (r) => { const t = weekCellText(r.cells[i]); const k = t.lastIndexOf("("); return k < 0 ? t : h("span", {}, t.slice(0, k), h("b", {}, t.slice(k))); } }))], rows));
 }
 
 /* =====================================================================
