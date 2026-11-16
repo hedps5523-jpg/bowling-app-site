@@ -104,6 +104,7 @@ const Conn = {
         this.mode = "site"; this.me = r.d.me; return { ok: true };
       }
       if (r.status === 403) return { need: "login", reason: "site_member" };
+      return { need: "login", reason: r.status === 401 ? "site_expired" : "site_error" };
     }
     return { need: "login" };
   },
@@ -1543,7 +1544,7 @@ function loginView(reason) {
   view.textContent = "";
   const id = h("input", { class: "pcin", placeholder: "모바일 볼링클럽 아이디", autocomplete: "username", autocapitalize: "off", maxlength: "20" });
   const pw = h("input", { class: "pcin", type: "password", placeholder: "비밀번호", autocomplete: "current-password" });
-  const msg = h("div", { class: "msg" + (reason ? " info" : "") }, reason === "site_member" ? "홈페이지 관리자·운영진만 홈페이지 계정으로 들어올 수 있어요. 모바일 볼링클럽 계정으로 로그인해 주세요."
+  const msg = h("div", { class: "msg" + (reason ? " info" : "") }, reason === "site_expired" ? "홈페이지 인증이 만료되었어요. 아래 \"홈페이지 관리자·운영진 인증하기\"로 다시 인증해 주세요." : reason === "site_error" ? "홈페이지 연결을 확인하지 못했어요. 잠시 후 다시 열거나 아래에서 다시 인증해 주세요." : reason === "site_member" ? "홈페이지 관리자·운영진만 홈페이지 계정으로 들어올 수 있어요. 모바일 볼링클럽 계정으로 로그인해 주세요."
     : reason === "not_approved" ? "아직 승인되지 않은 모바일 계정이에요. 관리자 승인 후 이용할 수 있어요." : reason === "expired" ? "로그인이 만료되었어요. 다시 로그인해 주세요." : "");
   const go2 = h("button", { class: "btn", type: "button" }, "로그인");
   go2.onclick = async () => {
@@ -1556,7 +1557,7 @@ function loginView(reason) {
   const box = h("section", { class: "card pclogin" }, h("h2", {}, "🎳 클럽관리 로그인"),
     h("p", { class: "lead" }, "PC·모바일 볼링클럽과 같은 서버 자료를 사용해요. 계정 권한(관리자 / 조회+입력 / 조회 전용)이 그대로 적용돼요."),
     id, pw, msg, go2);
-  if (!Conn.siteToken()) box.append(h("div", { class: "orline" }, "또는"), h("a", { class: "btn ghost", href: "/apps?next=%2Fhome" }, "홈페이지 관리자·운영진 인증하기"), h("small", { class: "mut", style: "display:block;margin-top:6px" }, "인증 후 다시 클럽관리를 열면 바로 들어와요."));
+  if (!Conn.siteToken() || reason === "site_expired" || reason === "site_error") box.append(h("div", { class: "orline" }, "또는"), h("a", { class: "btn ghost", href: "/apps?next=%2Fhome" }, "홈페이지 관리자·운영진 인증하기"), h("small", { class: "mut", style: "display:block;margin-top:6px" }, "인증 후 다시 클럽관리를 열면 바로 들어와요."));
   view.append(box);
 }
 function linkView(st) {
