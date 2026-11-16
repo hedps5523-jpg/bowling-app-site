@@ -109,13 +109,17 @@ const Conn = {
     }
     if (this.siteToken()) {
       const r = await this.bridge("whoami");
-      if (r.ok) {
-        if (!r.d.linked) return { need: "link", site: r.d.site };
-        if (!r.d.me) return { need: "link", site: r.d.site, reason: "not_approved", club: r.d.club };
-        this.mode = "site"; this.me = r.d.me; return { ok: true };
+      if (r.ok && r.d.linked && r.d.me) { this.mode = "site"; this.me = r.d.me; return { ok: true }; }
+      if (r.status === 401) return { need: "login", reason: "site_expired" };
+      // 클럽 계정을 연결하지 않아도, 구글(홈페이지) 로그인만으로 조회 화면을 볼 수 있어요
+      const v = await this.bridge("view_whoami");
+      if (v.ok) {
+        const w = v.d.viewer || {};
+        this.mode = "view"; this.viewer = w;
+        this.me = { name: w.name, loginId: "", role: "viewer", isAdmin: false, canRead: true, canWrite: false, source: "view", siteName: w.name, siteRole: w.role };
+        return { ok: true };
       }
-      if (r.status === 403) return { need: "login", reason: "site_member" };
-      return { need: "login", reason: r.status === 401 ? "site_expired" : "site_error" };
+      return { need: "login", reason: v.status === 401 ? "site_expired" : "site_error" };
     }
     return { need: "login" };
   },
@@ -130,8 +134,8 @@ const Conn = {
   async logout() { this.saveMobile(null); this.mode = null; this.me = null; },
 
   async snapshot() {
-    if (this.mode === "site") {
-      const r = await this.bridge("snapshot");
+    if (this.mode === "site" || this.mode === "view") {
+      const r = await this.bridge(this.mode === "view" ? "view_snapshot" : "snapshot");
       if (!r.ok) throw new Error(r.d.error || "자료를 불러오지 못했어요.");
       return { dataVersion: r.d.dataVersion, tables: r.d.tables };
     }
@@ -299,8 +303,12 @@ function drawHeader() {
   nav.append(h("button", { class: "pcbtn file", type: "button", onclick: (e) => openFileMenu(e.currentTarget) }, "FILE"));
   for (const k of HEADER_TABS) nav.append(h("button", { class: "pcbtn" + (current === k ? " on" : ""), type: "button", onclick: () => go(k) }, TITLES[k]));
   const me = Conn.me;
+  const ROLE_TXT = { admin: "관리자", staff: "운영진", member: "회원" };
   const permTxt = (m) => m.isAdmin ? "관리자" : m.canWrite ? "조회+입력" : "조회 전용";
-  $("authStatus").textContent = me ? (me.source === "site" ? `홈페이지 ${me.siteRole === "admin" ? "관리자" : "운영진"} ${me.siteName} · 클럽계정 ${me.loginId}(${permTxt(me)}) · 서버 v${S.dataVersion}` : `${permTxt(me)}: ${me.name} · 서버 v${S.dataVersion}`) : "";
+  const full = me ? (me.source === "view" ? `홈페이지 ${ROLE_TXT[me.siteRole] || "회원"} ${me.siteName} · 조회 전용 · 서버 v${S.dataVersion}` : me.source === "site" ? `홈페이지 ${me.siteRole === "admin" ? "관리자" : "운영진"} ${me.siteName} · 클럽계정 ${me.loginId}(${permTxt(me)}) · 서버 v${S.dataVersion}` : `${permTxt(me)}: ${me.name} · 서버 v${S.dataVersion}`) : "";
+  $("authStatus").textContent = me ? permTxt(me) : ""; $("authStatus").title = full;
+  $("logoutBtn").textContent = me && me.source === "view" ? "홈으로" : "로그아웃";
+  $("pcsub").textContent = "";
   $("pchead").hidden = false;
   $("appName").textContent = TITLES[current] || "클럽관리";
 }
@@ -309,9 +317,12 @@ function openFileMenu(btn) {
   if (!m.hidden) { m.hidden = true; return; }
   m.textContent = "";
   const item = (t, fn) => h("button", { type: "button", onclick: () => { m.hidden = true; fn(); } }, t);
-  m.append(item("회원관리", () => go("members")), item("락카 사용현황", () => go("lockers")), item("연락처(뷰)", contactView), h("hr"),
+  const view1 = Conn.mode === "view";
+  m.append(item("회원관리", () => go("members")), ...(view1 ? [] : [item("락카 사용현황", () => go("lockers")), item("연락처(뷰)", contactView)]), h("hr"),
     item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
-    ...(Conn.mode === "site" ? [item("클럽 계정 연결 해제", unlinkClub)] : []), item("로그아웃", logout));
+    ...(Conn.mode === "site" ? [item("클럽 계정 연결 해제", unlinkClub)] : []),
+    ...(view1 && (Conn.me.siteRole === "admin" || Conn.me.siteRole === "staff") ? [item("클럽 계정 연결 (입력 권한)", () => linkView({ site: { name: Conn.me.siteName } }))] : []),
+    item(view1 ? "홈으로" : "로그아웃", logout));
   const r = btn.getBoundingClientRect(); m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
 }
 /* FILE 메뉴 바깥을 누르면 닫기 (문서에 한 번만 등록: 열 때마다 등록하면 다음 FILE 클릭이 바로 닫혀버림) */
@@ -344,7 +355,24 @@ function fitView() {
 }
 let fitT; const fitSoon = () => { cancelAnimationFrame(fitT); fitT = requestAnimationFrame(fitView); };
 window.addEventListener("resize", fitSoon);
-new MutationObserver(fitSoon).observe(view, { childList: true });
+/* 메뉴 탭 + 조회(하위 메뉴) 줄을 1행에: 넓은 화면에서만. 조회 전용이면 입력 줄은 숨겨서 결과표를 더 크게 */
+function mergeRow() {
+  const sub = $("pcsub"); if (!sub || current === "settings") return;
+  if (window.innerWidth < 900 || narrowPortrait()) return;
+  const tw = view.querySelector(":scope > .pctable-wrap");
+  if (tw && tw.dataset.merged) return; // 이 표는 이미 한 줄로 합쳤어요
+  const boxes = [...view.children].filter((c) => c.classList && c.classList.contains("pcbox") && !c.classList.contains("envroot"));
+  if (!boxes.length) return;
+  const isInput = (b) => !!b.querySelector("button.pcbtn[disabled]");
+  const ro = !canWrite();
+  if (ro) boxes.filter(isInput).forEach((b) => b.remove());
+  const rest = boxes.filter((b) => b.isConnected);
+  const q = rest[rest.length - 1];
+  if (!q || (!ro && isInput(q))) return;
+  sub.textContent = ""; sub.append(...q.children); q.remove();
+  if (tw) tw.dataset.merged = "1";
+}
+new MutationObserver(() => { mergeRow(); fitSoon(); }).observe(view, { childList: true });
 const canWrite = () => !!(Conn.me && Conn.me.canWrite);
 const roBadge = () => canWrite() ? null : h("span", { class: "pcro" }, "조회 전용");
 
@@ -1663,6 +1691,7 @@ async function unlinkClub() {
   try { await Conn.unlinkClub(); await Conn.logout(); sessionStorage.removeItem("clubSkipSite"); await boot(); } catch (e) { toast(e.message); }
 }
 async function logout() {
+  if (Conn.mode === "view") { location.href = "/"; return; }
   if (Conn.mode === "site") { if (!(await confirmBox("홈페이지 계정으로 들어와 있어요.\n클럽관리에서만 나가고, 모바일 계정으로 로그인 화면을 열까요?"))) return; }
   await Conn.logout(); sessionStorage.setItem("clubSkipSite", "1"); loginView();
 }
@@ -1677,4 +1706,5 @@ async function boot() {
   const k = location.hash.replace("#", ""); if (TITLES[k]) current = k;
   render();
 }
+$("logoutBtn").onclick = logout;
 boot();

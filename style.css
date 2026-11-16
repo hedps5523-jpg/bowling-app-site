@@ -326,54 +326,5 @@ body.club footer.clubfoot div{line-height:1.4;font-size:12px}
 .sheet .opt i{font-style:normal;font-size:20px;width:28px;text-align:center}.sheet .opt small{display:block;color:var(--sub);font-weight:500;font-size:12px}
 .sheet .opt.tip{cursor:default;opacity:.8}
 
-/* ===== 홈 · 클럽 기록 (조회 전용) ===== */
-.cbcard h2{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.cbcard h2 small{font-size:12px;font-weight:600;color:var(--brand-d)}
-.cbtabs{display:flex;gap:6px;margin:0 0 10px}
-.cbtabs button{appearance:none;font:inherit;font-weight:700;font-size:14px;padding:8px 16px;border:1px solid #c3d2e2;background:#e9f0fa;border-radius:10px;color:#1c2333;cursor:pointer}
-.cbtabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
-.cbbody,.cbwrap,.cbout{display:flex;flex-direction:column;min-height:0}
-.cbflt{display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:13px}
-.cbflt select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid #b9c4d3;border-radius:8px;background:#fff;margin:0;width:auto}
-.cbsum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
-.cbsum div{background:#f3f6fc;border-radius:10px;padding:8px 10px}.cbsum small{display:block;font-size:11.5px;color:var(--sub)}.cbsum b{font-size:16px;color:var(--brand-d)}
-.cbscroll{overflow:auto;min-height:0;-webkit-overflow-scrolling:touch}
-table.cbt{border-collapse:collapse;width:100%;font-size:13.5px}
-table.cbt th{background:#dbe6f6;padding:7px 6px;font-weight:700;border:1px solid #c3d0e2;white-space:nowrap;position:sticky;top:0}
-table.cbt td{padding:8px 6px;text-align:center;border-bottom:1px solid #e7ecf3;white-space:nowrap}
-table.cbt tr:nth-child(even) td{background:#f7f9fc}
-table.cbt td.hi{color:#e68418;font-weight:700}.cbt .cup,.cbt td.cok{color:#1f4fd1}.cbt .cdn,.cbt td.cno{color:#d23030}.cbt td.cex{color:#8a93a3}
-.cbt td.nt{max-width:160px;overflow:hidden;text-overflow:ellipsis}
-.cbfee td.cur,.cbfee th:nth-child(n+3){min-width:46px}.cbfee td.cur{background:#fff8e1!important}
-.cbro{font-size:11.5px;color:var(--sub);margin:8px 0 0}.cbro a{color:var(--brand-d);font-weight:700}
-@media (max-width:599px){.cbsum{grid-template-columns:repeat(2,1fr)}.hcolA .card{margin-top:0}}
-/* 넓은 화면: A(공지·다음 모임)와 클럽 기록이 한 화면에 꽉 차게, 로그아웃은 맨 아래 한 줄 */
-@media (min-height:520px){
-  html[data-dev="desktop"] body.homefit .wrap{box-sizing:border-box;height:100vh;height:100dvh;min-height:0;padding-bottom:66px}
-  html[data-dev="desktop"] body.homefit .wrap>main{flex:1 1 0;min-height:0}
-  html[data-dev="desktop"] body.homefit #view.r-home{height:100%;grid-template-rows:auto minmax(0,1fr);align-items:stretch}
-  html[data-dev="desktop"] body.homefit .hcolA{display:flex;flex-direction:column;min-height:0;gap:12px}
-  html[data-dev="desktop"] body.homefit .hcolA>.card{flex:1 1 0;min-height:0;overflow:auto;margin:0}
-  html[data-dev="desktop"] body.homefit .cbcard{display:flex;flex-direction:column;min-height:0;margin:0}
-  html[data-dev="desktop"] body.homefit .cbwrap,html[data-dev="desktop"] body.homefit .cbbody,html[data-dev="desktop"] body.homefit .cbout{flex:1 1 auto;min-height:0}
-  html[data-dev="desktop"] body.homefit .cbscroll{flex:1 1 auto}
-  html[data-dev="desktop"] body.homefit footer.clubfoot{flex-direction:row;align-items:center;justify-content:space-between;padding-top:6px}
-  html[data-dev="desktop"] body.homefit footer.clubfoot .btn{width:200px}
-}
-
-.cbseg{display:inline-flex;gap:4px;background:#e9f0fa;border-radius:10px;padding:3px}
-.cbseg button{appearance:none;font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border:0;background:transparent;border-radius:8px;color:#1c2333;cursor:pointer}
-.cbseg button.on{background:#fff;color:var(--brand-d);box-shadow:0 1px 3px rgba(0,0,0,.15)}
-.cbflt{flex-wrap:wrap}
-.cbt td.tot{font-weight:700}.cbt td.cpd{color:#b07000}.cbt td.cur{background:#fff8e1!important}
-.cbfeewrap{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;min-height:0;flex:1 1 auto}
-.cbmem{display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:0;max-height:100%}
-.cbmem button{appearance:none;font:inherit;font-size:13.5px;text-align:left;padding:7px 10px;border:1px solid #d5deea;background:#fff;border-radius:9px;display:flex;justify-content:space-between;gap:6px;cursor:pointer;color:#1c2333}
-.cbmem button small{color:var(--sub);font-size:11px;align-self:center}.cbmem button.on{background:var(--brand);border-color:var(--brand);color:#fff}.cbmem button.on small{color:#e6eeff}
-@media (max-width:599px){.cbfeewrap{grid-template-columns:1fr}.cbmem{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.cbmem button{flex:none}}
-@media (min-height:520px){
-  html[data-dev="desktop"] body.homefit #view.r-home{grid-template-columns:minmax(0,3fr) minmax(0,7fr)!important}
-}
-
 /* 휴대폰·태블릿(터치 기기)은 가로로 돌려도 홈은 한 열로 */
 html[data-dev="mobile"] #view.r-home{display:block}

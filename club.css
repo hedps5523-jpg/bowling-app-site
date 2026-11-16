@@ -231,3 +231,10 @@ body.print .contactwrap{max-height:none}
   body.pc .envbasic .envlist,body.pc .envbasic .envother{gap:1px 4px !important}
   body.pc .envroot .envtop{margin:0 !important}
 }
+
+/* 메뉴 + 조회 줄 1행 (넓은 화면) */
+.pcsub{flex:1 1 0;min-width:0;display:flex;align-items:center;overflow-x:auto;scrollbar-width:thin}
+.pcsub:empty{display:none}
+.pcsub .pcform{flex-wrap:nowrap;white-space:nowrap;flex:0 0 auto}
+@media (min-width:900px){.pchead{flex-wrap:nowrap}.pcnav{flex:0 0 auto}.pcwho{flex:0 0 auto}.pcwho #authStatus{white-space:nowrap}}
+@media (min-width:1300px){body.pc .wrap{max-width:1560px}}

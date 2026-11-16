@@ -131,6 +131,22 @@ Deno.serve(async (req) => {
   } catch (e) { return json({ error: String((e as Error).message ?? e) }, 500); }
   const w = await who(String(b.token ?? ""));
   if (!w || !("ok" in w)) return json({ error: (w as { status?: number })?.status === 403 ? "not_member" : "expired" }, 401);
+  const action0b = String(b.action ?? "");
+  // 구글(홈페이지) 로그인만으로 조회 전용 열람: 회원 연락처·락카 자료는 내보내지 않음
+  if (action0b === "view_whoami") return json({ ok: true, viewer: { name: w.name, role: w.role, email: w.email } });
+  if (action0b === "view_snapshot") {
+    try {
+      const out: Record<string, unknown> = {};
+      for (const [t, o] of TABLES) {
+        if (t === "lockers") continue;
+        let rows = await readAll(t, o);
+        if (t === "members") rows = (rows as Record<string, unknown>[]).map((r) => { const c = { ...r }; delete c.phone; return c; });
+        out[t] = rows;
+      }
+      const { data: meta } = await db.from("club_data_meta").select("data_version").eq("id", 1).maybeSingle();
+      return json({ dataVersion: meta?.data_version ?? 0, tables: out, viewOnly: true });
+    } catch (e) { return json({ error: String((e as Error).message ?? e) }, 500); }
+  }
   if (w.role !== "admin" && w.role !== "staff") return json({ error: "forbidden", role: w.role }, 403);
   const email = String(w.email).toLowerCase();
   const site = { name: w.name, role: w.role, email: w.email };
