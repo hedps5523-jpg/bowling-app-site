@@ -678,3 +678,12 @@ body.phmode .phfixed .phlbar .phpillbtn{height:34px}body.phmode .phfixed .phlbar
 .phfixroot>.phsettle .phti{padding:6px 8px;gap:6px;min-width:0}.phfixroot>.phsettle .phti b{font-size:13.5px;white-space:nowrap}.phfixroot>.phsettle .phti small{font-size:11px}
 .phfixroot>.phsettle .phti i{width:30px;height:30px;font-size:15px;flex:none}
 .phqdet{padding:0 12px 6px}.phqdet .phrd{margin:0}
+
+/* 회원명 선택 목록 (6명 표시 · 드래그 스크롤) */
+.phpickbtn{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;margin:0;font:inherit;cursor:pointer;color:#12285A}
+.phpickbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.phpickbtn i{font-style:normal;font-size:12px;color:#5B6B84}
+.phpickbtn:disabled{opacity:.6}
+.phpickback{position:fixed;inset:0;z-index:300;background:rgba(20,28,48,.18)}
+.phpicklist{position:fixed;background:#fff;border:1px solid #BCCDE5;border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.22);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:0}
+.phpickit{display:block;width:100%;margin:0;border:0;border-bottom:1px solid #EEF2F8;background:#fff;color:#12285A;font:inherit;font-size:16px;font-weight:600;text-align:center;cursor:pointer;border-radius:0}
+.phpickit.on{background:#E3ECFA;color:#1A5BA8}

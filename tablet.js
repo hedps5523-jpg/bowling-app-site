@@ -219,9 +219,9 @@
     if (GS.lockedType) GS.type = GS.lockedType;
     else if (GS.editing <= 0) { const n = +(week.match(/(\d+)월(\d+)주/) || [0, 0, 1])[2]; const want = n === 1 || n === 3 ? "정모" : "비모"; GS.type = typeList().includes(want) ? want : typeList()[0]; }
   }
-  function inputMembersFor(games) {
+  function inputMembersFor(games, anyType) {
     const key = weekKey(GS.date), type = GS.type || "정모";
-    const reg = new Set(games.filter((g) => g.recordId !== GS.editing && weekKey(g.gameDate) === key && gtype(g) === type).map((g) => g.memberId));
+    const reg = new Set(games.filter((g) => g.recordId !== GS.editing && weekKey(g.gameDate) === key && (anyType || gtype(g) === type)).map((g) => g.memberId));
     const editMember = GS.editing > 0 ? (games.find((g) => g.recordId === GS.editing) || {}).memberId : null;
     return activeMembers().filter((m) => !reg.has(m.memberId) || m.memberId === editMember).sort((a, b) => ko.compare(a.name.trim(), b.name.trim()) || a.memberId - b.memberId);
   }
@@ -792,6 +792,21 @@
     const size = () => { const top = r.getBoundingClientRect().top, bn = document.querySelector(".bnav"), bh = bn && !bn.hidden ? bn.offsetHeight : 0; r.style.setProperty("--phh", Math.max(240, window.innerHeight - top - bh - 4) + "px"); };
     size(); requestAnimationFrame(size); window.onresize = size; return r;
   }
+  /* 회원명 선택: 6명까지 보이고 위·아래로 끌어서 이동하는 목록 */
+  function ppick(opts, value, onchange, cls = "") {
+    const cur = opts.find((o) => String(o[0]) === String(value)) || opts[0] || ["", ""];
+    const b = h("button", { type: "button", class: "phfs phpickbtn " + cls }, h("span", {}, cur[1]), h("i", {}, "▾"));
+    b.onclick = () => {
+      const close = () => { back.remove(); };
+      const rowH = 44, list = h("div", { class: "phpicklist", style: `max-height:${rowH * 6}px` }, opts.map((o) => h("button", { type: "button", class: "phpickit" + (String(o[0]) === String(cur[0]) ? " on" : ""), style: `height:${rowH}px`, onclick: () => { close(); b.firstChild.textContent = o[1]; onchange(String(o[0])); } }, o[1])));
+      const r = b.getBoundingClientRect(), back = h("div", { class: "phpickback", onclick: (e) => { if (e.target === back) close(); } }, list);
+      list.style.left = Math.max(8, Math.min(r.left, innerWidth - Math.max(r.width, 160) - 8)) + "px"; list.style.width = Math.max(r.width, 160) + "px";
+      const below = innerHeight - r.bottom; list.style.top = (below >= rowH * 6 + 8 ? r.bottom + 2 : Math.max(8, r.top - rowH * 6 - 2)) + "px";
+      document.body.append(back);
+      const on = list.querySelector(".on"); if (on) list.scrollTop = Math.max(0, on.offsetTop - rowH * 2);
+    };
+    return b;
+  }
   function phRoot(...kids) { const r = h("div", { class: "tbroot phroot" }, ...kids.filter(Boolean)); view.textContent = ""; view.append(r); fit(); return r; }
 
   /* ---- 점수관리: 점수 입력 ---- */
@@ -806,9 +821,9 @@
     if (GS.type == null) applyMeetingTypeRule(weekLabel(GS.date));
     const dSel = psel(opts.map((o, i) => [String(i), o[0]]), String(Math.max(0, opts.findIndex((o) => weekKey(o[1]) === weekKey(GS.date)))), (v) => { const o = opts[+v]; GS.date = o[1]; GS.editing = 0; applyMeetingTypeRule(o[0]); phGames(); });
     const tSel = psel(typeList(), GS.type, (v) => { GS.type = v; phGames(); }); tSel.disabled = !!GS.lockedType;
-    const ims = inputMembersFor(games);
+    const ims = inputMembersFor(games, true);
     if (!ims.some((m) => m.memberId === GS.member)) GS.member = ims.length ? ims[0].memberId : null;
-    const mSel = psel(ims.length ? ims.map((m) => [m.memberId, m.name]) : [["", "등록 가능한 회원 없음"]], GS.member, (v) => { GS.member = +v; }); mSel.disabled = !ims.length; mSel.id = "tbMember";
+    const mSel = ppick(ims.length ? ims.map((m) => [m.memberId, m.name]) : [["", "등록 가능한 회원 없음"]], GS.member, (v) => { GS.member = +v; }); mSel.disabled = !ims.length; mSel.id = "tbMember";
     const sumBar = h("div", { class: "phsumbar" });
     const scoreIn = GS.scores.map((v, i) => h("input", { class: "phin sc", inputmode: "numeric", maxlength: "3", placeholder: `${i + 1}G`, value: v }));
     const noteIn = h("input", { class: "phin note", placeholder: "비고", value: GS.note });
@@ -929,7 +944,7 @@
     });
     const pct = req ? Math.round(Math.min(paid, req) / req * 100) : 0;
     phRootF(1, pcard("회비 납부 등록",
-      psel(members.map((x) => [x.memberId, x.name]), FS.member, (v) => { FS.member = +v; phFees(); }, "center"),
+      ppick(members.map((x) => [x.memberId, x.name]), FS.member, (v) => { FS.member = +v; phFees(); }, "center"),
       h("div", { class: "phfeerow" }, h("label", { class: "phchk" }, pre, "선납"), h("label", { class: "phlab" }, h("small", {}, "시작 월"), sSel), h("label", { class: "phlab" }, h("small", {}, "종료 월"), eSel)),
       h("div", { class: "phrow2" }, h("label", { class: "phout" }, h("small", {}, "납부일"), dIn), nIn), calc,
       h("div", { class: "phbtns three" }, pbtn("납부취소", cancelRange, "ghost"), pbtn("수정", modifyFee, "ghost"), pbtn("납부 등록", savePay, "pri"))),
