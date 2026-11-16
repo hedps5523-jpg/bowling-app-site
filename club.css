@@ -237,7 +237,6 @@ body.print .contactwrap{max-height:none}
 .pcsub:empty{display:none}
 .pcsub .pcform{flex-wrap:nowrap;white-space:nowrap;flex:0 0 auto}
 @media (min-width:900px){.pchead{flex-wrap:nowrap}.pcnav{flex:0 0 auto}.pcwho{flex:0 0 auto}.pcwho #authStatus{white-space:nowrap}}
-@media (min-width:1300px){body.viewonly .wrap{max-width:1560px}}
 
 .pcmenusel{width:auto!important;margin:0!important;font:inherit;font-weight:800;font-size:17px;text-align:center;text-align-last:center;color:#1c2333;background:#eef3fb;border:1px solid #c3d2e2;border-radius:8px;padding:5px 26px 5px 14px;min-width:170px;cursor:pointer}
 .pcnav:empty{display:none}
