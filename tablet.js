@@ -1204,7 +1204,7 @@
   const PC = {}; TB_KEYS.forEach((k) => { PC[k] = TABS[k]; TABS[k] = { render() { TB.wasOn = MODE_KEY(); RENDER[k](); } }; });
   const pcHeader = drawHeader;
   /* 세로 화면 구역 목록 (모바일 볼링클럽: 입력모드 / 조회모드 선택목록) */
-  const PH_INPUT = [["games", "점수관리"], ["quarter", "분기에버"], ["ledger", "장부관리"], ["fees", "회비관리"]];
+  const PH_INPUT = [["members", "회원관리"], ["games", "점수관리"], ["quarter", "분기에버"], ["ledger", "장부관리"], ["fees", "회비관리"], ["lockers", "락카 사용현황"]];
   const PH_QUERY = [["members", "회원"], ["games", "게임기록"], ["ledger", "장부"], ["fees", "회비"], ["lockers", "락카"]];
   const phList = () => (inputMode() ? PH_INPUT : PH_QUERY);
   drawHeader = function () {
@@ -1223,7 +1223,6 @@
     if (phone) {
       // 조회모드에는 분기에버 구역이 없어요 → 게임기록의 분기에버 보고서로 보여 줘요
       if (!inputMode() && current === "quarter") { current = "games"; GS.report = "분기에버"; GS.linked = null; }
-      if (inputMode() && (current === "members" || current === "lockers")) current = "games";
       const list = phList();
       const secSel = h("select", { class: "phsec", "aria-label": "구역 선택" }, list.map(([k, t]) => h("option", { value: k }, t)));
       secSel.value = list.some(([k]) => k === current) ? current : "games";
