@@ -601,3 +601,35 @@ body.tbon .tbin.num{width:50px!important}
 .alp-idx{display:flex;flex-direction:column;gap:6px;font-size:32px}
 .alp-imaj{display:flex;justify-content:space-between;font-size:40px;font-weight:800;color:#14304f;margin-top:26px;border-bottom:3px solid #14304f;padding-bottom:6px}
 .alp-imid{display:flex;justify-content:space-between;padding:6px 20px;font-size:33px}.alp-imin{display:flex;justify-content:space-between;padding:2px 60px;font-size:28px;color:#475467}
+
+/* ===== 세로 화면 입력모드: 글자·줄높이 다듬기 (더 많이 보이게) ===== */
+.phrow2e{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.phfs.phbox{height:42px!important;border:1px solid #CFD9E6!important;border-radius:10px;background:#fff!important;font-size:15px!important;font-weight:600!important;text-align:left;text-align-last:left;padding:0 24px 0 12px!important;width:100%}
+.phllist2{max-height:none}
+body.phmode .phroot{padding-top:6px}
+body.phmode .phcard{padding:10px;gap:6px;margin-bottom:6px;border-radius:14px}
+body.phmode .phct{font-size:16px}body.phmode .phct.big{font-size:19px}
+body.phmode .phin{height:42px;font-size:15px;border-radius:9px;padding:0 10px}
+body.phmode .phbtn{height:42px;font-size:15px;border-radius:10px}
+body.phmode .phbtns{gap:8px}
+body.phmode .phtable th{height:38px;font-size:14px}
+body.phmode .phtable td{height:42px;font-size:15px}
+body.phmode .phtable.phmem td{font-size:14px;height:40px}
+body.phmode .phtable.phmem th:first-child{width:22%}
+body.phmode .phtable.phmem th:last-child{width:19%}
+body.phmode .phpreview{padding:6px 12px;font-size:13px;margin-bottom:6px}
+body.phmode .phlrow{height:44px;font-size:15px}
+body.phmode .phqhead{min-height:50px}
+body.phmode .phqhead .nm{font-size:15px}
+body.phmode .phsumbar{height:32px;font-size:13px}
+body.phmode .phchk{font-size:15px}
+body.phmode .phcalc{font-size:14px;padding:8px 12px}
+body.phmode .phtile{height:64px;font-size:14px}
+body.phmode .phle{padding:6px 12px}body.phmode .phle .l1 b{font-size:15px}body.phmode .phle .l2{font-size:13px}
+@media (min-width:600px) and (max-width:899px){
+  body.phmode .phroot{max-width:760px;margin:0 auto}
+  body.phmode .phtable td{font-size:16px}body.phmode .phin,body.phmode .phbtn{font-size:16px}
+}
+body.phmode .phtable.phmem th:first-child{width:19%}body.phmode .phtable.phmem th:nth-child(2){width:31%}body.phmode .phtable.phmem th:nth-child(3){width:19%}body.phmode .phtable.phmem th:nth-child(4){width:16%}body.phmode .phtable.phmem th:last-child{width:15%}
+body.phmode .phtable.phmem td{font-size:13px;padding:0 1px}body.phmode .phtable.phmem td.nm{font-size:14px}
+body.phmode .phtable.phmem th{font-size:12.5px;padding:0}

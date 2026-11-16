@@ -1138,10 +1138,66 @@
   }
   const phQ = () => PHONE() && !inputMode();
 
+  /* ---- 회원관리 (세로 입력모드) ---- */
+  function phMembers() {
+    const all = allMembers().filter((m) => isActive(m));
+    const q = (MS.q || "").trim();
+    const list = all.filter((m) => !q || m.name.includes(q)).sort((a, b) => qBase(b) - qBase(a) || ko.compare(a.name, b.name));
+    if (!list.some((m) => m.memberId === MS.sel)) MS.sel = 0;
+    const qIn = h("input", { class: "phin", placeholder: "검색 (회원명)", value: MS.q || "", enterkeyhint: "search" });
+    qIn.oninput = () => { MS.q = qIn.value; clearTimeout(phMembers.t); phMembers.t = setTimeout(() => { phMembers(); const n = view.querySelector(".phin"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); };
+    const rows = list.map((m) => { const lk = lockerOf(m.memberId), b = qBase(m);
+      return h("tr", { class: m.memberId === MS.sel ? "sel" : "", onclick: () => { MS.sel = MS.sel === m.memberId ? 0 : m.memberId; phMembers(); }, ondblclick: () => editMember(m) },
+        h("td", { class: "nm" }, m.name), h("td", {}, m.phone || "-"), h("td", {}, m.grade || "-"), h("td", {}, b > 0 ? String(b) : "-"), h("td", {}, lk ? lk.locker_number : "-")); });
+    phRoot(h("section", { class: "phcard" }, qIn,
+      h("div", { class: "phbtns three" }, pbtn("팝업", () => (window.contactView ? contactView() : toast("연락처를 열 수 없어요."))), pbtn("추가", () => memberForm(null)),
+        pbtn("수정", () => { const m = all.find((x) => x.memberId === MS.sel); m ? editMember(m) : toast("수정할 회원을 먼저 선택하세요."); }, "pri"))),
+      h("div", { class: "phtable phmem" }, h("table", {}, h("thead", {}, h("tr", {}, ["회원명", "연락처", "구분", "기준에버", "락카번호"].map((x) => h("th", {}, x)))),
+        h("tbody", {}, rows.length ? rows : h("tr", {}, h("td", { colspan: 5, class: "phempty" }, "회원 자료가 없습니다."))))));
+  }
+
+  /* ---- 장부관리 (세로 입력모드) ---- */
+  function phLedger() {
+    if (!LS.date) LS.date = today();
+    const all = S.ledger.filter((e) => e.date), mk = LS.date.slice(0, 7);
+    const dIn = h("input", { class: "phin sc", type: "date", value: LS.date }); dIn.onchange = () => { LS.date = dIn.value || today(); phLedger(); };
+    const tSel = psel(["수입", "지출"], LS.type, (v) => { LS.type = v; LS.cat = null; phLedger(); }, "phbox");
+    const cats = LC.names(LS.type); if (LS.cat && !cats.includes(LS.cat)) cats.push(LS.cat);
+    if (!cats.includes(LS.cat)) LS.cat = cats[0] || "";
+    const cSel = psel(cats, LS.cat, (v) => (LS.cat = v), "phbox");
+    const aIn = h("input", { class: "phin", inputmode: "numeric", placeholder: "금액", value: LS.amount }); aIn.oninput = () => (LS.amount = aIn.value);
+    const nIn = h("input", { class: "phin", placeholder: "비고", value: LS.note }); nIn.oninput = () => (LS.note = nIn.value);
+    const list = all.filter((e) => e.date.startsWith(mk)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.ledgerId - b.ledgerId));
+    const items = list.map((e) => h("div", { class: "phle" + (e.ledgerId === LS.editing ? " sel" : ""), onclick: () => { LS.editing = e.ledgerId; LS.date = e.date; LS.type = e.type === "지출" ? "지출" : "수입"; LS.cat = e.category; LS.amount = String(e.amount); LS.note = e.note || ""; phLedger(); } },
+      h("div", { class: "l1" }, h("b", {}, e.date.slice(5)), h("span", { class: "tag " + (e.type === "수입" ? "in" : "out") }, e.type), h("b", { class: "amt" }, won(e.amount) + "원")),
+      h("div", { class: "l2" }, `${e.category}${e.note ? " – " + e.note : ""}`)));
+    const clear = () => { LS.editing = 0; LS.amount = ""; LS.note = ""; };
+    async function saveP(update) {
+      if (!canIn()) return;
+      const amount = parseInt(String(LS.amount).replace(/,/g, ""), 10) || 0;
+      if (!LS.cat) return toast("내역을 선택하세요.");
+      if (amount <= 0) return toast("금액을 입력하세요.");
+      if (update && !(LS.editing > 0)) return toast("아래 목록에서 수정할 내역을 선택하세요.");
+      const prev = update ? S.ledger.find((x) => x.ledgerId === LS.editing) : null;
+      const e = { ledgerId: update ? LS.editing : 0, date: LS.date, type: LS.type || "수입", category: LS.cat, amount, note: String(LS.note || "").trim(), fromFee: prev ? prev.fromFee : false, memberId: prev ? prev.memberId : 0 };
+      if (await save([op("ledger_entries", update ? "update" : "insert", ledgerPayload(e), update ? S.rv.ledger[LS.editing] : undefined)], "저장되었습니다.")) { clear(); phLedger(); }
+    }
+    async function delP() {
+      const e = S.ledger.find((x) => x.ledgerId === LS.editing); if (!e) return toast("삭제할 내역을 선택하세요.");
+      if (!(await confirmBox("선택한 내역을 삭제하시겠습니까?"))) return;
+      clear(); await save([op("ledger_entries", "delete", ledgerPayload(e), S.rv.ledger[e.ledgerId])], "장부가 삭제되었습니다.");
+    }
+    phRoot(h("section", { class: "phcard" }, h("b", { class: "phct" }, "장부 입력"),
+      h("div", { class: "phrow2e" }, dIn, tSel), cSel, h("div", { class: "phrow2e" }, aIn, nIn),
+      h("div", { class: "phbtns three" }, LS.editing > 0 ? pbtn("삭제", delP) : pbtn("초기화", () => { clear(); phLedger(); }), pbtn("수정", () => saveP(true)), pbtn("저장", () => saveP(false), "pri"))),
+      h("div", { class: "phpreview" }, `입력 중 월별 미리보기: ${+mk.slice(5)}월 / ${list.length}건`),
+      h("div", { class: "phllist2" }, items.length ? items : h("div", { class: "phempty" }, "해당 월 장부 내역이 없습니다.")));
+  }
+
   const RENDER = { games: () => (phIn() ? phGames() : phQ() ? phqGames() : renderGames(false)), quarter: () => (phIn() ? phQuarter() : phQ() ? phqGames() : renderGames(true)),
-    ledger: () => (phQ() ? phqLedger() : renderLedger()), fees: () => (phIn() ? phFees() : phQ() ? phqFees() : renderFees()),
+    ledger: () => (phIn() ? phLedger() : phQ() ? phqLedger() : renderLedger()), fees: () => (phIn() ? phFees() : phQ() ? phqFees() : renderFees()),
     album: () => window.ClubAlbum.render(),
-    members: () => (phQ() ? phqMembers() : renderMembers()), lockers: () => (phIn() ? phLockers() : phQ() ? phqLockers() : renderLockers()) };
+    members: () => (phIn() ? phMembers() : phQ() ? phqMembers() : renderMembers()), lockers: () => (phIn() ? phLockers() : phQ() ? phqLockers() : renderLockers()) };
   const PC = {}; TB_KEYS.forEach((k) => { PC[k] = TABS[k]; TABS[k] = { render() { TB.wasOn = MODE_KEY(); RENDER[k](); } }; });
   const pcHeader = drawHeader;
   /* 세로 화면 구역 목록 (모바일 볼링클럽: 입력모드 / 조회모드 선택목록) */
