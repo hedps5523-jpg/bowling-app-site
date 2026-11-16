@@ -9,6 +9,8 @@
 (function () {
   const TB = { input: null, wasOn: null };
   const TB_ON = () => window.innerWidth >= 900 && document.documentElement.getAttribute("data-dev") === "desktop";
+  const PHONE = () => !TB_ON(); // 휴대폰·일반 태블릿 세로(좁은 화면): 모바일 볼링클럽 세로화면 배치
+  const MODE_KEY = () => (TB_ON() ? "tb" : "ph");
   const TB_KEYS = ["games", "ledger", "fees", "quarter", "members", "lockers"];
   const TAB_LABEL = { games: "게임기록", ledger: "회계장부", fees: "회비관리", quarter: "분기에버" };
   const canIn = () => !VIEWONLY && canWrite();
@@ -130,14 +132,24 @@
   const lab = (t) => h("span", { class: "tblab" }, t);
   const btn = (t, onclick, cls = "") => h("button", { type: "button", class: "tbbtn " + cls, onclick }, t);
   const sel = (opts, value, onchange, cls = "") => { const s = h("select", { class: "tbsel " + cls }, opts.map((o) => { const [v, t] = Array.isArray(o) ? o : [o, o]; return h("option", { value: v }, t); })); if (value != null) s.value = value; if (onchange) s.onchange = () => onchange(s.value); return s; };
-  const card = (...kids) => h("div", { class: "tbcard" }, ...kids);
+  const card = (...kids) => {
+    const list = kids.flat().filter((k) => k != null && k !== false), out = [];
+    for (let i = 0; i < list.length; i++) {
+      const k = list[i], nx = list[i + 1];
+      if (k.classList && k.classList.contains("tblab") && nx && nx.nodeType === 1 && !(nx.classList && (nx.classList.contains("tblab") || nx.classList.contains("tbbtn")))) {
+        const c = nx.classList || { contains: () => false };
+        out.push(h("label", { class: "tbf" + (c.contains("num") ? " sm" : c.contains("note") || c.contains("wide") ? " full" : "") }, k, nx)); i++;
+      } else out.push(k);
+    }
+    return h("div", { class: "tbcard" }, ...out);
+  };
   const spacer = () => h("span", { style: "flex:1" });
   const empty = (msg) => h("div", { class: "tbtable" }, h("div", { class: "tbempty" }, msg));
   /* 결과표: 머리글 고정, 행 클릭 = 선택/불러오기, 길게 누르기·오른쪽 클릭 = 삭제/취소 */
   function table({ headers, rows, weights, aligns = [], selectedRow = -1, cellColor, cellBg, custom, onClick, onLong, cls = "" }) {
     if (!rows.length) return null;
     const sum = weights.reduce((a, b) => a + b, 0);
-    const t = h("table", {}, h("colgroup", {}, weights.map((w) => h("col", { style: `width:${(w / sum * 100).toFixed(3)}%` }))),
+    const t = h("table", { style: PHONE() ? `min-width:${Math.round(Math.max(330, headers.length * 60, weights.reduce((a, b) => a + b, 0) * 0.7))}px` : "" }, h("colgroup", {}, weights.map((w) => h("col", { style: `width:${(w / sum * 100).toFixed(3)}%` }))),
       h("thead", {}, h("tr", {}, headers.map((x) => h("th", {}, x)))));
     const tb = h("tbody");
     rows.forEach((r, i) => {
@@ -167,12 +179,13 @@
   function root(...kids) { const r = h("div", { class: "tbroot" }, ...kids.filter(Boolean)); view.textContent = ""; view.append(r); fit(); return r; }
   function fit() {
     const r = view.querySelector(":scope > .tbroot"); if (!r) return;
+    if (PHONE()) { r.style.height = ""; document.documentElement.classList.remove("fitpage"); return; }
     window.scrollTo(0, 0);
     const nav = $("bnav"), navTop = nav && !nav.hidden && getComputedStyle(nav).display !== "none" ? nav.getBoundingClientRect().top : window.innerHeight;
     r.style.height = Math.max(360, navTop - r.getBoundingClientRect().top - 6) + "px";
     document.documentElement.classList.add("fitpage");
   }
-  window.addEventListener("resize", () => { if (TB.wasOn !== TB_ON() && TB.wasOn != null && typeof render === "function" && $("pchead") && !$("pchead").hidden) render(); else fit(); });
+  window.addEventListener("resize", () => { if (TB.wasOn != null && TB.wasOn !== MODE_KEY() && typeof render === "function" && $("pchead") && !$("pchead").hidden) render(); else fit(); });
 
   /* =====================================================================
      게임기록 / 분기에버 (LargeGameFragment)
@@ -215,7 +228,7 @@
       const ims = inputMembersFor(games);
       if (!ims.some((m) => m.memberId === GS.member)) GS.member = ims.length ? ims[0].memberId : null;
       const mSel = sel(ims.length ? ims.map((m) => [m.memberId, m.name]) : [["", "등록 가능한 회원 없음"]], GS.member, (v) => { GS.member = +v; });
-      mSel.disabled = !ims.length; mSel.id = "tbMember";
+      mSel.disabled = !ims.length; mSel.id = "tbMember"; mSel.classList.add("wide");
       const scoreIn = GS.scores.map((v, i) => h("input", { class: "tbin num", inputmode: "numeric", maxlength: "3", value: v }));
       const noteIn = h("input", { class: "tbin note", value: GS.note });
       // 3자리를 입력하면 다음 칸(1G→2G→3G→4G→비고)으로 자동 이동
@@ -229,7 +242,7 @@
 
     // 2행: 보고서 종류 / 연결 필드 / 조회
     let queryCard = null;
-    const reports = quarterOnly ? ["분기에버"] : ["개인기록", "모임기록", "누적기록", "순위표"];
+    const reports = quarterOnly ? ["분기에버"] : PHONE() && !inMode ? ["개인기록", "모임기록", "누적기록", "순위표", "분기에버"] : ["개인기록", "모임기록", "누적기록", "순위표"];
     if (!reports.includes(GS.report)) GS.report = reports[0];
     const report = quarterOnly ? "분기에버" : GS.report;
     let linkedOpts = [], linkedLabel = "";
@@ -396,7 +409,7 @@
     if (!rows.some((r) => r.id === GS.qMember)) GS.qMember = rows.length ? rows[0].id : null;
     const tbl = table({ headers: ["순번", "회원명", "등급", "기준에버", "누적에버", "조정에버"], rows: rows.map((r, i) => [String(i + 1), ...r.cells.slice(1)]),
       weights: [135, 271, 203, 203, 203, 237], selectedRow: rows.findIndex((r) => r.id === GS.qMember),
-      onClick: (i) => { document.querySelectorAll(".tbadj").forEach((e) => { GS.draft[`${y}-${q}-${e.dataset.id}`] = e.value; }); GS.qMember = rows[i].id; renderGames(true); },
+      onClick: (i) => { document.querySelectorAll(".tbadj").forEach((e) => { GS.draft[`${y}-${q}-${e.dataset.id}`] = e.value; }); GS.qMember = rows[i].id; RENDER[current](); },
       custom: (r, c) => {
         if (c !== 5 || !editable) return null;
         const k = `${y}-${q}-${rows[r].id}`;
@@ -469,7 +482,7 @@
     const carry = from ? all.filter((e) => e.date < from).reduce((a, e) => a + signed(e), 0)
       : windowStart ? all.filter((e) => e.date < windowStart).reduce((a, e) => a + signed(e), 0)
       : (!firstOfMonth || LS.showAll) ? 0 : all.filter((e) => e.date < firstOfMonth).reduce((a, e) => a + signed(e), 0);
-    const tbl = table({ headers: ["번호", "일자", "구분", "내역", "금액", "비고"], rows: list.map((e, i) => [String(i + 1), e.date, e.type, e.category, won(e.amount), e.note]),
+    const tbl = table({ headers: ["번호", "일자", "구분", "내역", "금액", "비고"], rows: list.map((e, i) => [String(i + 1), PHONE() ? e.date.slice(2) : e.date, e.type, e.category, won(e.amount), e.note]),
       weights: [40, 100, 50, 85, 95, 430], aligns: [0, 0, 0, 0, 2, 1], selectedRow: list.findIndex((e) => LS.editing > 0 && e.ledgerId === LS.editing),
       cellColor: (r, c) => (c === 2 ? (list[r].type === "수입" ? "#0F9D45" : "#D93025") : 0),
       onClick: (i) => loadL(list[i]), onLong: (i) => delL(list[i]) }) || empty("해당 장부 내역이 없습니다.");
@@ -743,31 +756,63 @@
      상단 막대 · 화면 연결
      ===================================================================== */
   const RENDER = { games: () => renderGames(false), quarter: () => renderGames(true), ledger: renderLedger, fees: renderFees, members: renderMembers, lockers: renderLockers };
-  const PC = {}; TB_KEYS.forEach((k) => { PC[k] = TABS[k]; TABS[k] = { render() { TB.wasOn = TB_ON(); if (TB.wasOn) RENDER[k](); else if (PC[k]) PC[k].render(); } }; });
+  const PC = {}; TB_KEYS.forEach((k) => { PC[k] = TABS[k]; TABS[k] = { render() { TB.wasOn = MODE_KEY(); RENDER[k](); } }; });
   const pcHeader = drawHeader;
+  /* 세로 화면 구역 목록 (모바일 볼링클럽: 입력모드 / 조회모드 선택목록) */
+  const PH_INPUT = [["members", "회원관리"], ["games", "점수관리"], ["quarter", "분기에버"], ["ledger", "장부관리"], ["fees", "회비관리"], ["lockers", "락카관리"]];
+  const PH_QUERY = [["members", "회원"], ["games", "게임기록"], ["ledger", "장부"], ["fees", "회비"], ["lockers", "락카"]];
+  const phList = () => (inputMode() ? PH_INPUT : PH_QUERY);
   drawHeader = function () {
-    TB.wasOn = TB_ON();
-    document.body.classList.toggle("tbon", TB.wasOn);
+    const tab = TB_ON(), phone = !tab;
+    TB.wasOn = MODE_KEY();
+    document.body.classList.toggle("tbon", tab);
+    document.body.classList.toggle("phmode", phone);
     const old = $("tbpill"); if (old) old.remove();
-    if (!TB.wasOn) { if (typeof pcHeader === "function") pcHeader(); return; }
     if (!TB.started) { TB.started = true; if (!location.hash.replace("#", "")) current = "games"; }
     if (!TB_KEYS.includes(current) && current !== "settings") current = "games";
     const nav = $("pcnav"); nav.textContent = "";
+    $("pcsub").textContent = "";
+    const me = Conn.me, mgr = cleanTitle(S.settings.key_management_name || "");
+    if (phone) {
+      // 조회모드에는 분기에버 구역이 없어요 → 게임기록의 분기에버 보고서로 보여 줘요
+      if (!inputMode() && current === "quarter") { current = "games"; GS.report = "분기에버"; GS.linked = null; }
+      const list = phList();
+      const secSel = h("select", { class: "phsec", "aria-label": "구역 선택" }, list.map(([k, t]) => h("option", { value: k }, t)));
+      secSel.value = list.some(([k]) => k === current) ? current : "games";
+      secSel.onchange = () => go(secSel.value);
+      nav.append(secSel);
+      const tools = h("span", { class: "phtools", id: "tbpill" });
+      if (canIn()) tools.append(h("button", { type: "button", class: "phmodebtn" + (inputMode() ? " in" : ""), title: inputMode() ? "조회모드로 전환" : "입력모드로 전환",
+        onclick: () => { TB.input = !inputMode(); if (!phList().some(([k]) => k === current)) current = "games"; render(); } }, inputMode() ? "✎ 입력" : "🔍 조회"));
+      tools.append(h("button", { type: "button", class: "phmenu pcbtn file", title: "메뉴", onclick: (e) => openFileMenu(e.currentTarget) }, "☰"));
+      $("authStatus").before(tools);
+      $("authStatus").textContent = "";
+      $("appName").textContent = mgr || (VIEWONLY ? "기록 조회" : "클럽관리");
+      $("pchead").hidden = false;
+      return;
+    }
     nav.append(h("button", { class: "tbbtn file pcbtn", type: "button", onclick: (e) => openFileMenu(e.currentTarget) }, "FILE"));
     for (const k of ["games", "ledger", "fees", "quarter"]) nav.append(h("button", { class: "tbbtn" + (current === k ? " sel" : ""), type: "button", onclick: () => go(k) }, TAB_LABEL[k]));
-    $("pcsub").textContent = "";
-    const me = Conn.me;
     if (canIn()) {
       const pill = h("span", { class: "tbpill", id: "tbpill" },
         h("button", { type: "button", class: inputMode() ? "on" : "", onclick: () => { TB.input = true; render(); } }, "입력"),
         h("button", { type: "button", class: inputMode() ? "" : "on", onclick: () => { TB.input = false; render(); } }, "조회"));
       $("authStatus").before(pill);
     }
-    const mgr = cleanTitle(S.settings.key_management_name || "") ;
     $("authStatus").textContent = me ? `${me.isAdmin ? "관리자" : VIEWONLY ? "조회" : "회원"} · ${mgr}` : "";
     $("authStatus").title = me ? `${me.siteName || me.name || ""} · 서버 v${S.dataVersion}` : "";
     $("logoutBtn").textContent = VIEWONLY ? "홈으로" : "로그아웃";
     $("pchead").hidden = false;
     $("appName").textContent = TITLES[current] || (VIEWONLY ? "기록 조회" : "클럽관리");
   };
+
+  /* 세로 화면: 좌우로 밀어 이전·다음 구역 (표 안에서 시작한 밀기는 표 가로 스크롤로 둬요) */
+  let sw = null;
+  view.addEventListener("touchstart", (e) => { if (!PHONE() || e.touches.length !== 1 || e.target.closest(".tbtable, input, select, textarea")) { sw = null; return; } sw = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }, { passive: true });
+  view.addEventListener("touchend", (e) => {
+    if (!sw) return; const t = e.changedTouches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y; sw = null;
+    if (Math.abs(dx) < 80 || Math.abs(dy) > 50) return;
+    const list = phList(), i = list.findIndex(([k]) => k === current); if (i < 0) return;
+    const n = list[(i + (dx < 0 ? 1 : -1) + list.length) % list.length][0]; go(n);
+  }, { passive: true });
 })();

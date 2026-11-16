@@ -317,3 +317,46 @@ body.tbon #logoutBtn{height:34px;border-radius:5px;border:1px solid #BCCDE5;back
 .tbcum{font-size:12px;padding-right:6px;letter-spacing:-.2px}
 .tbmini td{font-size:13px!important;line-height:1.2;font-weight:400}
 .tbmini tr.hd td,.tbmini tr.tot td{font-weight:700}
+
+/* ===== 휴대폰·일반 태블릿 세로 화면 (모바일 볼링클럽 세로 배치) ===== */
+.tbf{display:flex;align-items:center;gap:8px;flex:none;margin:0;font-weight:400}
+.tbf .tblab{margin-left:6px}
+.tbcard>.tbf:first-child .tblab{margin-left:0}
+body.phmode{background:#F2F6FB}
+body.phmode .pchead{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:4px 0}
+body.phmode .pcnav{flex:1 1 auto;min-width:0}
+body.phmode .pcwho{flex:none;gap:6px}
+body.phmode #authStatus,body.phmode #logoutBtn{display:none}
+.phsec{width:100%!important;max-width:240px;margin:0!important;height:38px;font:inherit;font-weight:800;font-size:16px;color:#12285A;background:#fff;border:1px solid #BCCDE5;border-radius:8px;padding:0 28px 0 12px}
+.phtools{display:inline-flex;gap:6px}
+.phmodebtn,.phmenu{height:38px;border-radius:19px;border:1px solid #BCCDE5;background:#E8EFFA;color:#12285A;font:inherit;font-weight:700;font-size:13px;padding:0 12px;width:auto;margin:0;white-space:nowrap}
+.phmodebtn.in{background:#1A5BA8;border-color:#1A5BA8;color:#fff}
+.phmenu{width:38px;padding:0;font-size:18px;background:#1A5BA8;border-color:#1A5BA8;color:#fff}
+body.phmode .tbroot{height:auto!important;padding-bottom:8px}
+body.phmode .tbcard{flex-wrap:wrap;align-items:flex-end;padding:10px;gap:8px;min-height:0;overflow:visible}
+body.phmode .tbf{flex-direction:column;align-items:stretch;gap:3px;flex:1 1 calc(50% - 8px);min-width:0}
+body.phmode .tbf .tblab{margin:0;font-size:11.5px}
+body.phmode .tbf.sm{flex:1 1 calc(25% - 8px)}
+body.phmode .tbf.full{flex:1 1 100%}
+body.phmode .tbsel,body.phmode .tbin{width:100%!important;min-width:0;height:38px!important;font-size:15px}
+body.phmode .tbin.num{width:100%!important;font-size:16px}
+body.phmode .tbcard>.tbsel{flex:1 1 calc(50% - 8px)}
+body.phmode .tbcard>.tbbtn{flex:1 1 auto;height:38px}
+body.phmode .tbcard>.tbbtn.pri{flex:1 1 30%}
+body.phmode .tbcard>span[style*="flex:1"]{display:none}
+body.phmode .tbsum{flex:1 1 100%;font-size:13px;white-space:normal;margin:0}
+body.phmode .tbbadge{flex:1 1 100%;text-align:center}
+body.phmode .tbtitle{margin-top:10px}
+body.phmode .tbbody{flex-direction:column;flex:none}
+body.phmode .tbbody>div{flex:none!important;width:100%}
+body.phmode .tbtable{max-height:calc(100vh - 170px);-webkit-overflow-scrolling:touch}
+body.phmode .tbtable td,body.phmode .tbtable th{font-size:12.5px}
+body.phmode .tbsplit{flex-direction:column}
+body.phmode .tbsplit>div{flex:none!important}
+body.phmode .tbdetail{max-height:none}
+body.phmode .tbright{overflow:visible}
+body.phmode .tbhead{gap:6px 12px;flex-wrap:wrap}.phmode .tbhead>b{font-size:18px}.phmode .tbhead>span{font-size:12.5px}
+body.phmode .tblegend{flex-wrap:wrap;height:auto;padding:6px 4px}
+body.phmode .tbchart{min-height:240px}
+body.phmode .tbin.note{flex:none!important;height:38px!important}
+body.phmode .tbcard>label.tbf>.tbchk{height:38px;width:22px}
