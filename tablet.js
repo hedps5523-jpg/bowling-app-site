@@ -1153,6 +1153,7 @@
     TB.wasOn = MODE_KEY();
     document.body.classList.toggle("tbon", tab);
     document.body.classList.toggle("phmode", phone);
+    $("logoutBtn").style.display = "";
     const old = $("tbpill"); if (old) old.remove();
     if (!TB.started) { TB.started = true; if (!location.hash.replace("#", "")) current = "games"; }
     if (!TB_KEYS.includes(current) && current !== "settings") current = "games";
@@ -1184,7 +1185,7 @@
       const VM = [["members", "회원관리"], ["games", "게임기록"], ["ledger", "회계장부"], ["fees", "회비관리"], ["lockers", "락카관리"]];
       const ms = h("select", { class: "pcmenusel", "aria-label": "메뉴 선택" }, VM.map(([k, t]) => h("option", { value: k }, t)));
       ms.value = VM.some(([k]) => k === current) ? current : "games"; ms.onchange = () => go(ms.value);
-      $("authStatus").textContent = me ? `조회 · ${mgr}` : ""; $("logoutBtn").textContent = "홈으로";
+      $("authStatus").textContent = me ? `조회 · ${mgr}` : ""; $("logoutBtn").style.display = "none";
       $("pchead").hidden = false; $("appName").textContent = ""; $("appName").append(ms);
       return;
     }
