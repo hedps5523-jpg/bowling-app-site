@@ -408,7 +408,15 @@ const gsum = (g) => [g.s1, g.s2, g.s3, g.s4].filter((x) => x > 0).reduce((a, b) 
 const gcnt = (g) => [g.s1, g.s2, g.s3, g.s4].filter((x) => x > 0).length;
 const gavg = (g) => gcnt(g) ? gsum(g) / gcnt(g) : 0;
 const gbest = (g) => Math.max(g.s1, g.s2, g.s3, g.s4);
-const fmt1 = (d) => (Math.round(d * 10 + (d >= 0 ? 1e-9 : -1e-9)) / 10).toFixed(1);
+// Java String.format("%.1f") 와 같은 반올림: 가장 짧은 십진 표기에서 HALF_UP
+const fmt1 = (d) => {
+  const neg = d < 0 || Object.is(d, -0), a = Math.abs(d); let t = String(a);
+  if (/e/i.test(t)) t = a.toFixed(20);
+  let [ip, fp = ""] = t.split("."); fp = (fp + "0").slice(0, Math.max(2, fp.length));
+  let tenth = +fp[0] + (+fp[1] >= 5 ? 1 : 0), whole = +ip;
+  if (tenth === 10) { tenth = 0; whole += 1; }
+  const r = `${whole}.${tenth}`; return neg && +r !== 0 ? "-" + r : r;
+};
 const signed1 = (d) => (d >= 0 ? "+" : "") + fmt1(d);
 const scoreDisplay = (n) => n > 0 ? String(n) : "";
 const meetingOf = (g) => (g.meetingType || "").trim() || "정모";
@@ -1136,6 +1144,38 @@ async function editFee(row) {
   if (!ops.length) return toast("회비가 수정되었습니다.");
   if (await save(ops, "회비가 수정되었습니다.")) { FV.memberId = m.memberId; render(); }
 }
+
+/* =====================================================================
+   4-5) 랭킹/현황 (PC createRankingPanel / getRankingRows)
+   ===================================================================== */
+Object.assign(Svc, {
+  rankingRows() {
+    const rows = [], games = this.canonicalRankingGames(S.year);
+    for (const m of this.getMembers()) {
+      if (this.isWithdrawn(m)) continue;
+      const gs = games.filter((g) => g.memberId === m.memberId); if (!gs.length) continue;
+      const base = this.effectiveBaseAverage(m);
+      rows.push({ memberId: m.memberId, nameWithBase: `${m.name}(${base})`, grade: m.grade, base, count: gs.reduce((a, g) => a + gcnt(g), 0), avg: this.aggregateAverage(gs), max: Math.max(...gs.map(gbest)) });
+    }
+    return rows.sort((a, b) => b.avg - a.avg || (a.nameWithBase < b.nameWithBase ? -1 : a.nameWithBase > b.nameWithBase ? 1 : 0));
+  },
+  clubAverage() { return this.aggregateAverage(this.canonicalRankingGames(S.year).filter((g) => { const m = this.findMember(g.memberId); return m && !this.isWithdrawn(m); })); },
+  visibleGameCount() { return S.games.filter((g) => yearOf(g.gameDate) === S.year && (() => { const m = this.findMember(g.memberId); return m && !this.isWithdrawn(m); })()).length; },
+});
+TABS.ranking = {
+  render() {
+    const rows = Svc.rankingRows();
+    const cols = [{ t: "순위", get: (r, i) => i + 1 }, { t: "회원명(기준에버)", get: (r) => r.nameWithBase }, { t: "등급", get: (r) => r.grade }, { t: "게임수", get: (r) => r.count },
+      { t: "평균점수", get: (r) => fmt1(r.avg) }, { t: "최고점수", get: (r) => r.max }, { t: "에버편차", get: (r) => signed1(r.avg - r.base) }];
+    const active = Svc.getMembers().filter((m) => !Svc.isWithdrawn(m)).length;
+    const summary = h("span", { class: "pctitle", style: "font-size:15px;margin:0 0 0 8px;white-space:pre-wrap" }, `총 회원 ${active}명   총 게임기록 ${Svc.visibleGameCount()}건   전체 평균 ${fmt1(Svc.clubAverage())}`);
+    const refresh = h("button", { class: "pcbtn", type: "button" }, "새로고침");
+    refresh.onclick = async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } };
+    const rep = h("button", { class: "pcbtn", type: "button" }, "보고서");
+    rep.onclick = () => reportModal("랭킹 현황", "", pcTable([{ t: "순위", get: (r, i) => i + 1 }, { t: "회원명(에버)", get: (r) => r.nameWithBase }, ...cols.slice(3)], rows));
+    view.append(h("section", { class: "pcbox" }, h("div", { class: "pcform" }, refresh, rep, summary)), pcTable(cols, rows));
+  },
+};
 
 /* =====================================================================
    5) 로그인 화면 · 시작
