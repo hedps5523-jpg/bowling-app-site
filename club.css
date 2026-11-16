@@ -166,3 +166,4 @@ table.feeedit{min-width:0;width:100%}table.feeedit td{padding:3px 6px}table.feee
 .envroot .envpanel>.pcnote{margin:2px 0 0;font-size:12px}
 .envroot .envbtns{padding-top:24px}
 @media (max-width:860px){.envroot{overflow:visible;height:auto !important}.envroot>.envpanel:not([hidden]){display:block}.envroot>.enved:not([hidden]){display:grid}.envroot .envdata .pctable-wrap{max-height:320px}.envroot .enved .envfill{max-height:420px}}
+html.fitpage,html.fitpage body{overflow:hidden}

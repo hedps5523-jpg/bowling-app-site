@@ -320,7 +320,25 @@ function render() {
   const t = TABS[current];
   if (!t) { view.append(h("section", { class: "pcbox" }, h("b", {}, TITLES[current] || current), h("p", { class: "pcnote" }, "이 화면은 순서대로 옮기는 중이에요. 곧 열려요."))); return; }
   try { t.render(); } catch (e) { console.error(e); view.append(h("section", { class: "pcbox" }, "화면을 그리지 못했어요: " + e.message)); }
+  fitView();
 }
+/* 기기 화면 한 화면에 맞추기: 표가 남는 높이만 차지하고, 넘치면 표 안에서만 스크롤 (넓은 화면). 좁은 세로 화면은 그대로 페이지 스크롤 */
+function fitView() {
+  if (current === "settings") return;
+  const root = document.documentElement; root.classList.remove("fitpage");
+  const wrap = view.querySelector(":scope > .pctable-wrap");
+  if (!wrap) return;
+  wrap.style.maxHeight = "";
+  if (window.innerWidth <= 860) return;
+  window.scrollTo(0, 0);
+  const nav = $("bnav"), navTop = nav && !nav.hidden ? nav.getBoundingClientRect().top : window.innerHeight;
+  const avail = navTop - wrap.getBoundingClientRect().top - 8;
+  wrap.style.maxHeight = Math.max(160, avail) + "px";
+  if (avail >= 160) root.classList.add("fitpage");
+}
+let fitT; const fitSoon = () => { cancelAnimationFrame(fitT); fitT = requestAnimationFrame(fitView); };
+window.addEventListener("resize", fitSoon);
+new MutationObserver(fitSoon).observe(view, { childList: true });
 const canWrite = () => !!(Conn.me && Conn.me.canWrite);
 const roBadge = () => canWrite() ? null : h("span", { class: "pcro" }, "조회 전용");
 
@@ -1533,10 +1551,10 @@ TABS.settings = {
     /* 기기 화면 한 화면에 맞추기 (가로가 넓은 화면). 좁은 화면(세로 폰)은 쌓아서 스크롤 */
     const fit = () => {
       if (!root.isConnected) { window.removeEventListener("resize", fit); return; }
-      if (window.innerWidth <= 860) { root.style.height = ""; return; }
+      if (window.innerWidth <= 860) { root.style.height = ""; document.documentElement.classList.remove("fitpage"); return; }
       const top = root.getBoundingClientRect().top + window.scrollY;
       const nav = document.getElementById("bnav"), navH = nav && !nav.hidden ? nav.getBoundingClientRect().height : 0;
-      root.style.height = Math.max(380, window.innerHeight - top - navH - 8) + "px";
+      root.style.height = Math.max(380, window.innerHeight - top - navH - 8) + "px"; document.documentElement.classList.add("fitpage");
     };
     window.scrollTo(0, 0); fit(); window.addEventListener("resize", fit); setTimeout(fit, 150);
   },
