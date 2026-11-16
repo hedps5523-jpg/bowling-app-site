@@ -1304,6 +1304,80 @@ async function editLocker(r) {
 }
 
 /* =====================================================================
+   4-8) 기초 자료 (PC createBasicPanel / refreshBasicTable / 모임구분 저장 / 전분기 에버 수정)
+   ===================================================================== */
+const settingOp = (key, value) => {
+  const exists = Object.prototype.hasOwnProperty.call(S.settings, key);
+  if (exists && String(S.settings[key]) === value) return null;
+  const payload = { setting_key: key, setting_value: value };
+  return exists ? op("app_settings", "update", payload, S.rv.settings[key]) : op("app_settings", "insert", payload);
+};
+function quarterOps(memberId, year, serverQ, value) {
+  const key = `${memberId}|${year}|${serverQ}`, exists = key in S.sq, remove = !(value > 0), payload = { member_id: memberId, year, quarter: serverQ };
+  if (remove) return exists ? [op("quarter_base_averages", "delete", payload, S.rv.quarters[key])] : [];
+  payload.average = value;
+  if (!exists) return [op("quarter_base_averages", "insert", payload)];
+  return S.sq[key] === value ? [] : [op("quarter_base_averages", "update", payload, S.rv.quarters[key])];
+}
+Object.assign(Svc, {
+  basicWeeksUntilNextFebruary() { return [...this.basicWeeks(S.year), ...this.basicWeeks(S.year + 1).filter((w) => monthOf(w.date) <= 2)]; },
+  quarterStored(m, q) {
+    if (!m || q < 2 || q > 4) return null; const now = todayStr();
+    if (S.year > yearOf(now)) return null;
+    if (S.year === yearOf(now) && q > this.quarterFromDate(now)) return null;
+    return this.quarterBaseAverage(m, S.year, q);
+  },
+});
+const nz = (n) => n != null && n > 0 ? String(n) : "";
+const BV = { sel: null };
+TABS.basic = {
+  render() {
+    const types = S.meetingTypes, fields = Array.from({ length: 10 }, (_, i) => h("input", { class: "pcin", style: "width:100%", maxlength: "20", value: types[i] || "" }));
+    const saveTypes = h("button", { class: "pcbtn", type: "button", disabled: !canWrite() }, "모임구분 저장");
+    saveTypes.onclick = async () => {
+      const vals = [...new Set(fields.map((f) => f.value.trim()).filter(Boolean))]; if (!vals.length) vals.push("정모", "비모");
+      const raw = vals.join("\n"), o = settingOp("key_meeting_types", raw);
+      const exists = Object.prototype.hasOwnProperty.call(S.settings, "key_meeting_types");
+      if (!o || (!exists && raw === S.meetingTypes.join("\n"))) return toast("모임구분이 저장되었습니다.");
+      saveTypes.disabled = true;
+      if (await save([o], "모임구분이 저장되었습니다.")) render(); else saveTypes.disabled = false;
+    };
+    const dq = () => Math.max(1, Math.floor(new Date().getMonth() / 3) + 1 - 1);
+    const editBtn = h("button", { class: "pcbtn", type: "button" }, "전분기 에버 수정"); editBtn.onclick = () => editBasicQuarter(BV.sel, dq());
+    const weeks = Svc.basicWeeksUntilNextFebruary(), members = Svc.getMembers(), rows = [];
+    for (let i = 0; i < Math.max(Math.max(1, weeks.length), members.length); i++) {
+      const w = weeks[i] || null, m = members[i] || null;
+      rows.push({ w, m, date: w ? shortMD(w.date) : "", label: w ? w.label : "", name: m ? m.name : "", base: m ? String(Svc.effectiveBaseAverage(m)) : "",
+        q: [1, 2, 3, 4].map((q) => !m ? "" : nz(q === 1 ? Svc.quarterBaseAverage(m, S.year, 1) : Svc.quarterStored(m, q))), dec: m ? nz(Svc.decisionAverage(m)) : "" });
+    }
+    const cols = [{ t: "게임일", get: (r) => r.date }, { t: "주차", get: (r) => r.label }, { t: "회원명", get: (r) => r.name }, { t: "기준에버", get: (r) => r.base },
+      ...[0, 1, 2, 3].map((k) => ({ t: `${k + 1}분기에버`, get: (r) => r.q[k] })), { t: "결정에버", get: (r) => r.dec }];
+    const table = pcTable(cols, rows, { onSelect: (r, i, dbl) => { BV.sel = r.m; } });
+    table.querySelectorAll("tbody tr").forEach((tr, i) => tr.addEventListener("dblclick", (e) => {
+      const td = e.target.closest("td"); if (!td) return; const c = [...tr.children].indexOf(td);
+      if (c >= 4 && c <= 7) { BV.sel = rows[i].m; editBasicQuarter(rows[i].m, c - 3); }
+    }));
+    view.append(h("section", { class: "pcbox" }, h("div", { class: "pcgrid5" }, fields.map((f, i) => h("div", {}, h("label", { class: "pcl" }, `구분${i + 1}`), f))),
+      h("div", { style: "text-align:right;margin-top:6px" }, saveTypes, " ", editBtn, " ", roBadge())), table);
+  },
+};
+async function editBasicQuarter(m, defQ) {
+  if (!m) return toast("회원이 표시된 행을 선택하세요.");
+  const ro = (v) => h("input", { class: "pcin", value: v, readonly: true });
+  const sel = selectEl([["1", "1분기"], ["2", "2분기"], ["3", "3분기"], ["4", "4분기"]], String(Math.max(1, Math.min(4, defQ))));
+  const val = h("input", { class: "pcin", inputmode: "numeric" });
+  const sync = () => { val.value = nz(Svc.quarterBaseAverage(m, S.year, +sel.value)); val.select(); }; sel.onchange = sync; sync();
+  const res = await modal("기초자료 전분기 에버 수정", h("div", { class: "pcgrid" }, h("label", {}, "회원명"), ro(m.name), h("label", {}, "연도"), ro(`${S.year}년`), h("label", {}, "분기"), sel, h("label", {}, "에버"), val), canWrite() ? [["확인", "ok"], ["취소", "cancel"]] : [["닫기", "cancel"]]);
+  if (res !== "ok") return;
+  const s = val.value.trim().replace(/,/g, ""); if (!/^-?\d+$/.test(s)) return toast("에버를 숫자로 입력하세요.");
+  const avg = parseInt(s, 10); if (avg < 0) return toast("에버는 0 이상이어야 합니다.");
+  const q = +sel.value, ops = quarterOps(m.memberId, S.year, q, avg);
+  const msg = `${m.name} ${q}분기 에버가 수정되었습니다.`;
+  if (!ops.length) return toast(msg);
+  if (await save(ops, msg)) render();
+}
+
+/* =====================================================================
    5) 로그인 화면 · 시작
    ===================================================================== */
 function loginView(reason) {

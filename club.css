@@ -115,3 +115,6 @@ table.pct.feet{min-width:900px}
 table.pct.feet tbody tr.sel td{background:#ffe082 !important;color:#1e1e1e;font-weight:800}
 table.feeedit{min-width:0;width:100%}table.feeedit td{padding:3px 6px}table.feeedit td:first-child{text-align:left}
 .pcform input[type=checkbox]{width:18px;height:18px}
+/* 기초 자료 */
+.pcgrid5{display:grid;grid-template-columns:repeat(5,1fr);gap:4px 6px}.pcgrid5 .pcl{display:block;font-size:13px;font-weight:600;margin-bottom:2px}
+@media (max-width:760px){.pcgrid5{grid-template-columns:repeat(2,1fr)}}
