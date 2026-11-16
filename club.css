@@ -514,8 +514,9 @@ body.phmode .phmodebtn.in{background:transparent}
 .envapproval{display:flex;flex-direction:column;min-height:0}
 .envapb{display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #C3D2E6;border-radius:8px;padding:10px 12px;flex:1;min-height:0}
 .envapb .aptitle{font-size:16px;color:#12285A}
-.aplist{flex:1;min-height:160px;overflow:auto;display:flex;flex-direction:column;gap:6px}
-.aprow{display:flex;justify-content:space-between;align-items:center;height:44px;padding:0 12px;border:1px solid #C3D2E6;border-radius:6px;background:#fff;cursor:pointer;font-size:15px;color:#12285A;flex:none}
+.aplist{flex:1;min-height:160px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:44px;align-content:start;gap:6px 10px}
+@media(max-width:700px){.aplist{grid-template-columns:1fr}}
+.aprow{display:flex;justify-content:space-between;align-items:center;height:44px;min-width:0;padding:0 12px;border:1px solid #C3D2E6;border-radius:6px;background:#fff;cursor:pointer;font-size:15px;color:#12285A;flex:none}
 .aprow.on{background:#D6E4F7;border-color:#1A5BA8}
 .apchecks{display:flex;gap:10px}.apchk{flex:1;display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:#12285A;margin:0!important}.apchk input{width:18px;height:18px;margin:0}
 .apbtns{display:flex;gap:8px}.apbtns .pcbtn{min-width:100px;height:34px}
