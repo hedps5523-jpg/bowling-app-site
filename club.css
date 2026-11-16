@@ -1,5 +1,5 @@
 /* ===== 클럽관리 (PC 볼링클럽 화면을 웹으로 옮김) ===== */
-body.pc .wrap{max-width:1240px}
+body.pc .wrap{max-width:1560px}
 .pchead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;width:100%}
 .pcnav{display:flex;gap:5px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:3px 2px}
 .pcnav::-webkit-scrollbar{display:none}

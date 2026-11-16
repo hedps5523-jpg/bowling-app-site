@@ -163,7 +163,7 @@
 
 /* ===== 가로 화면 (8인치·12.4인치 태블릿, 갤럭시 Z 폴드 펼침) — 세로 화면은 그대로 ===== */
 @media (orientation: landscape) and (min-width: 760px) {
-  .wrap{max-width:1240px;padding-left:24px;padding-right:24px}
+  .wrap{max-width:1560px;padding-left:24px;padding-right:24px}
   .topbar{padding:6px 0}
   .topbar .lg{width:30px;height:30px;font-size:16px}
   .topbar .tb-title{font-size:17px}
