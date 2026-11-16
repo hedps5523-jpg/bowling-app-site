@@ -292,7 +292,7 @@ async function reload(msg) {
 const TABS = {};       // key → { title, render }
 let current = "members";
 const HEADER_TABS = ["games", "ledger", "fees", "ranking", "quarter"];
-const TITLES = { members: "회원관리", games: "게임기록", ledger: "회계장부", fees: "회비관리", ranking: "랭킹/현황", quarter: "분기 기준에버", lockers: "락카 사용현황", settings: "환경설정", contacts: "연락처(뷰)" };
+const TITLES = { members: "회원관리", games: "게임기록", ledger: "회계장부", fees: "회비관리", ranking: "랭킹/현황", quarter: "분기 기준에버", lockers: "락카 사용현황", settings: "환경설정" };
 
 function drawHeader() {
   const nav = $("pcnav"); nav.textContent = "";
@@ -307,7 +307,7 @@ function drawHeader() {
 function openFileMenu(btn) {
   const m = $("fileMenu"); m.textContent = "";
   const item = (t, fn) => h("button", { type: "button", onclick: () => { m.hidden = true; fn(); } }, t);
-  m.append(item("회원관리", () => go("members")), item("락카 사용현황", () => go("lockers")), item("연락처(뷰)", () => go("contacts")), h("hr"),
+  m.append(item("회원관리", () => go("members")), item("락카 사용현황", () => go("lockers")), item("연락처(뷰)", contactView), h("hr"),
     item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
     ...(Conn.mode === "site" ? [item("클럽 계정 연결 해제", unlinkClub)] : []), item("로그아웃", logout));
   const r = btn.getBoundingClientRect(); m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
@@ -323,18 +323,21 @@ function render() {
   fitView();
 }
 /* 기기 화면 한 화면에 맞추기: 표가 남는 높이만 차지하고, 넘치면 표 안에서만 스크롤 (넓은 화면). 좁은 세로 화면은 그대로 페이지 스크롤 */
+const narrowPortrait = () => window.innerWidth <= 860 && window.innerHeight > window.innerWidth;
+const navTopY = (nav) => nav && !nav.hidden && getComputedStyle(nav).display !== "none" ? nav.getBoundingClientRect().top : window.innerHeight;
 function fitView() {
   if (current === "settings") return;
   const root = document.documentElement; root.classList.remove("fitpage");
   const wrap = view.querySelector(":scope > .pctable-wrap");
   if (!wrap) return;
   wrap.style.maxHeight = "";
-  if (window.innerWidth <= 860) return;
+  if (narrowPortrait()) return;
   window.scrollTo(0, 0);
-  const nav = $("bnav"), navTop = nav && !nav.hidden ? nav.getBoundingClientRect().top : window.innerHeight;
+  const nav = $("bnav"), navTop = navTopY(nav);
   const avail = navTop - wrap.getBoundingClientRect().top - 8;
-  wrap.style.maxHeight = Math.max(160, avail) + "px";
-  if (avail >= 160) root.classList.add("fitpage");
+  const minH = window.innerHeight < 560 ? 110 : 160;
+  wrap.style.maxHeight = Math.max(minH, avail) + "px";
+  if (avail >= minH) root.classList.add("fitpage");
 }
 let fitT; const fitSoon = () => { cancelAnimationFrame(fitT); fitT = requestAnimationFrame(fitView); };
 window.addEventListener("resize", fitSoon);
@@ -1453,7 +1456,7 @@ TABS.settings = {
     const dq = () => Math.max(1, Math.floor(new Date().getMonth() / 3) + 1 - 1);
     qT.querySelectorAll("tbody tr").forEach((tr, i) => tr.addEventListener("dblclick", (e) => { const td = e.target.closest("td"); if (!td) return; const c = [...tr.children].indexOf(td); if (c >= 2 && c <= 5) { ST.sel = qrows[i].m; editBasicQuarter(qrows[i].m, c - 1); } }));
     const editQ = h("button", { class: "pcbtn", type: "button", onclick: () => editBasicQuarter(ST.sel, dq()) }, "전분기 에버 수정");
-    const basic = h("div", { class: "envpanel" }, h("div", { class: "pcform", style: "margin:2px 0 4px" }, h("label", { style: "font-size:16px" }, "관리 명칭"), h("div", { style: "flex:1;min-width:220px;max-width:420px" }, nameF)),
+    const basic = h("div", { class: "envpanel envbasic" }, h("div", { class: "pcform", style: "margin:2px 0 4px" }, h("label", { style: "font-size:16px" }, "관리 명칭"), h("div", { style: "flex:1;min-width:220px;max-width:420px" }, nameF)),
       h("div", { class: "envband" }, numList("모임", mFields), numList("등급", gFields), other),
       h("div", { class: "envdata" }, secBox("주차별", weekT), secBox("분기 에버", h("div", { style: "text-align:right;margin-bottom:6px" }, editQ), qT)),
       h("p", { class: "pcnote" }, "관리 명칭·모임구분·등급·회비·락카 기본값·수입/지출 목록은 서버 공용입니다."));
@@ -1551,10 +1554,9 @@ TABS.settings = {
     /* 기기 화면 한 화면에 맞추기 (가로가 넓은 화면). 좁은 화면(세로 폰)은 쌓아서 스크롤 */
     const fit = () => {
       if (!root.isConnected) { window.removeEventListener("resize", fit); return; }
-      if (window.innerWidth <= 860) { root.style.height = ""; document.documentElement.classList.remove("fitpage"); return; }
+      if (narrowPortrait()) { root.style.height = ""; document.documentElement.classList.remove("fitpage"); return; }
       const top = root.getBoundingClientRect().top + window.scrollY;
-      const nav = document.getElementById("bnav"), navH = nav && !nav.hidden ? nav.getBoundingClientRect().height : 0;
-      root.style.height = Math.max(380, window.innerHeight - top - navH - 8) + "px"; document.documentElement.classList.add("fitpage");
+      root.style.height = Math.max(220, navTopY(document.getElementById("bnav")) - top - 8) + "px"; document.documentElement.classList.add("fitpage");
     };
     window.scrollTo(0, 0); fit(); window.addEventListener("resize", fit); setTimeout(fit, 150);
   },
@@ -1573,6 +1575,21 @@ async function editBasicQuarter(m, defQ) {
   const msg = `${m.name} ${q}분기 에버가 수정되었습니다.`;
   if (!ops.length) return toast(msg);
   if (await save(ops, msg)) render();
+}
+
+/* =====================================================================
+   4-10) 연락처(뷰) (PC openContactViewDialog: 회원명(에버)·락카·구분·연락처, 탈퇴 회원 제외, 에버 높은 순)
+   ===================================================================== */
+async function contactView() {
+  const ms = Svc.getMembers().filter((m) => !Svc.isWithdrawn(m)).map((m) => ({ m, avg: Svc.effectiveBaseAverage(m) }));
+  ms.sort((a, b) => b.avg - a.avg || ((a.m.name || "") < (b.m.name || "") ? -1 : (a.m.name || "") > (b.m.name || "") ? 1 : 0));
+  const rows = ms.map(({ m, avg }) => ({ name: `${m.name || ""}(${avg})`, locker: (S.lockers[m.memberId] || {}).mainLocker || "", grade: m.grade || "", phone: m.phone || "" }));
+  const table = pcTable([{ t: "회원명", get: (r) => r.name }, { t: "락카", get: (r) => r.locker }, { t: "구분", get: (r) => r.grade },
+    { t: "연락처", get: (r) => (r.phone ? h("a", { href: "tel:" + r.phone.replace(/[^0-9+]/g, ""), style: "color:inherit;text-decoration:none" }, r.phone) : "") }], rows);
+  table.classList.add("contactwrap"); table.querySelector("table").style.minWidth = "0";
+  const body = h("div", { class: "rpt contact" }, h("div", { class: "contact-h" }, h("b", {}, "회원 연락처"), h("span", {}, `${S.year}년 기준`)), table);
+  const r = await modal("회원 연락처", body, [["인쇄", "print"], ["닫기", "close"]]);
+  if (r === "print") printNode(body);
 }
 
 /* =====================================================================
