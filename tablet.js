@@ -1,0 +1,773 @@
+/* =====================================================================
+   12.4인치 태블릿 가로 화면 (모바일 볼링클럽 Large* 화면 이식) — PC·노트북 전용
+   - 상단: FILE · 게임기록 · 회계장부 · 회비관리 · 분기에버 · [입력|조회] · 사용자 · 로그아웃
+   - 각 화면: 1행 입력(입력 모드) / 2행 조회 조건(조회 모드) / 결과표(+오른쪽 상세)
+   - 규칙: LargeGameFragment · LargeLedgerFragment · LargeFeeFragment · LargeMemberFragment · LargeLockerFragment,
+           MeetingRoleRule(최고하이·에버하이·올카), QuarterAdjustRule(조정에버 입력 시작일), MemberLifecycleUtils
+   - 저장: club.js 의 save()/op() (PC·모바일과 같은 서버 원자적 업로드)
+   ===================================================================== */
+(function () {
+  const TB = { input: null, wasOn: null };
+  const TB_ON = () => window.innerWidth >= 900 && document.documentElement.getAttribute("data-dev") === "desktop";
+  const TB_KEYS = ["games", "ledger", "fees", "quarter", "members", "lockers"];
+  const TAB_LABEL = { games: "게임기록", ledger: "회계장부", fees: "회비관리", quarter: "분기에버" };
+  const canIn = () => !VIEWONLY && canWrite();
+  const inputMode = () => { if (TB.input == null) TB.input = canIn(); return TB.input && canIn(); };
+  const won = (v) => Number(v || 0).toLocaleString("ko-KR");
+  const fmt1 = (d) => (d <= 0 ? "-" : d.toFixed(1));
+  const sgn1 = (d) => (d >= 0 ? "+" : "") + d.toFixed(1);
+  const today = () => todayStr();
+  const dnum = (s) => +s.slice(8, 10), mnum = (s) => +s.slice(5, 7), ynum = (s) => +s.slice(0, 4);
+  const dow = (s) => new Date(s + "T00:00:00").getDay();
+  const ymd = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
+  const monthEnd = (y, m) => ymd(y, m, new Date(y, m, 0).getDate());
+  const ko = new Intl.Collator("ko", { sensitivity: "base" });
+
+  /* ---------- 회원 상태 (MemberLifecycleUtils) ---------- */
+  const withdrawn = (m, ref = today()) => !!m.withdrawalDate && ref >= m.withdrawalDate && (!m.rejoinDate || ref < m.rejoinDate);
+  const isActive = (m, ref) => !m.deletedAt && !withdrawn(m, ref);
+  const allMembers = () => S.members.filter((m) => !m.deletedAt).sort((a, b) => a.memberId - b.memberId);
+  const activeMembers = () => allMembers().filter((m) => isActive(m));
+  const byId = () => new Map(S.members.map((m) => [m.memberId, m]));
+  const includedForRanking = (m, d) => !!m && isActive(m) && (!m.rejoinDate || d >= m.rejoinDate);
+
+  /* 회원별 기준에버: 기준일 분기의 분기에버 → 없으면 직전 분기 → 회원 현재 기준에버 */
+  function qBase(m, date = today()) {
+    if (!m) return 0;
+    const y = ynum(date), q = Math.floor((mnum(date) - 1) / 3) + 1;
+    const ex = S.sq[`${m.memberId}|${y}|${q}`];
+    if (ex != null) return ex;
+    const [py, pq] = q === 1 ? [y - 1, 4] : [y, q - 1];
+    const pv = S.sq[`${m.memberId}|${py}|${pq}`];
+    return pv != null ? pv : m.currentBaseAverage;
+  }
+
+  /* ---------- 게임 기록 도우미 ---------- */
+  const sc = (g) => [g.s1, g.s2, g.s3, g.s4];
+  const cnt = (g) => sc(g).filter((v) => v > 0).length;
+  const tot = (g) => sc(g).filter((v) => v > 0).reduce((a, b) => a + b, 0);
+  const gavg = (g) => (cnt(g) ? tot(g) / cnt(g) : 0);
+  const smax = (g) => Math.max(...sc(g));
+  const recAvg = (list) => { const c = list.reduce((a, g) => a + cnt(g), 0); return c ? list.reduce((a, g) => a + tot(g), 0) / c : 0; };
+  const weekLabel = (d) => `${mnum(d)}월${Math.floor((dnum(d) - 1) / 7) + 1}주`;
+  const weekKey = (d) => `${ynum(d)}|${mnum(d)}|${Math.floor((dnum(d) - 1) / 7)}`;
+  const gtype = (g) => (g.meetingType || "").trim() || "정모";
+  /* 탈퇴 회원의 기록은 조회에서 제외 */
+  const tbGames = () => { const act = new Set(activeMembers().map((m) => m.memberId)); return S.games.filter((g) => act.has(g.memberId)); };
+  const statGames = () => { const mm = byId(); return tbGames().filter((g) => includedForRanking(mm.get(g.memberId), g.gameDate)); };
+  function weekGroups(games) {
+    const ds = [...new Set(games.map((g) => g.gameDate))].sort();
+    const out = [], idx = new Map();
+    for (const d of ds) { const k = weekKey(d); if (!idx.has(k)) { idx.set(k, out.length); out.push({ label: weekLabel(d), key: k, dates: [] }); } out[idx.get(k)].dates.push(d); }
+    return out;
+  }
+  const deviation = (avg, base) => (base > 0 && avg > 0 ? sgn1(avg - base) : "-");
+  const nameWithAvg = (m, d) => { if (!m) return "-"; const b = qBase(m, d); return b > 0 ? `${m.name}(${b})` : m.name; };
+  const yearEndRef = (y) => (y === ynum(today()) ? today() : `${y}-12-31`);
+
+  /* 최고하이 / 에버하이 / 올카 (MeetingRoleRule: 정모만 판정) */
+  function roleMap(list) {
+    const mm = byId(), base = (g) => qBase(mm.get(g.memberId), g.gameDate), noteKey = (g) => String(g.note || "").replace(/\s+/g, "");
+    const out = new Map(), groups = new Map();
+    for (const g of list) { const k = g.gameDate + "|" + gtype(g); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(g); }
+    const maxBy = (arr, cmp) => arr.reduce((best, x) => (best == null || cmp(x, best) > 0 ? x : best), null);
+    for (const grp of groups.values()) {
+      if (gtype(grp[0]) !== "정모") continue;
+      const topCmp = (a, b) => (smax(a) - smax(b)) || (base(a) - base(b));
+      const marked = grp.filter((g) => noteKey(g).includes("최고하이"));
+      const top = maxBy(marked.length ? marked : grp.filter((g) => smax(g) > 0), topCmp);
+      if (top) out.set(top.recordId, { role: "HIGH", diff: smax(top) - base(top) });
+      const devCmp = (a, b) => ((smax(a) - base(a)) - (smax(b) - base(b))) || (base(a) - base(b));
+      const markedEver = grp.filter((g) => noteKey(g).includes("에버하이") && (!top || g.memberId !== top.memberId));
+      const ever = maxBy(markedEver, devCmp) || maxBy(grp.filter((g) => (!top || g.memberId !== top.memberId) && smax(g) > 0 && base(g) > 0), devCmp);
+      if (ever) out.set(ever.recordId, { role: "EVER", diff: smax(ever) - base(ever) });
+      grp.filter((g) => noteKey(g).includes("올카") && (!top || g.memberId !== top.memberId) && (!ever || g.memberId !== ever.memberId))
+        .forEach((g) => out.set(g.recordId, { role: "ALL", diff: smax(g) - base(g) }));
+    }
+    return out;
+  }
+  /* 점수 칸 강조 대상: 최고하이 기록의 최고 점수 칸 (recordId*10+게임번호) */
+  function meetingHighRefs(list, roles) {
+    const refs = new Set();
+    list.filter((g) => roles.get(g.recordId)?.role === "HIGH").forEach((g) => { const mx = smax(g); sc(g).forEach((v, i) => { if (mx > 0 && v === mx) refs.add(g.recordId * 10 + i + 1); }); });
+    return refs;
+  }
+  function highRefs(list) {
+    let max = 0; const refs = new Set();
+    list.forEach((g) => sc(g).forEach((v, i) => { if (v > 0) { if (v > max) { max = v; refs.clear(); refs.add(g.recordId * 10 + i + 1); } else if (v === max) refs.add(g.recordId * 10 + i + 1); } }));
+    return max > 0 ? refs : new Set();
+  }
+  const ROW_BG = { HIGH: "#FFE08A", EVER: "#BBDEFB", ALL: "#C8E6C9" };
+  function scoreCell(g, i, refs, roles) {
+    const v = sc(g)[i - 1], role = roles && roles.get(g.recordId);
+    if (role && (role.role === "HIGH" || role.role === "EVER") && v > 0 && v === smax(g))
+      return h("span", { class: "tbstrong " + (role.role === "HIGH" ? "hi" : "ev") }, v);
+    const high = v > 0 && refs.has(g.recordId * 10 + i), red = v >= 200;
+    return h("span", { style: `color:${high ? "#8B0000" : red ? "#B42318" : "#12285A"};font-weight:${high || red ? 700 : 400}` }, v > 0 ? v : "");
+  }
+  const noteOf = (g, roles) => { const r = roles.get(g.recordId); return r && r.role === "EVER" ? `에버하이 : ${r.diff >= 0 ? "+" : ""}${r.diff}` : g.note; };
+
+  /* 조정에버 입력 시작일 (QuarterAdjustRule) */
+  const QA = {
+    lastMeeting(dates, y, q) {
+      const lm = q * 3; let d = monthEnd(y, lm);
+      const counts = new Map(); dates.forEach((x) => counts.set(dow(x), (counts.get(x) || 0) + 1));
+      let usual = null, best = -1; for (const [k, v] of counts) if (v > best) { best = v; usual = k; }
+      if (usual != null) while (dow(d) !== usual) d = addDays(d, -1);
+      const rec = dates.filter((x) => ynum(x) === y && mnum(x) === lm).sort().pop();
+      return rec && rec > d ? rec : d;
+    },
+    prevWeek(dates, y, q) {
+      const last = this.lastMeeting(dates, y, q), pw = Math.floor((dnum(last) - 1) / 7) - 1;
+      const listed = dates.filter((x) => ynum(x) === ynum(last) && mnum(x) === mnum(last) && Math.floor((dnum(x) - 1) / 7) === pw).sort().pop();
+      return listed || addDays(last, -7);
+    },
+    openFrom(dates, y, q) { return addDays(this.prevWeek(dates, y, q), 1); },
+    isOpen(dates, y, q) { return today() >= this.openFrom(dates, y, q); },
+  };
+
+  /* ---------- 공통 UI ---------- */
+  const lab = (t) => h("span", { class: "tblab" }, t);
+  const btn = (t, onclick, cls = "") => h("button", { type: "button", class: "tbbtn " + cls, onclick }, t);
+  const sel = (opts, value, onchange, cls = "") => { const s = h("select", { class: "tbsel " + cls }, opts.map((o) => { const [v, t] = Array.isArray(o) ? o : [o, o]; return h("option", { value: v }, t); })); if (value != null) s.value = value; if (onchange) s.onchange = () => onchange(s.value); return s; };
+  const card = (...kids) => h("div", { class: "tbcard" }, ...kids);
+  const spacer = () => h("span", { style: "flex:1" });
+  const empty = (msg) => h("div", { class: "tbtable" }, h("div", { class: "tbempty" }, msg));
+  /* 결과표: 머리글 고정, 행 클릭 = 선택/불러오기, 길게 누르기·오른쪽 클릭 = 삭제/취소 */
+  function table({ headers, rows, weights, aligns = [], selectedRow = -1, cellColor, cellBg, custom, onClick, onLong, cls = "" }) {
+    if (!rows.length) return null;
+    const sum = weights.reduce((a, b) => a + b, 0);
+    const t = h("table", {}, h("colgroup", {}, weights.map((w) => h("col", { style: `width:${(w / sum * 100).toFixed(3)}%` }))),
+      h("thead", {}, h("tr", {}, headers.map((x) => h("th", {}, x)))));
+    const tb = h("tbody");
+    rows.forEach((r, i) => {
+      const tr = h("tr", { class: i === selectedRow ? "sel" : "" });
+      r.forEach((v, c) => {
+        const own = custom && custom(i, c);
+        const td = h("td", { class: aligns[c] === 1 ? "l" : aligns[c] === 2 ? "r" : "" }, own || String(v ?? ""));
+        const fg = cellColor && cellColor(i, c); if (fg) td.style.color = fg;
+        const bg = i !== selectedRow && cellBg && cellBg(i, c); if (bg) td.style.background = bg;
+        if (!own) td.title = String(v ?? "");
+        tr.append(td);
+      });
+      if (onClick) tr.onclick = () => onClick(i);
+      if (onLong) {
+        tr.oncontextmenu = (e) => { e.preventDefault(); onLong(i); };
+        let tm; tr.onpointerdown = (e) => { if (e.pointerType === "mouse") return; tm = setTimeout(() => onLong(i), 650); };
+        tr.onpointerup = tr.onpointerleave = () => clearTimeout(tm);
+      }
+      tb.append(tr);
+    });
+    t.append(tb);
+    return h("div", { class: "tbtable " + cls }, t);
+  }
+  function infoBox(title, items) {
+    return h("div", { class: "tbinfo" }, h("b", {}, title), ...items.map(([k, v]) => h("div", { class: "tbline" }, h("span", {}, k), h("b", {}, v))));
+  }
+  function root(...kids) { const r = h("div", { class: "tbroot" }, ...kids.filter(Boolean)); view.textContent = ""; view.append(r); fit(); return r; }
+  function fit() {
+    const r = view.querySelector(":scope > .tbroot"); if (!r) return;
+    window.scrollTo(0, 0);
+    const nav = $("bnav"), navTop = nav && !nav.hidden && getComputedStyle(nav).display !== "none" ? nav.getBoundingClientRect().top : window.innerHeight;
+    r.style.height = Math.max(360, navTop - r.getBoundingClientRect().top - 6) + "px";
+    document.documentElement.classList.add("fitpage");
+  }
+  window.addEventListener("resize", () => { if (TB.wasOn !== TB_ON() && TB.wasOn != null && typeof render === "function" && $("pchead") && !$("pchead").hidden) render(); else fit(); });
+
+  /* =====================================================================
+     게임기록 / 분기에버 (LargeGameFragment)
+     ===================================================================== */
+  const GS = { report: "개인기록", linked: null, sort: "평균점수", date: null, type: null, member: null, editing: 0, lockedType: null, lockedWeek: null, scores: ["", "", "", ""], note: "", qOpt: null, qMember: null, draft: {}, inited: false };
+  const typeList = () => (S.meetingTypes && S.meetingTypes.length ? S.meetingTypes : ["정모", "비모"]);
+
+  function applyMeetingTypeRule(week) {
+    if (GS.lockedType && week !== GS.lockedWeek) { GS.lockedType = null; GS.lockedWeek = null; }
+    if (GS.lockedType) GS.type = GS.lockedType;
+    else if (GS.editing <= 0) { const n = +(week.match(/(\d+)월(\d+)주/) || [0, 0, 1])[2]; const want = n === 1 || n === 3 ? "정모" : "비모"; GS.type = typeList().includes(want) ? want : typeList()[0]; }
+  }
+  function inputMembersFor(games) {
+    const key = weekKey(GS.date), type = GS.type || "정모";
+    const reg = new Set(games.filter((g) => g.recordId !== GS.editing && weekKey(g.gameDate) === key && gtype(g) === type).map((g) => g.memberId));
+    const editMember = GS.editing > 0 ? (games.find((g) => g.recordId === GS.editing) || {}).memberId : null;
+    return activeMembers().filter((m) => !reg.has(m.memberId) || m.memberId === editMember).sort((a, b) => ko.compare(a.name.trim(), b.name.trim()) || a.memberId - b.memberId);
+  }
+
+  function renderGames(quarterOnly) {
+    const games = tbGames(), stat = statGames(), groups = weekGroups(games), mm = byId();
+    const inMode = inputMode() && !quarterOnly;
+    if (!GS.inited && games.length) { GS.date = games.reduce((a, g) => (g.gameDate > a ? g.gameDate : a), ""); GS.inited = true; }
+    if (!GS.date) GS.date = today();
+    // 게임일: 주차 목록 + 다가오는 주차(마지막 기록 이후 2주 + 오늘 주차)
+    const opts = groups.slice().reverse().map((g) => [g.label, g.dates[g.dates.length - 1]]);
+    const last = games.reduce((a, g) => (g.gameDate > a ? g.gameDate : a), "") || today();
+    [today(), GS.date, addDays(last, 7), addDays(last, 14)].forEach((d) => { if (!opts.some((o) => o[0] === weekLabel(d) && weekKey(o[1]) === weekKey(d))) opts.push([weekLabel(d), d]); });
+    opts.sort((a, b) => (a[1] < b[1] ? 1 : -1));
+    if (GS.type == null) applyMeetingTypeRule(weekLabel(GS.date));
+
+    let inputCard = null, batchRow = null;
+    if (inMode) {
+      const dSel = sel(opts.map((o, i) => [String(i), o[0]]), String(Math.max(0, opts.findIndex((o) => weekKey(o[1]) === weekKey(GS.date)))), (v) => {
+        const o = opts[+v]; if (weekLabel(GS.date) !== o[0] || weekKey(GS.date) !== weekKey(o[1])) GS.date = o[1];
+        applyMeetingTypeRule(o[0]); draw();
+      });
+      const tSel = sel(typeList(), GS.type, (v) => { GS.type = v; draw(); });
+      tSel.disabled = !!GS.lockedType;
+      const ims = inputMembersFor(games);
+      if (!ims.some((m) => m.memberId === GS.member)) GS.member = ims.length ? ims[0].memberId : null;
+      const mSel = sel(ims.length ? ims.map((m) => [m.memberId, m.name]) : [["", "등록 가능한 회원 없음"]], GS.member, (v) => { GS.member = +v; });
+      mSel.disabled = !ims.length; mSel.id = "tbMember";
+      const scoreIn = GS.scores.map((v, i) => h("input", { class: "tbin num", inputmode: "numeric", maxlength: "3", value: v }));
+      const noteIn = h("input", { class: "tbin note", value: GS.note });
+      // 3자리를 입력하면 다음 칸(1G→2G→3G→4G→비고)으로 자동 이동
+      scoreIn.forEach((e, i) => { e.oninput = () => { e.value = e.value.replace(/\D/g, "").slice(0, 3); GS.scores[i] = e.value; if (e.value.length === 3) (scoreIn[i + 1] || noteIn).focus(); }; e.onkeydown = (ev) => { if (ev.key === "Enter") saveInput(GS.editing > 0); }; });
+      noteIn.oninput = () => GS.note = noteIn.value; noteIn.onkeydown = (ev) => { if (ev.key === "Enter") saveInput(GS.editing > 0); };
+      const add = btn("등록", () => saveInput(false), "pri"), edit = btn("수정", () => saveInput(true));
+      add.disabled = GS.editing > 0; edit.disabled = !(GS.editing > 0);
+      inputCard = card(lab("게임일"), dSel, lab("모임 구분"), tSel, lab("회원명"), mSel, ...scoreIn.flatMap((e, i) => [lab(`${i + 1}G`), e]), lab("비고"), noteIn, add, edit);
+      batchRow = h("div", { class: "tbbatch" }, GS.editing > 0 ? btn("입력 취소", () => { clearInput(); draw(); }) : null, btn("일괄변경", bulkChange));
+    }
+
+    // 2행: 보고서 종류 / 연결 필드 / 조회
+    let queryCard = null;
+    const reports = quarterOnly ? ["분기에버"] : ["개인기록", "모임기록", "누적기록", "순위표"];
+    if (!reports.includes(GS.report)) GS.report = reports[0];
+    const report = quarterOnly ? "분기에버" : GS.report;
+    let linkedOpts = [], linkedLabel = "";
+    const qOpts = (() => { const y = ynum(today()); return [[`${pad2((y - 1) % 100)}_4분기`, y - 1, 4], ...[1, 2, 3, 4].map((q) => [`${q}분기`, y, q])]; })();
+    if (report === "개인기록") { linkedLabel = "회원명"; linkedOpts = activeMembers().map((m) => [String(m.memberId), m.name]); }
+    else if (report === "모임기록") { linkedLabel = "주차"; linkedOpts = groups.slice().reverse().map((g) => [g.key, g.label]); }
+    else if (report === "누적기록") { linkedLabel = "기간"; linkedOpts = ["최근 2주", "최근 3주", "최근 4주", "최근 5주"].map((x) => [x, x]); }
+    else if (report === "순위표") { linkedLabel = "기준"; linkedOpts = [...new Set([...games.map((g) => ynum(g.gameDate)), ynum(today())])].sort((a, b) => b - a).map((y) => [String(y), `${y}년`]); }
+    else { linkedLabel = "분기"; linkedOpts = qOpts.map((o) => [o[0], o[0]]); }
+    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "누적기록" ? "최근 4주" : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
+    if (!inMode || quarterOnly) {
+      const rSel = quarterOnly ? null : sel(reports, report, (v) => { GS.report = v; GS.linked = null; draw(); });
+      const lSel = sel(linkedOpts, GS.linked, (v) => { GS.linked = v; draw(); });
+      const sortSel = report === "순위표" ? sel(["평균점수", "최고점수", "게임수"], GS.sort, (v) => { GS.sort = v; draw(); }) : null;
+      const qEdit = quarterOnly && inputMode();
+      queryCard = card(rSel, lab(linkedLabel), lSel, sortSel ? lab("정렬") : null, sortSel, btn("조회", draw, "pri"),
+        qEdit ? btn("조정에버 저장", saveQuarter, "pri") : null, spacer(), qEdit ? h("span", { class: "tbbadge" }, "수정모드 : 조정에버 칸 입력 가능") : null);
+    }
+
+    // 결과표
+    let title = "", body;
+    const editingSel = (list) => list.findIndex((g) => GS.editing > 0 && g.recordId === GS.editing);
+    if (inMode) {
+      const key = weekKey(GS.date);
+      title = `게임기록 · ${weekLabel(GS.date)}`;
+      const list = games.filter((g) => weekKey(g.gameDate) === key).sort((a, b) => gavg(b) - gavg(a));
+      const roles = roleMap(list), refs = meetingHighRefs(list, roles);
+      body = table({ headers: ["회원명(에버)", "구분", "1G", "2G", "3G", "4G", "평균", "에버편차", "비고"],
+        rows: list.map((g) => [nameWithAvg(mm.get(g.memberId), g.gameDate), gtype(g), "", "", "", "", fmt1(gavg(g)), deviation(gavg(g), qBase(mm.get(g.memberId), g.gameDate)), noteOf(g, roles)]),
+        weights: [256, 90, 112, 112, 112, 112, 134, 146, 214], selectedRow: editingSel(list),
+        cellBg: (r) => ROW_BG[(roles.get(list[r].recordId) || {}).role], custom: (r, c) => (c >= 2 && c <= 5 ? scoreCell(list[r], c - 1, refs, roles) : null),
+        onClick: (i) => loadToInput(list[i]), onLong: (i) => confirmDelete(list[i]) }) || empty("이 주차에 등록된 기록이 없습니다.");
+    } else if (report === "개인기록") {
+      const id = +GS.linked, m = mm.get(id);
+      title = `개인 기록 · ${m ? m.name : ""}`;
+      const list = stat.filter((g) => g.memberId === id).sort((a, b) => (a.gameDate < b.gameDate ? 1 : -1));
+      const refs = highRefs(list.filter((g) => ynum(g.gameDate) === ynum(today()) && g.gameDate <= today()));
+      body = table({ headers: ["게임일", "1G", "2G", "3G", "4G", "평균", "에버편차", "비고"],
+        rows: list.map((g) => [weekLabel(g.gameDate), "", "", "", "", fmt1(gavg(g)), deviation(gavg(g), qBase(m, g.gameDate)), g.note]),
+        weights: [198, 124, 124, 124, 124, 148, 162, 248], custom: (r, c) => (c >= 1 && c <= 4 ? scoreCell(list[r], c, refs) : null) }) || empty("조회된 자료가 없습니다.");
+    } else if (report === "모임기록") {
+      const g0 = groups.find((g) => g.key === GS.linked);
+      title = `모임 기록 · ${g0 ? g0.label : ""}`;
+      const list = games.filter((g) => g0 && g0.dates.includes(g.gameDate)).sort((a, b) => gavg(b) - gavg(a));
+      const roles = roleMap(list), refs = meetingHighRefs(list, roles);
+      body = table({ headers: ["회원명(에버)", "1G", "2G", "3G", "4G", "평균", "에버편차", "비고"],
+        rows: list.map((g) => [nameWithAvg(mm.get(g.memberId), g.gameDate), "", "", "", "", fmt1(gavg(g)), deviation(gavg(g), qBase(mm.get(g.memberId), g.gameDate)), noteOf(g, roles)]),
+        weights: [256, 118, 118, 118, 118, 140, 152, 236],
+        cellBg: (r) => ROW_BG[(roles.get(list[r].recordId) || {}).role], custom: (r, c) => (c >= 1 && c <= 4 ? scoreCell(list[r], c, refs, roles) : null) }) || empty("조회된 자료가 없습니다.");
+    } else if (report === "누적기록") {
+      const n = +(GS.linked.match(/\d+/) || [4])[0], gs = groups.slice(-Math.max(1, n));
+      const year = gs.length ? ynum(gs[gs.length - 1].dates[gs[gs.length - 1].dates.length - 1]) : ynum(today());
+      title = `모임 누적 현황 · ${year}년 기준 · ${GS.linked}`;
+      const yearGames = new Map(); stat.filter((g) => ynum(g.gameDate) === year).forEach((g) => { if (!yearGames.has(g.memberId)) yearGames.set(g.memberId, []); yearGames.get(g.memberId).push(g); });
+      const ids = [...yearGames.keys()].sort((a, b) => a - b);
+      const groupRefs = gs.map((gr) => { const l = games.filter((g) => gr.dates.includes(g.gameDate)); return meetingHighRefs(l, roleMap(l)); });
+      const cellOf = (id, k) => {
+        const w = (yearGames.get(id) || []).filter((g) => gs[k].dates.includes(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? -1 : 1));
+        if (!w.some((g) => cnt(g) > 0)) return null;
+        const span = h("span", { class: "tbcum" });
+        w.forEach((g, wi) => {
+          const raw = sc(g), lastI = raw.map((v) => v > 0).lastIndexOf(true); if (lastI < 0) return;
+          if (wi > 0 && span.childNodes.length) span.append("  ");
+          raw.slice(0, lastI + 1).forEach((v, si) => {
+            if (si > 0) span.append(" / ");
+            const high = v > 0 && groupRefs[k].has(g.recordId * 10 + si + 1);
+            span.append(h("span", { style: high || v >= 200 ? `color:${high ? "#8B0000" : "#B42318"};font-weight:700` : "" }, v > 0 ? String(v) : "   "));
+          });
+        });
+        span.append(h("b", {}, ` (${recAvg(w).toFixed(1).padStart(5, " ")})`));
+        return span;
+      };
+      body = table({ headers: ["순번", "회원명(에버)", "누적에버", "출석일수", ...gs.map((g) => g.label.replace("월", "월 "))],
+        rows: ids.map((id) => { const l = yearGames.get(id); return [String(id), nameWithAvg(mm.get(id), yearEndRef(year)), fmt1(recAvg(l)), String(new Set(l.map((g) => g.gameDate)).size), ...gs.map(() => "")]; }),
+        weights: [60, 150, 100, 90, ...gs.map(() => (n <= 4 ? 260 : 200))], aligns: [0, 0, 0, 0, ...gs.map(() => 2)], cls: n >= 5 ? "small" : "",
+        custom: (r, c) => (c >= 4 ? cellOf(ids[r], c - 4) : null) }) || empty("조회된 자료가 없습니다.");
+    } else if (report === "순위표") {
+      const year = +GS.linked || ynum(today());
+      title = `순위표 · ${year}년`;
+      const agg = new Map(); stat.filter((g) => ynum(g.gameDate) === year).forEach((g) => { if (!agg.has(g.memberId)) agg.set(g.memberId, []); agg.get(g.memberId).push(g); });
+      let rows = [...agg.entries()].map(([id, l]) => ({ m: mm.get(id), cnt: l.reduce((a, g) => a + cnt(g), 0), avg: recAvg(l), best: Math.max(...l.map(smax)) })).filter((r) => r.cnt > 0);
+      rows.sort(GS.sort === "최고점수" ? (a, b) => b.best - a.best : GS.sort === "게임수" ? (a, b) => b.cnt - a.cnt : (a, b) => b.avg - a.avg);
+      body = table({ headers: ["순위", "회원명(기준에버)", "등급", "게임수", "평균점수", "최고점수", "에버편차"],
+        rows: rows.map((r, i) => [String(i + 1), nameWithAvg(r.m, yearEndRef(year)), (r.m && r.m.grade) || "-", String(r.cnt), fmt1(r.avg), String(r.best), deviation(r.avg, qBase(r.m, yearEndRef(year)))]),
+        weights: [110, 302, 165, 138, 179, 179, 179] }) || empty("조회된 자료가 없습니다.");
+    } else {
+      const o = qOpts.find((x) => x[0] === GS.linked) || qOpts[qOpts.length - 1];
+      const r = renderQuarter(o, stat, games); title = r.title; body = r.body;
+    }
+
+    function draw() { renderGames(quarterOnly); }
+    function clearInput() { GS.editing = 0; GS.scores = ["", "", "", ""]; GS.note = ""; }
+    function loadToInput(g) {
+      if (!inMode) return;
+      GS.editing = g.recordId; GS.date = g.gameDate; GS.type = gtype(g); GS.member = g.memberId;
+      GS.scores = sc(g).map((v) => (v > 0 ? String(v) : "")); GS.note = g.note || ""; draw();
+    }
+    async function confirmDelete(g) {
+      if (!inMode) return;
+      if (!(await confirmBox("선택한 기록을 삭제하시겠습니까?"))) return;
+      clearInput();
+      await save([op("games", "delete", gamePayload(g), S.rv.games[g.recordId])], "게임 기록이 삭제되었습니다.");
+    }
+    async function saveInput(update) {
+      if (!canIn()) return;
+      const m = mm.get(GS.member); if (!m) return toast("등록 가능한 회원이 없습니다.");
+      const s = [];
+      for (let i = 0; i < 4; i++) { const t = String(GS.scores[i] || "").trim(); const v = t ? (/^\d+$/.test(t) ? +t : null) : 0; if (v == null) return toast(`${i + 1}G 점수를 숫자로 입력하세요.`); if (v < 0 || v > 300) return toast(`${i + 1}G 점수는 0~300 사이여야 합니다.`); s.push(v); }
+      if (update && !(GS.editing > 0)) return toast("표에서 수정할 기록을 선택하세요.");
+      const rec = { recordId: update ? GS.editing : 0, memberId: m.memberId, gameDate: GS.date, s1: s[0], s2: s[1], s3: s[2], s4: s[3], note: String(GS.note || "").trim(), meetingType: GS.type || "정모" };
+      const ok = await save([op("games", update ? "update" : "insert", gamePayload(rec), update ? S.rv.games[GS.editing] : undefined)], update ? "게임 기록이 수정되었습니다." : "게임 기록이 저장되었습니다.");
+      if (!ok) return;
+      GS.lockedWeek = weekLabel(GS.date); GS.lockedType = rec.meetingType;
+      clearInput(); applyMeetingTypeRule(GS.lockedWeek); draw();
+      setTimeout(() => { const ms = $("tbMember"); if (ms) ms.focus(); }, 30); // 저장 후 다음 회원 입력
+    }
+    async function bulkChange() {
+      if (!canIn()) return;
+      const key = weekKey(GS.date), wk = weekLabel(GS.date), targets = games.filter((g) => weekKey(g.gameDate) === key);
+      if (!targets.length) return toast(`${wk}에 변경할 기록이 없습니다.`);
+      const cur = [...new Set(targets.map(gtype))].join("/");
+      const r = await modal("모임 구분 일괄변경", h("p", { style: "margin:0" }, `${wk} ${targets.length}건 (현재 ${cur})`, h("br"), "바꿀 모임 구분을 선택하세요."), [...typeList().map((t) => [t, t]), ["취소", null]]);
+      if (!r) return;
+      const per = new Map(); targets.forEach((g) => per.set(g.memberId, (per.get(g.memberId) || 0) + 1));
+      if ([...per.values()].some((v) => v > 1)) return toast("같은 회원의 기록이 2건 이상이라 일괄변경할 수 없습니다.");
+      const ops = targets.filter((g) => gtype(g) !== r).map((g) => op("games", "update", gamePayload({ ...g, meetingType: r }), S.rv.games[g.recordId]));
+      if (!ops.length) return toast(`이미 모두 ${r}입니다.`);
+      if (await save(ops, `${wk} ${ops.length}건을 ${r}(으)로 변경했습니다.`)) { GS.lockedWeek = wk; GS.lockedType = r; clearInput(); applyMeetingTypeRule(wk); draw(); }
+    }
+    async function saveQuarter() {
+      if (!canIn()) return;
+      const o = qOpts.find((x) => x[0] === GS.linked); if (!o) return;
+      const dates = games.map((g) => g.gameDate);
+      if (!QA.isOpen(dates, o[1], o[2])) { const op1 = QA.openFrom(dates, o[1], o[2]); return toast(`조정에버는 ${mnum(op1)}월 ${dnum(op1)}일부터 입력할 수 있습니다.`); }
+      document.querySelectorAll(".tbadj").forEach((e) => { GS.draft[`${o[1]}-${o[2]}-${e.dataset.id}`] = e.value; });
+      const ops = [];
+      Object.entries(GS.draft).forEach(([k, v]) => { const [y, q, id] = k.split("-").map(Number); if (y !== o[1] || q !== o[2]) return; const n = /^\d+$/.test(String(v).trim()) ? +v : 0; if (n >= 1 && n <= 300) ops.push(...quarterOps(id, y, q, n)); });
+      GS.draft = {};
+      if (!ops.length) { toast("저장할 조정에버 값이 없습니다."); return draw(); }
+      await save(ops, `조정에버 ${ops.length}명이 저장되었습니다.`);
+    }
+
+    root(inputCard, batchRow, queryCard, h("div", { class: "tbtitle" }, title), h("div", { class: "tbbody" }, body));
+  }
+
+  function renderQuarter(o, stat, games) {
+    const [label, y, q] = o, mm = byId();
+    const act = activeMembers();
+    const [py, pq] = q === 1 ? [y - 1, 4] : [y, q - 1];
+    const dates = games.map((g) => g.gameDate);
+    const curY = ynum(today()), curQ = Math.floor((mnum(today()) - 1) / 3) + 1;
+    const inProgress = y === curY && q === curQ && !QA.isOpen(dates, y, q);
+    const months = [q * 3 - 2, q * 3 - 1, q * 3];
+    const rows = act.map((m) => {
+      const exact = S.sq[`${m.memberId}|${y}|${q}`];
+      const pv = S.sq[`${m.memberId}|${py}|${pq}`];
+      const base = exact != null ? exact : pv != null ? pv : m.currentBaseAverage;
+      const recs = stat.filter((g) => g.memberId === m.memberId && ynum(g.gameDate) === y && months.includes(mnum(g.gameDate)));
+      return { id: m.memberId, cells: ["", m.name, m.grade || "-", base > 0 ? String(base) : "-", fmt1(recAvg(recs)), inProgress ? "진행중" : exact != null ? String(exact) : ""] };
+    });
+    const editable = inputMode(), open = QA.isOpen(dates, y, q);
+    let title = `분기 기준에버 · ${label}`;
+    if (editable && !open) { const lk = QA.openFrom(dates, y, q); title += ` · 조정에버는 ${mnum(lk)}/${dnum(lk)}부터 입력`; }
+    if (!rows.some((r) => r.id === GS.qMember)) GS.qMember = rows.length ? rows[0].id : null;
+    const tbl = table({ headers: ["순번", "회원명", "등급", "기준에버", "누적에버", "조정에버"], rows: rows.map((r, i) => [String(i + 1), ...r.cells.slice(1)]),
+      weights: [135, 271, 203, 203, 203, 237], selectedRow: rows.findIndex((r) => r.id === GS.qMember),
+      onClick: (i) => { document.querySelectorAll(".tbadj").forEach((e) => { GS.draft[`${y}-${q}-${e.dataset.id}`] = e.value; }); GS.qMember = rows[i].id; renderGames(true); },
+      custom: (r, c) => {
+        if (c !== 5 || !editable) return null;
+        const k = `${y}-${q}-${rows[r].id}`;
+        const e = h("input", { class: "tbin adj " + (open ? "tbadj" : "lock"), inputmode: "numeric", maxlength: "3", placeholder: open ? "" : "잠김", value: inProgress ? "진행중" : (GS.draft[k] ?? rows[r].cells[5]) });
+        e.dataset.id = rows[r].id; if (!open) e.disabled = true;
+        e.onclick = (ev) => ev.stopPropagation();
+        return e;
+      } }) || empty("조회된 자료가 없습니다.");
+    // A영역: 선택 회원의 분기 월별 상세내역
+    const who = mm.get(GS.qMember);
+    const summary = (lbl, recs) => {
+      const c = recs.reduce((a, g) => a + cnt(g), 0);
+      if (!c) return [lbl, "-", "-", "-", "-"];
+      const avg = recAvg(recs), best = Math.max(...recs.map(smax));
+      const bw = recs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c;
+      return [lbl, String(c), fmt1(avg), String(best), bw > 0 ? sgn1(avg - bw) : "-"];
+    };
+    const detail = h("div", { class: "tbdetail" }, h("b", { class: "tbdh" }, who ? `${who.name} · 상세내역` : "회원을 선택하세요"));
+    months.forEach((mo) => {
+      const recs = stat.filter((g) => g.memberId === GS.qMember && ynum(g.gameDate) === y && mnum(g.gameDate) === mo);
+      detail.append(h("div", { class: "tbmh" }, h("b", {}, `${mo}월`), h("b", { class: "blue" }, "에버 : " + (recs.some((g) => cnt(g) > 0) ? fmt1(recAvg(recs)) : "-"))));
+      const wc = recs.some((g) => Math.floor((dnum(g.gameDate) - 1) / 7) >= 4) ? 5 : 4;
+      const tr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v) => h("td", {}, v)));
+      detail.append(h("table", { class: "tbmini" }, h("tbody", {}, tr(["구분", "게임수", "총에버", "최고게임", "편차"], "hd"),
+        ...Array.from({ length: wc }, (_, w) => tr(summary(`${w + 1}주`, recs.filter((g) => Math.floor((dnum(g.gameDate) - 1) / 7) === w)), w % 2 ? "alt" : "")),
+        tr(summary("Total", recs), "tot"))));
+    });
+    return { title, body: h("div", { class: "tbsplit" }, h("div", { style: "flex:55;min-width:0;display:flex" }, tbl), h("div", { style: "flex:45;min-width:0;display:flex" }, detail)) };
+  }
+
+  /* =====================================================================
+     회계장부 (LargeLedgerFragment)
+     ===================================================================== */
+  const LS = { date: null, type: "수입", cat: null, amount: "", note: "", editing: 0, showAll: false, month: null, pickedFrom: null };
+  const mkey = (d) => d.slice(0, 7);
+  function renderLedger() {
+    const inMode = inputMode(), all = S.ledger.filter((e) => e.date);
+    if (!LS.date) LS.date = today();
+    const keys = new Set(all.map((e) => mkey(e.date))); keys.add(mkey(today()));
+    const latest = all.reduce((a, e) => (e.date > a ? e.date : a), ""); if (latest) keys.add(mkey(addDays(latest, 1)));
+    const monthKeys = [...keys].sort().reverse();
+    if (!monthKeys.includes(LS.month)) LS.month = monthKeys[0];
+    const mLabel = (k) => (ynum(k + "-01") === ynum(today()) ? `${+k.slice(5)}월` : k);
+    const signed = (e) => (e.type === "수입" ? e.amount : -e.amount);
+
+    let inputCard = null, queryCard = null;
+    if (inMode) {
+      const dIn = h("input", { class: "tbin date", type: "date", value: LS.date }); dIn.onchange = () => { LS.date = dIn.value || today(); LS.pickedFrom = LS.date; renderLedger(); };
+      const tSel = sel(["수입", "지출"], LS.type, (v) => { LS.type = v; LS.cat = null; renderLedger(); });
+      const cats = LC.names(LS.type); if (LS.cat && !cats.includes(LS.cat)) cats.push(LS.cat);
+      if (!cats.includes(LS.cat)) LS.cat = cats[0] || "";
+      const cSel = sel(cats, LS.cat, (v) => LS.cat = v);
+      const aIn = h("input", { class: "tbin amt", inputmode: "numeric", value: LS.amount }); aIn.oninput = () => LS.amount = aIn.value;
+      const nIn = h("input", { class: "tbin note", value: LS.note }); nIn.oninput = () => LS.note = nIn.value;
+      inputCard = card(lab("일자"), dIn, lab("구분"), tSel, lab("내역"), cSel, lab("금액"), aIn, lab("비고"), nIn, btn("장부 저장", () => saveL(false), "pri"), btn("장부수정", () => saveL(true)),
+        LS.editing > 0 ? btn("취소", () => { clearL(); renderLedger(); }) : null);
+    } else {
+      queryCard = card(lab("조회월"), sel(monthKeys.map((k) => [k, mLabel(k)]), LS.month, (v) => { LS.month = v; LS.showAll = false; renderLedger(); }),
+        btn("월별 조회", () => { LS.showAll = false; renderLedger(); }), btn("전체 조회", () => { LS.showAll = true; if (latest) { const k = mkey(addDays(latest, 1)); if (monthKeys.includes(k)) LS.month = k; } renderLedger(); }), h("span", { class: "tbsum", id: "tbLsum" }));
+    }
+    const key = LS.month, ty = ynum(today());
+    const windowStart = inMode ? `${ty}-01-01` : null, from = inMode ? LS.pickedFrom : null;
+    const sortAsc = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.ledgerId - b.ledgerId);
+    let list;
+    if (from) list = all.filter((e) => e.date >= from).sort(sortAsc);
+    else if (windowStart) list = all.filter((e) => e.date >= windowStart && e.date <= today()).sort((a, b) => -sortAsc(a, b));
+    else list = (LS.showAll || !key ? all : all.filter((e) => mkey(e.date) === key)).slice().sort(sortAsc);
+    const income = list.filter((e) => e.type === "수입").reduce((a, e) => a + e.amount, 0), expense = list.filter((e) => e.type === "지출").reduce((a, e) => a + e.amount, 0);
+    const firstOfMonth = key ? key + "-01" : null;
+    const carry = from ? all.filter((e) => e.date < from).reduce((a, e) => a + signed(e), 0)
+      : windowStart ? all.filter((e) => e.date < windowStart).reduce((a, e) => a + signed(e), 0)
+      : (!firstOfMonth || LS.showAll) ? 0 : all.filter((e) => e.date < firstOfMonth).reduce((a, e) => a + signed(e), 0);
+    const tbl = table({ headers: ["번호", "일자", "구분", "내역", "금액", "비고"], rows: list.map((e, i) => [String(i + 1), e.date, e.type, e.category, won(e.amount), e.note]),
+      weights: [40, 100, 50, 85, 95, 430], aligns: [0, 0, 0, 0, 2, 1], selectedRow: list.findIndex((e) => LS.editing > 0 && e.ledgerId === LS.editing),
+      cellColor: (r, c) => (c === 2 ? (list[r].type === "수입" ? "#0F9D45" : "#D93025") : 0),
+      onClick: (i) => loadL(list[i]), onLong: (i) => delL(list[i]) }) || empty("해당 장부 내역이 없습니다.");
+    const monthNo = key ? +key.slice(5) : null, yearView = LS.showAll || inMode, janView = !yearView && monthNo === 1;
+    const title = inMode ? `${pad2(ty % 100)}년 보고서` : LS.showAll ? "1년 보고서" : `${monthNo ? monthNo + "월" : "월별"} 보고서`;
+    const isCarryFund = (e) => e.type === "수입" && String(e.category).trim() === "이월금";
+    const carryFund = yearView || janView ? list.filter(isCarryFund).reduce((a, e) => a + e.amount, 0) : 0;
+    const incomeShown = income - carryFund, carryShown = yearView || janView ? carry + carryFund : carry;
+    const mEnd = !yearView && key ? monthEnd(+key.slice(0, 4), +key.slice(5)) : null;
+    const total = all.filter((e) => !mEnd || e.date <= mEnd).reduce((a, e) => a + signed(e), 0);
+    const line = (l, v, color, dot, bold) => h("div", { class: "tbrl" }, dot ? h("i", { style: `color:${dot}` }, "● ") : null, h("span", { style: bold ? "font-weight:700;color:" + (color === "#1A5BA8" ? "#1A5BA8" : "#12285A") : "" }, l), h("b", { style: `color:${color}` }, v));
+    const report = h("div", { class: "tbreport" }, h("b", { class: "tbrt" }, title),
+      h("div", { class: "tbg1" }, line("수입 합계", won(incomeShown), "#0F9D45", "#0F9D45"), line("지출 합계", won(expense), "#D93025", "#D93025")),
+      h("div", { class: "tbg2" }, line("잔액", won(incomeShown - expense), incomeShown - expense < 0 ? "#D93025" : "#1A5BA8", null, true)),
+      h("div", { class: "tbg3" }, line(yearView || janView ? "전년 이월" : "전월 이월", won(carryShown), "#12285A"), line("총 잔액", won(total), "#12285A", null, true)));
+    // 집계(연간집계 구분 기준)
+    const groupOf = new Map(LC.items().map((i) => [i.type + "|" + i.name, i.group && i.group !== "-" ? i.group : ""]));
+    const src = janView || yearView ? list.filter((e) => !isCarryFund(e)) : list;
+    const inc = new Map(), exp = new Map();
+    src.forEach((e) => { const g = groupOf.get(e.type + "|" + e.category) || e.category || "기타"; const t = e.type === "수입" ? inc : exp; t.set(g, (t.get(g) || 0) + e.amount); });
+    const agg = (label, map, color, fill, stroke, track) => {
+      const rows = [...map.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]), mx = Math.max(1, ...rows.map((r) => r[1]));
+      return h("div", { class: "tbagg", style: `background:${fill};border-color:${stroke}` },
+        h("div", { class: "tbah", style: `color:${color};border-bottom-color:${stroke}` }, h("b", {}, "● " + label), h("b", {}, won(rows.reduce((a, r) => a + r[1], 0)))),
+        rows.length ? rows.map(([n, v]) => h("div", { class: "tbar" }, h("span", {}, n), h("div", { class: "trk", style: `background:${track}` }, h("i", { style: `background:${color};width:${Math.max(2, v / mx * 100)}%` })), h("b", { style: `color:${color}` }, won(v))))
+          : h("div", { class: "tbna" }, "내역 없음"));
+    };
+    const chart = h("div", { class: "tbchart" }, h("b", { class: "tbrt" }, yearView ? "연간집계 수입/지출" : "월간집계 수입/지출"),
+      inc.size || exp.size ? h("div", { class: "tbcs" }, agg("수입", inc, "#0F9D45", "#F2FAF5", "#CFE8D9", "#DDF0E4"), agg("지출", exp, "#D93025", "#FDF4F4", "#F0D3D3", "#F8DEDE")) : h("div", { class: "tbna" }, "표시할 장부 내역이 없습니다."));
+    root(inputCard, queryCard, h("div", { class: "tbbody", style: "margin-top:10px" }, h("div", { style: "flex:62;min-width:0;display:flex" }, tbl), h("div", { class: "tbright", style: "flex:38" }, report, chart)));
+    const sm = $("tbLsum"); if (sm) sm.textContent = `수입 ${won(income)} · 지출 ${won(expense)} · 잔액 ${won(income - expense)}`;
+
+    function clearL() { LS.editing = 0; LS.amount = ""; LS.note = ""; }
+    function loadL(e) { if (!inputMode()) return; LS.editing = e.ledgerId; LS.date = e.date; LS.type = e.type === "지출" ? "지출" : "수입"; LS.cat = e.category; LS.amount = String(e.amount); LS.note = e.note || ""; renderLedger(); }
+    async function delL(e) {
+      if (!inputMode()) return;
+      if (!(await confirmBox("선택한 내역을 삭제하시겠습니까?"))) return;
+      clearL(); await save([op("ledger_entries", "delete", ledgerPayload(e), S.rv.ledger[e.ledgerId])], "장부가 삭제되었습니다.");
+    }
+    async function saveL(update) {
+      if (!canIn()) return;
+      const amount = parseInt(String(LS.amount).replace(/,/g, ""), 10) || 0;
+      if (!LS.cat) return toast("내역을 선택하세요.");
+      if (amount <= 0) return toast("금액을 입력하세요.");
+      if (update && !(LS.editing > 0)) return toast("표에서 수정할 내역을 선택하세요.");
+      const prev = update ? S.ledger.find((x) => x.ledgerId === LS.editing) : null;
+      const e = { ledgerId: update ? LS.editing : 0, date: LS.date, type: LS.type || "수입", category: LS.cat, amount, note: String(LS.note || "").trim(), fromFee: prev ? prev.fromFee : false, memberId: prev ? prev.memberId : 0 };
+      if (await save([op("ledger_entries", update ? "update" : "insert", ledgerPayload(e), update ? S.rv.ledger[LS.editing] : undefined)], "저장되었습니다.")) { clearL(); renderLedger(); }
+    }
+  }
+
+  /* =====================================================================
+     회비관리 (LargeFeeFragment)
+     ===================================================================== */
+  const FS = { member: null, prepay: false, start: null, end: null, date: null, note: "", month: null };
+  /* MemberLifecycleUtils.isFeeTargetMonth */
+  function isFeeTarget(m, y, mo, pays) {
+    if (m.feeExempt) return false;
+    const key = y * 100 + mo, baseKey = m.feeStartYear * 100 + Math.min(12, Math.max(1, m.feeStartMonth || 1));
+    if (key < baseKey) return false;
+    const rjY = m.rejoinFeeStartYear > 0 ? m.rejoinFeeStartYear : m.rejoinDate ? ynum(m.rejoinDate) : null;
+    const rjM = m.rejoinFeeStartMonth >= 1 && m.rejoinFeeStartMonth <= 12 ? m.rejoinFeeStartMonth : m.rejoinDate ? mnum(m.rejoinDate) : null;
+    const rjKey = rjY != null && rjM != null ? rjY * 100 + rjM : null;
+    let wKey = null;
+    if (m.withdrawalDate) {
+      const fin = pays.filter((p) => rjKey == null || p.year * 100 + p.month < rjKey).reduce((a, p) => Math.max(a, p.year * 100 + p.month), 0);
+      wKey = fin ? (fin % 100 >= 12 ? (Math.floor(fin / 100) + 1) * 100 + 1 : fin + 1) : ynum(m.withdrawalDate) * 100 + mnum(m.withdrawalDate);
+    }
+    if (rjKey != null && key >= rjKey) return true;
+    if (wKey != null && key >= wKey) return false;
+    return true;
+  }
+  function renderFees() {
+    const inMode = inputMode(), year = ynum(today()), tm = mnum(today());
+    const members = activeMembers().filter((m) => !m.feeExempt);
+    const allPays = S.fees, pays = allPays.filter((p) => p.year === year);
+    if (!members.some((m) => m.memberId === FS.member)) FS.member = members.length ? members[0].memberId : null;
+    if (FS.start == null) FS.start = tm; if (FS.end == null) FS.end = tm; if (!FS.date) FS.date = today(); if (!FS.month) FS.month = tm;
+    const months = Array.from({ length: 12 }, (_, i) => [String(i + 1), `${i + 1}월`]);
+    let inputCard = null, queryCard = null;
+    if (inMode) {
+      const pre = h("input", { type: "checkbox", class: "tbchk" }); pre.checked = FS.prepay; pre.onchange = () => { FS.prepay = pre.checked; renderFees(); };
+      const sSel = sel(months, String(FS.start), (v) => { FS.start = +v; if (!FS.prepay) FS.end = FS.start; }), eSel = sel(months, String(FS.prepay ? FS.end : FS.start), (v) => FS.end = +v);
+      eSel.disabled = !FS.prepay;
+      const dIn = h("input", { class: "tbin date", type: "date", value: FS.date }); dIn.onchange = () => FS.date = dIn.value || today();
+      const nIn = h("input", { class: "tbin", style: "width:150px", value: FS.note }); nIn.oninput = () => FS.note = nIn.value;
+      inputCard = card(lab("회원명"), sel(members.map((m) => [m.memberId, m.name]), FS.member, (v) => { FS.member = +v; renderFees(); }), lab("선납"), pre, lab("시작월"), sSel, lab("종료월"), eSel,
+        lab("납부일"), dIn, lab("비고"), nIn, btn("회비 등록", savePay, "pri"), btn("수정", openModify));
+    } else {
+      queryCard = card(lab("조회월"), sel(months, String(FS.month), (v) => { FS.month = +v; renderFees(); }), btn("회비 현황 조회", renderFees), h("span", { class: "tbsum", id: "tbFsum" }));
+    }
+    const month = inMode ? tm : FS.month;
+    const dueMonth = year < ynum(today()) ? 12 : year === ynum(today()) ? tm : 0, displayMonth = Math.max(month, dueMonth);
+    const rank = { 미납: 0, 예정: 1, 정상: 2, 완납: 3 };
+    const built = members.map((m) => {
+      const p = new Map(pays.filter((x) => x.memberId === m.memberId).map((x) => [x.month, x]));
+      const prior = allPays.filter((x) => x.memberId === m.memberId);
+      let hasUnpaid = false, curUnpaid = false, req = 0, allPaid = true;
+      const cells = Array.from({ length: 12 }, (_, i) => {
+        const mo = i + 1, fp = p.get(mo), active = isFeeTarget(m, year, mo, prior), exempt = active && m.executiveThreeMonthExempt && mo >= 10;
+        if (active && !exempt) { req++; if (!fp) allPaid = false; }
+        if (fp) return "P"; if (!active) return "N"; if (exempt) return "E";
+        if (mo <= displayMonth && mo <= dueMonth) { if (year === ynum(today()) && mo === tm) { curUnpaid = true; return "S"; } hasUnpaid = true; return "O"; }
+        return "N";
+      });
+      const status = req > 0 && allPaid ? "완납" : hasUnpaid ? "미납" : curUnpaid ? "예정" : "정상";
+      return { m, status, cells, total: [...p.values()].reduce((a, x) => a + x.amount, 0) };
+    });
+    const sorted = built.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
+    const sc2 = (s) => built.filter((b) => b.status === s).length;
+    const ids = new Set(built.map((b) => b.m.memberId)), shownPays = pays.filter((p) => ids.has(p.memberId));
+    const DOT = { P: "#0F9D45", S: "#E3A92B", O: "#D93025", E: "#A79FC9" };
+    const ST_FG = { 미납: "#B33535", 예정: "#B07000", 정상: "#1A5BA8", 완납: "#2E7D32" }, ST_BG = { 미납: "#FFEDED", 예정: "#FFF8E1", 정상: "#E3EEFB", 완납: "#E8F5E9" };
+    const tbl = table({ headers: ["순번", "회원명", "등급", "상태", ...Array.from({ length: 12 }, (_, i) => `${i + 1}월`), "합계금액"],
+      rows: sorted.map((b, i) => [String(i + 1), b.m.name, b.m.grade || "-", b.status, ...b.cells, won(b.total)]),
+      weights: [44, 86, 100, 74, ...Array(12).fill(50), 104], aligns: [...Array(16).fill(0), 2],
+      selectedRow: sorted.findIndex((b) => b.m.memberId === FS.member),
+      cellColor: (r, c) => (c === 3 ? ST_FG[sorted[r].status] : 0), cellBg: (r, c) => (c === 3 ? ST_BG[sorted[r].status] : 0),
+      custom: (r, c) => { if (c < 4 || c > 15) return null; const k = sorted[r].cells[c - 4]; return DOT[k] ? h("span", { class: "tbdot", style: `color:${DOT[k]}` }, "●") : h("span", { style: "color:#C3CBD8" }, "—"); },
+      onClick: (i) => { FS.member = sorted[i].m.memberId; renderFees(); }, onLong: (i) => cancelMonth(sorted[i].m, month) }) || empty("회원 자료가 없습니다.");
+    const legend = h("div", { class: "tblegend" }, ...[["#0F9D45", "납부"], ["#E3A92B", "예정(현재월)"], ["#D93025", "미납(이전 달)"], ["#A79FC9", "운영진 면제"]].flatMap(([c, l]) => [h("i", { style: `color:${c}` }, "●"), h("span", {}, l)]), h("span", {}, "— 대상 아님"));
+    const selM = members.find((m) => m.memberId === FS.member), sp = pays.filter((p) => p.memberId === FS.member).sort((a, b) => a.month - b.month);
+    const detail = [["회원명", selM ? selM.name : "-"], ["등급", (selM && selM.grade) || "-"], ...sp.map((p) => [`${p.month}월 납부일`, p.paidDate || "-"])];
+    if (!sp.length) detail.push(["납부일", "-"]); detail.push(["합계금액", won(sp.reduce((a, p) => a + p.amount, 0))]);
+    root(inputCard, queryCard, h("div", { class: "tbbody", style: "margin-top:10px" }, h("div", { class: "tbcol", style: "flex:71" }, tbl, legend), h("div", { class: "tbright", style: "flex:29" }, infoBox("회원 상세", detail))));
+    const sm = $("tbFsum"); if (sm) sm.textContent = `완납 ${sc2("완납")}명 · 정상 ${sc2("정상")}명 · 예정 ${sc2("예정")}명 · 미납 ${sc2("미납")}명 · 총납부 ${shownPays.length}건 · 총합계 ${won(shownPays.reduce((a, p) => a + p.amount, 0))}`;
+
+    const monthsLabel = (ms) => { const s = [...new Set(ms)].sort((a, b) => a - b); if (!s.length) return ""; const parts = []; let st = s[0], pv = st; for (let i = 1; i < s.length; i++) { if (s[i] === pv + 1) { pv = s[i]; continue; } parts.push(st === pv ? `${st}월` : `${st}~${pv}월`); st = pv = s[i]; } parts.push(st === pv ? `${st}월` : `${st}~${pv}월`); return parts.join(", "); };
+    async function apply(memberId, desired, msg) {
+      const ops = feeOps(memberId, year, desired);
+      if (!ops.length) return toast(msg);
+      await save(ops, msg);
+    }
+    async function savePay() {
+      if (!canIn()) return;
+      const m = members.find((x) => x.memberId === FS.member); if (!m) return;
+      const s = FS.start, e = FS.prepay ? FS.end : FS.start;
+      const ms = []; for (let k = Math.min(s, e); k <= Math.max(s, e); k++) if (!(m.executiveThreeMonthExempt && k >= 10)) ms.push(k);
+      if (!ms.length) return toast("등록할 회비 월이 없습니다.");
+      const label = ms.length === 1 ? `${ms[0]}월` : `${ms[0]}~${ms[ms.length - 1]}월`;
+      const note = String(FS.note || "").trim() || `${m.name}(${label})`;
+      const list = feeCopy(m.memberId, year);
+      ms.forEach((mo) => { const i = list.findIndex((f) => f.month === mo), nf = { feeId: 0, memberId: m.memberId, year, month: mo, paidDate: FS.date, amount: S.monthlyFee, note }; if (i >= 0) list[i] = { ...list[i], ...nf, feeId: list[i].feeId }; else list.push(nf); });
+      FS.note = "";
+      await apply(m.memberId, list, "회비가 저장되었습니다.");
+    }
+    async function cancelMonth(m, mo) {
+      if (!inputMode() || !canIn()) return;
+      if (!pays.some((p) => p.memberId === m.memberId && p.month === mo)) return toast(`${mo}월 납부 기록이 없습니다.`);
+      if (!(await confirmBox(`${m.name}님의 ${year}년 ${mo}월 회비를 취소하시겠습니까?`))) return;
+      await apply(m.memberId, feeCopy(m.memberId, year).filter((f) => f.month !== mo), "회비가 취소되었습니다.");
+    }
+    async function openModify() {
+      if (!canIn()) return;
+      const m = members.find((x) => x.memberId === FS.member); if (!m) return toast("수정할 회원을 먼저 선택하세요.");
+      if (withdrawn(m)) return toast("탈퇴 회원은 회비를 수정할 수 없습니다.");
+      const mine = pays.filter((p) => p.memberId === m.memberId).sort((a, b) => (a.paidDate < b.paidDate ? -1 : a.paidDate > b.paidDate ? 1 : a.month - b.month));
+      if (!mine.length) return toast("수정할 회비 기록이 없습니다.");
+      const gmap = new Map(); mine.forEach((p) => { if (!gmap.has(p.paidDate)) gmap.set(p.paidDate, []); gmap.get(p.paidDate).push(p); });
+      const groups = [...gmap.values()];
+      let target = groups[0];
+      if (groups.length > 1) {
+        const pick = await modal(`${m.name} 회비 수정`, h("div", { class: "tbpick" }, "수정할 납부 기록을 고르세요."),
+          [...groups.map((g, i) => [`${mmdd(g[0].paidDate)} | ${g.map((p) => p.month + "월").join(", ")}${g[0].note ? " / " + g[0].note : ""}`, i]), ["닫기", null]]);
+        if (pick == null) return; target = groups[pick];
+      }
+      const selSet = new Set(target.map((p) => p.month)), reserved = new Set(mine.map((p) => p.month).filter((x) => !selSet.has(x)));
+      const boxes = new Map();
+      const grid = h("div", { class: "tbmonths" }, Array.from({ length: 12 }, (_, i) => { const mo = i + 1, cb = h("input", { type: "checkbox" }); cb.checked = selSet.has(mo); cb.disabled = reserved.has(mo) && !selSet.has(mo); boxes.set(mo, cb); return h("label", {}, cb, `${mo}월`); }));
+      const dIn = h("input", { class: "pcin", type: "date", value: target[0].paidDate }), nIn = h("input", { class: "pcin" });
+      const checked = () => [...boxes.entries()].filter(([, c]) => c.checked).map(([k]) => k);
+      const gen = () => { const l = monthsLabel(checked()); nIn.value = l ? `${m.name}(${l})` : m.name; };
+      boxes.forEach((c) => c.onchange = gen); gen();
+      const r = await modal("회비 기록 수정", h("div", {}, h("div", { class: "pcnote" }, `${m.name} · 선납 월 선택`), grid, h("div", { class: "pcgrid" }, h("label", {}, "납부일"), dIn, h("label", {}, "비고"), nIn)), [["수정", "ok"], ["삭제", "del", "danger"], ["닫기", null]]);
+      if (!r) return;
+      if (r === "del") {
+        const ms = checked().length ? checked() : target.map((p) => p.month);
+        if (!(await confirmBox(`${m.name} ${monthsLabel(ms) || "회비"} 회비 기록을 삭제하시겠습니까?`))) return;
+        const drop = new Set(target.map((p) => p.month));
+        return apply(m.memberId, feeCopy(m.memberId, year).filter((f) => !drop.has(f.month)), "회비 기록이 삭제되었습니다.");
+      }
+      const ms = checked(); if (!ms.length) return toast("선택된 월이 없습니다.");
+      const d = smartDate(dIn.value); if (!d) return toast("납부일을 확인하세요.");
+      const note = nIn.value.trim() || (monthsLabel(ms) ? `${m.name}(${monthsLabel(ms)})` : m.name);
+      const amount = target[0].amount || S.monthlyFee, tset = new Set(target.map((p) => p.month));
+      const list = feeCopy(m.memberId, year).filter((f) => !tset.has(f.month));
+      ms.forEach((mo) => list.push({ feeId: 0, memberId: m.memberId, year, month: mo, paidDate: d, amount, note }));
+      await apply(m.memberId, list, "회비 기록이 수정되었습니다.");
+    }
+  }
+
+  /* =====================================================================
+     회원관리 (LargeMemberFragment) · 락카 (LargeLockerFragment)
+     ===================================================================== */
+  const MS = { q: "", sel: 0 };
+  const genderTxt = (g) => (g === "MALE" ? "남" : g === "FEMALE" ? "여" : "-");
+  const lockerOf = (id) => { const r = S.lockerRows.find((x) => int(x.member_id) === id); return r && String(r.locker_number || "").trim() ? r : null; };
+  function renderMembers() {
+    const all = allMembers(), names = [...new Set(all.map((m) => m.name.trim()).filter(Boolean))].sort(ko.compare);
+    const list = MS.q ? all.filter((m) => m.name.includes(MS.q)) : all;
+    if (!list.some((m) => m.memberId === MS.sel)) MS.sel = list.length ? list[0].memberId : 0;
+    const act = list.filter((m) => isActive(m)).length;
+    const actions = inputMode() ? [btn("회원 등록", () => memberForm(null), "pri"), btn("회원수정", () => { const m = all.find((x) => x.memberId === MS.sel); m ? editMember(m) : toast("수정할 회원을 먼저 선택하세요."); }), btn("삭제", delMember)] : [];
+    const rows = list.map((m, i) => { const lk = lockerOf(m.memberId), b = qBase(m); return [String(i + 1), m.name, m.grade || "-", genderTxt(m.gender), m.phone || "-", m.joinDate || "-", b > 0 ? String(b) : "-", lk ? lk.locker_number : "-", isActive(m) ? "활동" : "탈퇴"]; });
+    const tbl = table({ headers: ["번호", "회원명", "등급", "성별", "연락처", "가입일", "에버", "락카", "상태"], rows, weights: [50, 150, 90, 50, 150, 110, 60, 60, 60],
+      selectedRow: list.findIndex((m) => m.memberId === MS.sel), cellColor: (r, c) => (c === 8 && rows[r][8] === "탈퇴" ? "#D93025" : 0),
+      onClick: (i) => { MS.sel = list[i].memberId; renderMembers(); }, onLong: (i) => { if (inputMode()) editMember(list[i]); } }) || empty("회원 자료가 없습니다.");
+    const m = list.find((x) => x.memberId === MS.sel);
+    const lk = m && lockerOf(m.memberId), b = m ? qBase(m) : 0;
+    const detail = m ? [["회원명", m.name], ["등급", m.grade || "-"], ["성별", genderTxt(m.gender)], ["연락처", m.phone || "-"], ["가입일", m.joinDate || "-"], ["기준 에버", b > 0 ? String(b) : "-"], ["락카", lk ? lk.locker_number : "-"],
+      ["회비 면제", m.feeExempt ? "예" : "아니오"], ["회비 시작", `${m.feeStartYear || "-"}년 ${m.feeStartMonth}월`], ["운영진 3개월 면제", m.executiveThreeMonthExempt ? "예" : "아니오"],
+      ["탈퇴일", m.withdrawalDate || "-"], ["재가입일", m.rejoinDate || "-"], ["상태", isActive(m) ? "활동" : "탈퇴"]] : [["회원명", "-"]];
+    root(card(lab("회원명 검색"), sel([["", "전체"], ...names.map((n) => [n, n])], MS.q, (v) => { MS.q = v; renderMembers(); }), h("span", { class: "tbsum" }, `전체 ${list.length}명 · 활동 ${act}명`), spacer(), ...actions),
+      h("div", { class: "tbbody", style: "margin-top:10px" }, h("div", { style: "flex:2;min-width:0;display:flex" }, tbl), h("div", { class: "tbright", style: "flex:1" }, infoBox("회원 상세기록", detail))));
+
+    async function delMember() {
+      const m = all.find((x) => x.memberId === MS.sel); if (!m) return toast("삭제할 회원을 먼저 선택하세요.");
+      editMember(m); // 삭제 규칙(탈퇴 후 다음 해부터 · 서버 자료는 탈퇴일로 관리)은 회원 수정 창과 같아요
+    }
+  }
+  async function memberForm() {
+    if (!canIn()) return;
+    const f = { name: h("input", { class: "pcin", maxlength: "30" }), phone: h("input", { class: "pcin", maxlength: "20", inputmode: "tel" }), grade: selectEl(S.gradeTypes, S.gradeTypes[0]),
+      gender: selectEl([["", "미선택"], ["MALE", "남"], ["FEMALE", "여"]], ""), join: h("input", { class: "pcin", type: "date", value: today() }), avg: h("input", { class: "pcin", inputmode: "numeric", maxlength: "3" }) };
+    const r = await modal("회원 등록", h("div", { class: "pcgrid" }, h("label", {}, "회원명"), f.name, h("label", {}, "연락처"), f.phone, h("label", {}, "등급"), f.grade, h("label", {}, "성별"), f.gender, h("label", {}, "가입일"), f.join, h("label", {}, "기준에버"), f.avg), [["등록", "ok"], ["취소", null]]);
+    if (r !== "ok") return;
+    const nm = f.name.value.trim(); if (!nm) return toast("이름을 입력하세요.");
+    if (!/^\d+$/.test(f.avg.value.trim())) return toast("기준에버를 숫자로 입력하세요.");
+    const m = { memberId: 0, name: nm, phone: f.phone.value.trim(), grade: f.grade.value || "일반", gender: f.gender.value || null, joinDate: f.join.value || null, currentBaseAverage: int(f.avg.value), feeExempt: false, feeStartMonth: f.join.value ? mnum(f.join.value) : 1, feeStartYear: f.join.value ? ynum(f.join.value) : ynum(today()), executiveThreeMonthExempt: false, withdrawalDate: null, rejoinDate: null, rejoinFeeStartMonth: 0, rejoinFeeStartYear: 0 };
+    await save([op("members", "insert", memberPayload(m))], "회원이 등록되었습니다.");
+  }
+
+  const KS = { sel: 0 };
+  function renderLockers() {
+    const st = S.settings, dDep = int(st.key_locker_deposit), dFee = int(st.key_locker_yearly_fee), dCon = st.key_locker_contract_date || "", dExp = st.key_locker_expiry_date || "";
+    const md = (v) => { const s = String(v || ""); const m = s.match(/(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[2]}-${m[3]}` : s || "-"; };
+    const no = (m) => { const l = lockerOf(m.memberId); return l ? String(l.locker_number) : "-"; };
+    const ms = activeMembers().sort((a, b) => { const x = no(a) === "-" ? "9999" : no(a), y = no(b) === "-" ? "9999" : no(b); return (x < y ? -1 : x > y ? 1 : 0) || ko.compare(a.name, b.name); });
+    if (!ms.some((m) => m.memberId === KS.sel)) KS.sel = (ms.find((m) => no(m) !== "-") || ms[0] || {}).memberId || 0;
+    const used = ms.filter((m) => no(m) !== "-");
+    const depSum = used.reduce((a, m) => a + (int((lockerOf(m.memberId) || {}).deposit) || dDep), 0);
+    const rows = ms.map((m, i) => { const l = lockerOf(m.memberId) || {}; return [String(i + 1), m.name, String(qBase(m)), m.phone || "-", no(m), won(int(l.deposit) || dDep), won(int(l.yearly_fee) || dFee), md(l.contract_date || dCon), md(l.expiry_date || dExp), m.joinDate || "-"]; });
+    const tbl = table({ headers: ["순번", "회원명", "에버", "연락처", "메인락커", "보증금", "1년사용료", "계약일", "만료일", "가입일"], rows, weights: [70, 130, 80, 200, 100, 100, 120, 150, 150, 150],
+      selectedRow: ms.findIndex((m) => m.memberId === KS.sel), onClick: (i) => { KS.sel = ms[i].memberId; renderLockers(); }, onLong: (i) => { if (inputMode()) { KS.sel = ms[i].memberId; editL(); } } }) || empty("회원 자료가 없습니다.");
+    root(h("div", { class: "tbhead" }, h("b", {}, "락카 사용 현황"), h("span", {}, `사용 ${used.length} / 전체 ${ms.length} · 보증금 합계 ${won(depSum)}`), spacer(), inputMode() ? btn("수정", editL) : null),
+      h("div", { class: "tbbody" }, tbl));
+    async function editL() {
+      if (!canIn()) return toast("입력 권한이 있는 회원만 수정할 수 있습니다.");
+      const m = ms.find((x) => x.memberId === KS.sel); if (!m) return toast("수정할 회원을 선택하세요.");
+      const l = lockerOf(m.memberId) || {};
+      const f = (v) => h("input", { class: "pcin", value: v ?? "" });
+      const nIn = f(no(m) === "-" ? "" : no(m)), dep = f(String(int(l.deposit) || dDep)), fee = f(String(int(l.yearly_fee) || dFee)), con = f(md(l.contract_date || dCon).replace(/^-$/, "")), exp = f(md(l.expiry_date || dExp).replace(/^-$/, ""));
+      const r = await modal(`${m.name} 락카 수정`, h("div", { class: "pcgrid" }, h("label", {}, "번호"), nIn, h("label", {}, "보증금"), dep, h("label", {}, "1년사용료"), fee, h("label", {}, "계약일"), con, h("label", {}, "만료일"), exp),
+        [["저장", "ok"], ["배정해제", "rel", "danger"], ["취소", null]]);
+      if (!r) return;
+      const toDate = (v) => { const s = v.trim(); if (!s) return null; if (/^\d{1,2}-\d{1,2}$/.test(s)) { const [mm2, dd] = s.split("-").map(Number); return ymd(ynum(today()), mm2, dd); } return smartDate(s); };
+      let ops;
+      try {
+        if (r === "rel") { if (!lockerOf(m.memberId)) return toast("저장된 락카 정보가 없습니다."); ops = lockerOps(m.memberId, "", 0, 0, null, null); }
+        else {
+          const number = nIn.value.trim(); if (!number) return toast("락카 번호를 입력하세요.");
+          ops = lockerOps(m.memberId, number, parseInt(dep.value.replace(/,/g, ""), 10) || dDep, parseInt(fee.value.replace(/,/g, ""), 10) || dFee, toDate(con.value) || (dCon ? toDate(md(dCon)) : null), toDate(exp.value) || (dExp ? toDate(md(dExp)) : null));
+        }
+      } catch (e) { return toast(e.message, 4200); }
+      if (!ops.length) return toast("변경된 내용이 없습니다.");
+      await save(ops, r === "rel" ? "락카 배정이 해제되었습니다." : "락카 현황이 저장되었습니다.");
+    }
+  }
+
+  /* =====================================================================
+     상단 막대 · 화면 연결
+     ===================================================================== */
+  const RENDER = { games: () => renderGames(false), quarter: () => renderGames(true), ledger: renderLedger, fees: renderFees, members: renderMembers, lockers: renderLockers };
+  const PC = {}; TB_KEYS.forEach((k) => { PC[k] = TABS[k]; TABS[k] = { render() { TB.wasOn = TB_ON(); if (TB.wasOn) RENDER[k](); else if (PC[k]) PC[k].render(); } }; });
+  const pcHeader = drawHeader;
+  drawHeader = function () {
+    TB.wasOn = TB_ON();
+    document.body.classList.toggle("tbon", TB.wasOn);
+    const old = $("tbpill"); if (old) old.remove();
+    if (!TB.wasOn) { if (typeof pcHeader === "function") pcHeader(); return; }
+    if (!TB.started) { TB.started = true; if (!location.hash.replace("#", "")) current = "games"; }
+    if (!TB_KEYS.includes(current) && current !== "settings") current = "games";
+    const nav = $("pcnav"); nav.textContent = "";
+    nav.append(h("button", { class: "tbbtn file pcbtn", type: "button", onclick: (e) => openFileMenu(e.currentTarget) }, "FILE"));
+    for (const k of ["games", "ledger", "fees", "quarter"]) nav.append(h("button", { class: "tbbtn" + (current === k ? " sel" : ""), type: "button", onclick: () => go(k) }, TAB_LABEL[k]));
+    $("pcsub").textContent = "";
+    const me = Conn.me;
+    if (canIn()) {
+      const pill = h("span", { class: "tbpill", id: "tbpill" },
+        h("button", { type: "button", class: inputMode() ? "on" : "", onclick: () => { TB.input = true; render(); } }, "입력"),
+        h("button", { type: "button", class: inputMode() ? "" : "on", onclick: () => { TB.input = false; render(); } }, "조회"));
+      $("authStatus").before(pill);
+    }
+    const mgr = cleanTitle(S.settings.key_management_name || "") ;
+    $("authStatus").textContent = me ? `${me.isAdmin ? "관리자" : VIEWONLY ? "조회" : "회원"} · ${mgr}` : "";
+    $("authStatus").title = me ? `${me.siteName || me.name || ""} · 서버 v${S.dataVersion}` : "";
+    $("logoutBtn").textContent = VIEWONLY ? "홈으로" : "로그아웃";
+    $("pchead").hidden = false;
+    $("appName").textContent = TITLES[current] || (VIEWONLY ? "기록 조회" : "클럽관리");
+  };
+})();
