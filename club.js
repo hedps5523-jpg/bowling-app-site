@@ -320,6 +320,14 @@ function drawHeader() {
   $("pcsub").textContent = "";
   $("pchead").hidden = false;
   $("appName").textContent = TITLES[current] || "클럽관리";
+  if (VIEWONLY) {
+    // 기록 조회: 상단 제목 자리에 메뉴 드롭다운, 메뉴 줄에는 선택한 메뉴의 하위 메뉴만 표시
+    nav.textContent = "";
+    const sel = h("select", { class: "pcmenusel", "aria-label": "메뉴 선택" }, ["members", "games", "ledger", "fees", "ranking", "quarter"].map((k) => h("option", { value: k }, TITLES[k])));
+    sel.value = TITLES[current] && sel.querySelector(`option[value="${current}"]`) ? current : "games";
+    sel.onchange = () => go(sel.value);
+    $("appName").textContent = ""; $("appName").append(sel);
+  }
 }
 function openFileMenu(btn) {
   const m = $("fileMenu");
