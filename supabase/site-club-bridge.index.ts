@@ -55,11 +55,80 @@ async function linkedProfile(email: string): Promise<Prof | null> {
   return (p as Prof) ?? null;
 }
 
+
+// ---- 모바일 볼링클럽 PIN 인증 (bowlingclub-pin-auth 와 같은 규칙, 단 계정을 새로 만들지 않고 확인만 함) ----
+const enc = new TextEncoder(), ITER = 180_000, PIN_MAX_FAIL = 5, PIN_LOCK_MIN = 10;
+const nm = (v: unknown) => String(v ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
+const kk = (v: unknown) => nm(v).toLowerCase();
+const pinOf = (v: unknown) => String(v ?? "").replace(/\D/g, "").slice(0, 6);
+const b64 = (a: Uint8Array) => { let s = ""; a.forEach((v) => s += String.fromCharCode(v)); return btoa(s); };
+const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+async function hashPin(value: string, salt64: string) {
+  const k = await crypto.subtle.importKey("raw", enc.encode(value), "PBKDF2", false, ["deriveBits"]);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: unb64(salt64), iterations: ITER }, k, 256));
+  return `pbkdf2_sha256$${ITER}$${salt64}$${b64(bits)}`;
+}
+async function verifyPin(value: string, stored: string) {
+  const p = String(stored ?? "").split("$"); if (p.length !== 4 || p[0] !== "pbkdf2_sha256") return false;
+  const got = enc.encode(await hashPin(value, p[2])), want = enc.encode(stored); if (got.length !== want.length) return false;
+  let d = 0; for (let i = 0; i < got.length; i++) d |= got[i] ^ want[i]; return d === 0;
+}
+const PCOLS = "user_id,login_id,contact_email,contact_phone,requested_member_name,member_id,role,approved,can_write,must_change_password,created_at,approved_at,last_seen_at,club_name,club_key,member_key,pin_hash,pin_failed_attempts,pin_locked_until";
+async function clubList() {
+  const { data } = await db.from("user_profiles").select("club_name").not("club_name", "is", null).limit(1000);
+  const seen = new Set<string>(), out: string[] = [];
+  for (const r of data ?? []) { const c = nm((r as { club_name?: string }).club_name), k = kk(c); if (c && !seen.has(k)) { seen.add(k); out.push(c); } }
+  return out.sort((a, c) => a.localeCompare(c, "ko"));
+}
+// 성공: 프로필 / 실패: {err, remaining?}
+async function checkPin(clubIn: unknown, memberIn: unknown, pinIn: unknown): Promise<{ p?: Record<string, unknown>; err?: string; remaining?: number }> {
+  const member = nm(memberIn), pv = pinOf(pinIn);
+  if (!nm(clubIn) || !member || !/^\d{6}$/.test(pv)) return { err: "invalid" };
+  const club = (await clubList()).find((c) => kk(c) === kk(clubIn));
+  if (!club) return { err: "invalid" };
+  let { data: list } = await db.from("user_profiles").select(PCOLS).eq("club_key", kk(club)).eq("member_key", kk(member)).limit(20);
+  if (!list || !list.length) ({ data: list } = await db.from("user_profiles").select(PCOLS).ilike("requested_member_name", member).limit(20));
+  const cands = (list ?? []).filter((p: Record<string, unknown>) => kk(p.club_name || club) === kk(club) && kk(p.requested_member_name) === kk(member) && p.pin_hash && p.login_id !== "site_bridge");
+  if (!cands.length) return { err: "invalid" };
+  const valid: Record<string, unknown>[] = [];
+  for (const p of cands) {
+    const lock = p.pin_locked_until ? new Date(String(p.pin_locked_until)).getTime() : 0; if (lock > Date.now()) continue;
+    if (await verifyPin(pv, String(p.pin_hash))) valid.push(p);
+  }
+  if (valid.length === 1) { await db.from("user_profiles").update({ pin_failed_attempts: 0, pin_locked_until: null }).eq("user_id", valid[0].user_id); return { p: valid[0] }; }
+  if (valid.length > 1) return { err: "ambiguous" };
+  const t = cands[0], lock = t.pin_locked_until ? new Date(String(t.pin_locked_until)).getTime() : 0;
+  if (lock > Date.now()) return { err: "locked" };
+  const next = Number(t.pin_failed_attempts ?? 0) + 1;
+  if (next >= PIN_MAX_FAIL) { await db.from("user_profiles").update({ pin_failed_attempts: 0, pin_locked_until: new Date(Date.now() + PIN_LOCK_MIN * 60000).toISOString() }).eq("user_id", t.user_id); return { err: "locked" }; }
+  await db.from("user_profiles").update({ pin_failed_attempts: next }).eq("user_id", t.user_id);
+  return { err: "invalid", remaining: PIN_MAX_FAIL - next };
+}
+function cleanProfile(p: Record<string, unknown>) { const c = { ...p }; delete c.pin_hash; delete c.pin_failed_attempts; delete c.pin_locked_until; return c; }
+async function issueSession(p: Record<string, unknown>) {
+  const { data: u } = await db.auth.admin.getUserById(String(p.user_id)); const email = u?.user?.email ?? "";
+  if (!email) throw new Error("인증 계정 정보를 확인하지 못했어요.");
+  const { data: link } = await db.auth.admin.generateLink({ type: "magiclink", email });
+  const token = (link as { properties?: { hashed_token?: string } })?.properties?.hashed_token ?? "";
+  const { data: s, error } = await pub.auth.verifyOtp({ type: "magiclink", token_hash: token });
+  if (error || !s.session) throw new Error("인증 세션을 발급하지 못했어요.");
+  return { access_token: s.session.access_token, refresh_token: s.session.refresh_token, profile: cleanProfile(p) };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   let b: Record<string, unknown> = {};
   try { b = await req.json(); } catch { return json({ error: "bad_request" }, 400); }
+  const act0 = String(b.action ?? "");
+  try {
+    if (act0 === "list_clubs") return json({ ok: true, clubs: await clubList() });
+    if (act0 === "pin_login") {
+      const r = await checkPin(b.club_name, b.member_name, b.pin);
+      if (!r.p) return json({ error: r.err, remaining: r.remaining }, r.err === "locked" ? 429 : 401);
+      return json({ ok: true, ...(await issueSession(r.p)) });
+    }
+  } catch (e) { return json({ error: String((e as Error).message ?? e) }, 500); }
   const w = await who(String(b.token ?? ""));
   if (!w || !("ok" in w)) return json({ error: (w as { status?: number })?.status === 403 ? "not_member" : "expired" }, 401);
   if (w.role !== "admin" && w.role !== "staff") return json({ error: "forbidden", role: w.role }, 403);
@@ -77,31 +146,38 @@ Deno.serve(async (req) => {
     }
 
     if (action === "link") {
-      const loginId = String(b.login_id ?? "").trim().toLowerCase(), password = String(b.password ?? "");
-      if (!/^[a-z0-9_]{4,20}$/.test(loginId) || !password) return json({ error: "invalid_credentials" }, 401);
       const { data: att } = await db.from("site_club_link_attempts").select("fails,locked_until").eq("site_email", email).maybeSingle();
       if (att?.locked_until && new Date(att.locked_until).getTime() > Date.now()) return json({ error: "locked" }, 429);
-      const fail = async () => {
+      const fail = async (detail: string, remaining?: number) => {
         const fails = (att?.fails ?? 0) + 1;
         await db.from("site_club_link_attempts").upsert({ site_email: email, fails: fails >= MAX_FAILS ? 0 : fails, locked_until: fails >= MAX_FAILS ? new Date(Date.now() + LOCK_MIN * 60000).toISOString() : null });
-        await audit(email, null, "link_fail", loginId);
-        return json({ error: "invalid_credentials" }, 401);
+        await audit(email, null, "link_fail", detail);
+        return json({ error: "invalid_credentials", remaining }, 401);
       };
-      const { data: ps } = await db.from("user_profiles").select("user_id,login_id,requested_member_name,role,approved,can_write").ilike("login_id", loginId).limit(2);
-      if (!ps || ps.length !== 1) return await fail();
-      const p = ps[0] as Prof;
-      const { data: u } = await db.auth.admin.getUserById(p.user_id);
-      const authEmail = u?.user?.email?.trim().toLowerCase() ?? "";
-      if (!authEmail || p.login_id === "site_bridge") return await fail();
-      const { data: sg, error: se } = await pub.auth.signInWithPassword({ email: authEmail, password });
-      if (se || !sg.session) return await fail();
+      let p: Prof;
+      if (b.pin != null) {
+        const r = await checkPin(b.club_name, b.member_name, b.pin);
+        if (!r.p) { if (r.err === "locked") return json({ error: "pin_locked" }, 429); if (r.err === "ambiguous") return json({ error: "ambiguous" }, 409); return await fail("pin:" + nm(b.member_name), r.remaining); }
+        p = r.p as unknown as Prof;
+      } else {
+        const loginId = String(b.login_id ?? "").trim().toLowerCase(), password = String(b.password ?? "");
+        if (!/^[a-z0-9_]{4,20}$/.test(loginId) || !password) return await fail("id:" + loginId);
+        const { data: ps } = await db.from("user_profiles").select("user_id,login_id,requested_member_name,role,approved,can_write").ilike("login_id", loginId).limit(2);
+        if (!ps || ps.length !== 1) return await fail("id:" + loginId);
+        p = ps[0] as Prof;
+        const { data: u } = await db.auth.admin.getUserById(p.user_id);
+        const authEmail = u?.user?.email?.trim().toLowerCase() ?? "";
+        if (!authEmail || p.login_id === "site_bridge") return await fail("id:" + loginId);
+        const { data: sg, error: se } = await pub.auth.signInWithPassword({ email: authEmail, password });
+        if (se || !sg.session) return await fail("id:" + loginId);
+      }
       if (!perms(p).canRead) return json({ error: "not_approved" }, 403);
       const { data: other } = await db.from("site_club_links").select("site_email").eq("club_user_id", p.user_id).maybeSingle();
       if (other && other.site_email !== email) return json({ error: "already_linked" }, 409);
       const { error: le } = await db.from("site_club_links").upsert({ site_email: email, club_user_id: p.user_id, linked_at: new Date().toISOString() });
       if (le) throw new Error(le.message);
       await db.from("site_club_link_attempts").delete().eq("site_email", email);
-      await audit(email, p.user_id, "link", p.login_id);
+      await audit(email, p.user_id, "link", String(p.login_id));
       const c = { loginId: p.login_id, name: p.requested_member_name || p.login_id, role: p.role, ...perms(p) };
       return json({ ok: true, linked: true, club: c });
     }

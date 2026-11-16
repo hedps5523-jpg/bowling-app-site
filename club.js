@@ -79,10 +79,21 @@ const Conn = {
     return out;
   },
 
-  async loginMobile(loginId, password) {
-    const r = await fetch(VH_FN("bowlingclub-login-by-id"), { method: "POST", headers: { "Content-Type": "application/json", apikey: VH_KEY }, body: JSON.stringify({ login_id: loginId, password }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.access_token) throw new Error(d.error === "rate_limited" ? "잠시 후 다시 시도해 주세요. (시도 횟수 초과)" : "아이디 또는 비밀번호가 맞지 않아요.");
+  async clubs() {
+    try { const r = await fetch(VH_FN("site-club-bridge"), { method: "POST", headers: { "Content-Type": "application/json", apikey: VH_KEY }, body: JSON.stringify({ action: "list_clubs" }) }); const d = await r.json(); return d.clubs || []; } catch { return []; }
+  },
+  /* v: {club_name, member_name, pin} (모바일 볼링클럽과 같은 PIN 로그인) 또는 {login_id, password} (옛 방식) */
+  async loginMobile(v) {
+    let r, d;
+    if (v.pin != null) {
+      r = await fetch(VH_FN("site-club-bridge"), { method: "POST", headers: { "Content-Type": "application/json", apikey: VH_KEY }, body: JSON.stringify({ action: "pin_login", club_name: v.club_name, member_name: v.member_name, pin: v.pin }) });
+      d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.access_token) throw new Error(d.error === "locked" ? "PIN 입력 오류가 반복되어 10분 동안 제한돼요." : d.error === "ambiguous" ? "같은 이름의 계정이 여러 개예요. 관리자에게 정리를 요청해 주세요." : "클럽명·회원명·PIN 번호를 확인해 주세요." + (d.remaining != null ? ` (남은 시도 ${d.remaining}회)` : ""));
+    } else {
+      r = await fetch(VH_FN("bowlingclub-login-by-id"), { method: "POST", headers: { "Content-Type": "application/json", apikey: VH_KEY }, body: JSON.stringify({ login_id: v.login_id, password: v.password }) });
+      d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.access_token) throw new Error(d.error === "rate_limited" ? "잠시 후 다시 시도해 주세요. (시도 횟수 초과)" : "아이디 또는 비밀번호가 맞지 않아요.");
+    }
     this.saveMobile({ access_token: d.access_token, refresh_token: d.refresh_token, profile: d.profile });
   },
 
@@ -108,11 +119,11 @@ const Conn = {
     }
     return { need: "login" };
   },
-  async linkClub(loginId, password) {
-    const r = await this.bridge("link", { login_id: loginId, password });
+  async linkClub(v) {
+    const r = await this.bridge("link", v);
     if (!r.ok) {
       const e = r.d.error;
-      throw new Error(e === "locked" ? "시도 횟수를 넘었어요. 15분 뒤에 다시 시도해 주세요." : e === "already_linked" ? "이 클럽 계정은 이미 다른 홈페이지 계정에 연결되어 있어요." : e === "not_approved" ? "아직 승인되지 않은 클럽 계정이에요. 관리자 승인 후 연결할 수 있어요." : e === "expired" ? "홈페이지 인증이 만료되었어요. 다시 인증해 주세요." : "클럽 아이디 또는 비밀번호가 맞지 않아요.");
+      throw new Error(e === "pin_locked" ? "PIN 입력 오류가 반복되어 10분 동안 제한돼요." : e === "ambiguous" ? "같은 이름의 계정이 여러 개예요. 관리자에게 정리를 요청해 주세요." : e === "invalid_credentials" && r.d.remaining != null ? `클럽명·회원명·PIN 번호를 확인해 주세요. (남은 시도 ${r.d.remaining}회)` : e === "locked" ? "시도 횟수를 넘었어요. 15분 뒤에 다시 시도해 주세요." : e === "already_linked" ? "이 클럽 계정은 이미 다른 홈페이지 계정에 연결되어 있어요." : e === "not_approved" ? "아직 승인되지 않은 클럽 계정이에요. 관리자 승인 후 연결할 수 있어요." : e === "expired" ? "홈페이지 인증이 만료되었어요. 다시 인증해 주세요." : "클럽 계정 정보가 맞지 않아요. 클럽명·회원명·PIN 번호를 확인해 주세요.");
     }
   },
   async unlinkClub() { const r = await this.bridge("unlink"); if (!r.ok) throw new Error("연결을 해제하지 못했어요."); },
@@ -1542,41 +1553,61 @@ async function editBasicQuarter(m, defQ) {
 function loginView(reason) {
   $("pchead").hidden = true; $("appName").textContent = "클럽관리";
   view.textContent = "";
-  const id = h("input", { class: "pcin", placeholder: "모바일 볼링클럽 아이디", autocomplete: "username", autocapitalize: "off", maxlength: "20" });
-  const pw = h("input", { class: "pcin", type: "password", placeholder: "비밀번호", autocomplete: "current-password" });
   const msg = h("div", { class: "msg" + (reason ? " info" : "") }, reason === "site_expired" ? "홈페이지 인증이 만료되었어요. 아래 \"홈페이지 관리자·운영진 인증하기\"로 다시 인증해 주세요." : reason === "site_error" ? "홈페이지 연결을 확인하지 못했어요. 잠시 후 다시 열거나 아래에서 다시 인증해 주세요." : reason === "site_member" ? "홈페이지 관리자·운영진만 홈페이지 계정으로 들어올 수 있어요. 모바일 볼링클럽 계정으로 로그인해 주세요."
     : reason === "not_approved" ? "아직 승인되지 않은 모바일 계정이에요. 관리자 승인 후 이용할 수 있어요." : reason === "expired" ? "로그인이 만료되었어요. 다시 로그인해 주세요." : "");
   const go2 = h("button", { class: "btn", type: "button" }, "로그인");
+  const f = credForm(() => go2.click());
   go2.onclick = async () => {
-    if (!id.value.trim() || !pw.value) { msg.className = "msg err"; msg.textContent = "아이디와 비밀번호를 입력해 주세요."; return; }
+    const v = f.value(); if (!v) { msg.className = "msg err"; msg.textContent = CRED_HINT; return; }
     go2.disabled = true;
-    try { await Conn.loginMobile(id.value.trim(), pw.value); await boot(); }
+    try { await Conn.loginMobile(v); f.clear(); await boot(); }
     catch (e) { msg.className = "msg err"; msg.textContent = e.message; go2.disabled = false; }
   };
-  pw.onkeydown = (e) => { if (e.key === "Enter") go2.click(); };
   const box = h("section", { class: "card pclogin" }, h("h2", {}, "🎳 클럽관리 로그인"),
-    h("p", { class: "lead" }, "PC·모바일 볼링클럽과 같은 서버 자료를 사용해요. 계정 권한(관리자 / 조회+입력 / 조회 전용)이 그대로 적용돼요."),
-    id, pw, msg, go2);
+    h("p", { class: "lead" }, "모바일 볼링클럽에 로그인하는 정보(클럽명·회원명·PIN)로 들어와요. 같은 서버 자료를 쓰고, 계정 권한(관리자 / 조회+입력 / 조회 전용)이 그대로 적용돼요."),
+    f.el, msg, go2);
   if (!Conn.siteToken() || reason === "site_expired" || reason === "site_error") box.append(h("div", { class: "orline" }, "또는"), h("a", { class: "btn ghost", href: "/apps?next=%2Fhome" }, "홈페이지 관리자·운영진 인증하기"), h("small", { class: "mut", style: "display:block;margin-top:6px" }, "인증 후 다시 클럽관리를 열면 바로 들어와요."));
   view.append(box);
 }
+/* 클럽 계정 입력칸: 모바일 볼링클럽과 같은 클럽명 + 회원명 + PIN(6자리). 옛 아이디/비밀번호 방식도 선택 가능 */
+function credForm(onEnter) {
+  let mode = "pin";
+  const dl = h("datalist", { id: "clubDl" });
+  const club = h("input", { class: "pcin", placeholder: "클럽명", list: "clubDl", autocomplete: "off", maxlength: "40" });
+  const member = h("input", { class: "pcin", placeholder: "회원명", autocomplete: "off", maxlength: "40" });
+  const pin = h("input", { class: "pcin", type: "password", placeholder: "PIN 번호 (숫자 6자리)", inputmode: "numeric", autocomplete: "off", maxlength: "6" });
+  const lid = h("input", { class: "pcin", placeholder: "클럽 아이디", autocomplete: "off", autocapitalize: "off", maxlength: "20" });
+  const pw = h("input", { class: "pcin", type: "password", placeholder: "비밀번호", autocomplete: "off" });
+  const pinBox = h("div", {}, club, dl, member, pin), idBox = h("div", { hidden: true }, lid, pw);
+  const sw = h("button", { type: "button", class: "pcbtn sm", style: "margin-top:8px" }, "아이디/비밀번호로 입력");
+  sw.onclick = () => { mode = mode === "pin" ? "id" : "pin"; pinBox.hidden = mode !== "pin"; idBox.hidden = mode === "pin"; sw.textContent = mode === "pin" ? "아이디/비밀번호로 입력" : "클럽명·회원명·PIN으로 입력"; };
+  [member, pin, lid, pw].forEach((i) => i.onkeydown = (e) => { if (e.key === "Enter") onEnter(); });
+  Conn.clubs().then((l) => { l.forEach((n) => dl.append(h("option", { value: n }))); if (!club.value && l.length) club.value = l[0]; });
+  return {
+    el: h("div", {}, pinBox, idBox, sw),
+    value() {
+      if (mode === "pin") { if (!club.value.trim() || !member.value.trim() || !/^\d{6}$/.test(pin.value.trim())) return null; return { club_name: club.value.trim(), member_name: member.value.trim(), pin: pin.value.trim() }; }
+      if (!lid.value.trim() || !pw.value) return null; return { login_id: lid.value.trim(), password: pw.value };
+    },
+    clear() { pin.value = ""; pw.value = ""; },
+  };
+}
+const CRED_HINT = "클럽명, 회원명, PIN 번호(6자리)를 모두 입력해 주세요.";
 function linkView(st) {
   $("pchead").hidden = true; $("appName").textContent = "클럽관리"; view.textContent = "";
-  const id = h("input", { class: "pcin", placeholder: "클럽(모바일 볼링클럽) 아이디", autocomplete: "off", autocapitalize: "off", maxlength: "20" });
-  const pw = h("input", { class: "pcin", type: "password", placeholder: "클럽 비밀번호", autocomplete: "off" });
   const msg = h("div", { class: "msg" + (st.reason ? " err" : "") }, st.reason === "not_approved" ? "연결된 클럽 계정이 아직 승인되지 않았어요. 관리자 승인 후 다시 열어 주세요." : "");
   const btn = h("button", { class: "btn", type: "button" }, "연결하기");
+  const f = credForm(() => btn.click());
   btn.onclick = async () => {
-    if (!id.value.trim() || !pw.value) { msg.className = "msg err"; msg.textContent = "클럽 아이디와 비밀번호를 입력해 주세요."; return; }
+    const v = f.value(); if (!v) { msg.className = "msg err"; msg.textContent = CRED_HINT; return; }
     btn.disabled = true;
-    try { await Conn.linkClub(id.value.trim(), pw.value); pw.value = ""; await boot(); }
+    try { await Conn.linkClub(v); f.clear(); await boot(); }
     catch (e) { msg.className = "msg err"; msg.textContent = e.message; btn.disabled = false; }
   };
-  pw.onkeydown = (e) => { if (e.key === "Enter") btn.click(); };
   view.append(h("section", { class: "card pclogin" }, h("h2", {}, "🔗 클럽 계정 연결"),
-    h("p", { class: "lead" }, `${st.site ? st.site.name + "님, " : ""}홈페이지 관리자·운영진 계정으로 확인되었어요. 클럽관리를 쓰려면 본인의 클럽(모바일 볼링클럽) 계정을 한 번 연결해 주세요.`),
-    h("p", { class: "pcnote" }, "• 연결하면 다음부터는 홈페이지 로그인만으로 들어와요.", h("br"), "• 읽기·입력 권한은 연결한 클럽 계정의 권한(관리자 / 조회+입력 / 조회 전용)이 그대로 적용돼요.", h("br"), "• 비밀번호는 연결 확인에만 쓰이고 저장되지 않아요."),
-    id, pw, msg, btn,
+    h("p", { class: "lead" }, `${st.site ? st.site.name + "님, " : ""}홈페이지 관리자·운영진 계정으로 확인되었어요. 클럽관리를 쓰려면 모바일 볼링클럽에 로그인하는 정보(클럽명·회원명·PIN)로 한 번 연결해 주세요.`),
+    h("p", { class: "pcnote" }, "• 연결하면 다음부터는 홈페이지 로그인만으로 들어와요.", h("br"), "• 읽기·입력 권한은 연결한 클럽 계정의 권한(관리자 / 조회+입력 / 조회 전용)이 그대로 적용돼요.", h("br"), "• PIN은 연결 확인에만 쓰이고 저장되지 않아요."),
+    f.el, msg, btn,
     h("div", { class: "orline" }, "또는"), h("button", { class: "btn ghost", type: "button", onclick: () => { sessionStorage.setItem("clubSkipSite", "1"); loginView(); } }, "클럽 계정으로만 로그인")));
 }
 async function unlinkClub() {
