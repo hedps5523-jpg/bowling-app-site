@@ -204,6 +204,49 @@ Deno.serve(async (req) => {
     }
 
     if (!prof || !club) return json({ error: "not_linked" }, 403);
+
+    // ---- 승인관리 (모바일 볼링클럽 환경설정 승인관리와 같은 규칙) : 홈페이지 관리자 + 연결된 클럽 계정도 관리자일 때만 ----
+    if (action === "approval_list" || action === "approval_set" || action === "approval_delete") {
+      if (w.role !== "admin" || !club.isAdmin) return json({ error: "admin_required" }, 403);
+      if (action === "approval_list") {
+        const { data, error } = await db.from("user_profiles").select("user_id,login_id,requested_member_name,contact_email,approved,can_write,role,created_at,approved_at,last_seen_at").neq("login_id", "site_bridge").limit(2000);
+        if (error) throw new Error(error.message);
+        return json({ ok: true, rows: (data ?? []).filter((r: Record<string, unknown>) => String(r.requested_member_name ?? "").trim()) });
+      }
+      const uid = String(b.user_id ?? "");
+      if (!/^[0-9a-f-]{36}$/i.test(uid)) return json({ error: "invalid_user_id" }, 400);
+      const { data: target } = await db.from("user_profiles").select("user_id,login_id,requested_member_name,role").eq("user_id", uid).maybeSingle();
+      if (!target || target.login_id === "site_bridge") return json({ error: "대상 계정을 찾을 수 없습니다." }, 404);
+      if (action === "approval_delete") {
+        if (uid === prof.user_id || String(target.role ?? "").toLowerCase() === "admin") return json({ error: "관리자 계정은 삭제할 수 없습니다." }, 403);
+        const { error } = await db.auth.admin.deleteUser(uid, false);
+        if (error) return json({ error: "계정 삭제에 실패했습니다." }, 500);
+        await audit(email, prof.user_id, "approval_delete", `${target.requested_member_name}(${target.login_id})`);
+        return json({ ok: true });
+      }
+      const admin = b.admin === true, canW = b.can_write === true || admin, read = b.approved === true || canW;
+      const role = admin ? "admin" : "member";
+      const name = String(target.requested_member_name ?? "").trim().replace(/\s+/g, " ");
+      let memberId: number | null = null, memberName = name;
+      if (read) {
+        const { data: ms } = await db.from("members").select("member_id,name,deleted_at").ilike("name", name).limit(10);
+        const hit = (ms ?? []).filter((m: Record<string, unknown>) => !m.deleted_at && String(m.name ?? "").trim().replace(/\s+/g, " ").toLowerCase() === name.toLowerCase());
+        if (hit.length === 0) return json({ error: `Supabase 회원관리 데이터에서 '${name}' 회원을 찾을 수 없습니다. 회원명을 정확히 확인해주세요.` }, 400);
+        if (hit.length > 1) return json({ error: `동일한 회원명 '${name}'이 여러 명입니다. 회원관리에서 중복 회원명을 정리한 뒤 다시 시도해주세요.` }, 400);
+        memberId = Number(hit[0].member_id); memberName = String(hit[0].name).trim();
+      }
+      if (role !== "admin" && String(target.role ?? "").toLowerCase() === "admin") {
+        const { count } = await db.from("user_profiles").select("user_id", { count: "exact", head: true }).ilike("role", "admin").neq("user_id", uid);
+        if (!count) return json({ error: "마지막 관리자는 해제할 수 없습니다." }, 400);
+      }
+      const { data: up, error: ue } = await db.from("user_profiles").update({
+        member_id: read ? memberId : null, requested_member_name: read ? memberName : target.requested_member_name, approved: read,
+        can_write: admin ? true : read && canW, role, approved_at: read ? new Date().toISOString() : null, updated_at: new Date().toISOString(),
+      }).eq("user_id", uid).select("user_id,login_id,requested_member_name,approved,can_write,role").maybeSingle();
+      if (ue) return json({ error: /duplicate|unique/i.test(ue.message) ? "해당 회원은 이미 다른 로그인 계정에 연결되어 있습니다." : ue.message }, 400);
+      await audit(email, prof.user_id, "approval_set", `${memberName}: read=${read} write=${admin || (read && canW)} role=${role}`);
+      return json({ ok: true, row: up, memberId });
+    }
     if (action === "snapshot") {
       if (!club.canRead) return json({ error: "not_approved" }, 403);
       const out: Record<string, unknown> = {};

@@ -14,7 +14,8 @@
   const TB_KEYS = ["games", "ledger", "fees", "quarter", "members", "lockers"];
   const TAB_LABEL = { games: "게임기록", ledger: "회계장부", fees: "회비관리", quarter: "분기에버" };
   const canIn = () => !VIEWONLY && canWrite();
-  const inputMode = () => { if (TB.input == null) TB.input = canIn(); return TB.input && canIn(); };
+  // PC·노트북 클럽관리는 입력모드 전용 (입력/조회 전환 없음), 세로 화면은 앱처럼 전환
+  const inputMode = () => { if (TB_ON() && !VIEWONLY) return canIn(); if (TB.input == null) TB.input = canIn(); return TB.input && canIn(); };
   const won = (v) => Number(v || 0).toLocaleString("ko-KR");
   const fmt1 = (d) => (d <= 0 ? "-" : d.toFixed(1));
   const sgn1 = (d) => (d >= 0 ? "+" : "") + d.toFixed(1);
@@ -187,7 +188,16 @@
   function infoBox(title, items) {
     return h("div", { class: "tbinfo" }, h("b", {}, title), ...items.map(([k, v]) => h("div", { class: "tbline" }, h("span", {}, k), h("b", {}, v))));
   }
-  function root(...kids) { const r = h("div", { class: "tbroot" }, ...kids.filter(Boolean)); view.textContent = ""; view.append(r); fit(); return r; }
+  function root(...kids) {
+    kids = kids.filter(Boolean);
+    const sub = $("pcsub");
+    if (VIEWONLY && TB_ON() && sub) {
+      sub.textContent = "";
+      const i = kids.findIndex((k) => k.classList && k.classList.contains("tbcard"));
+      if (i >= 0) { sub.append(...kids[i].childNodes); kids.splice(i, 1); }
+    }
+    const r = h("div", { class: "tbroot" }, ...kids); view.textContent = ""; view.append(r); fit(); return r;
+  }
   function fit() {
     const r = view.querySelector(":scope > .tbroot"); if (!r) return;
     if (PHONE()) { r.style.height = ""; document.documentElement.classList.remove("fitpage"); return; }
@@ -253,7 +263,7 @@
 
     // 2행: 보고서 종류 / 연결 필드 / 조회
     let queryCard = null;
-    const reports = quarterOnly ? ["분기에버"] : PHONE() && !inMode ? ["개인기록", "모임기록", "누적기록", "순위표", "분기에버"] : ["개인기록", "모임기록", "누적기록", "순위표"];
+    const reports = quarterOnly ? ["분기에버"] : (PHONE() || VIEWONLY) && !inMode ? ["개인기록", "모임기록", "누적기록", "순위표", "분기에버"] : ["개인기록", "모임기록", "누적기록", "순위표"];
     if (!reports.includes(GS.report)) GS.report = reports[0];
     const report = quarterOnly ? "분기에버" : GS.report;
     let linkedOpts = [], linkedLabel = "";
@@ -1166,14 +1176,18 @@
       $("pchead").hidden = false;
       return;
     }
+    if (VIEWONLY) {
+      // 기록 조회(PC): 상단 탭 대신 제목 자리 드롭메뉴, 메뉴 줄에는 선택한 화면의 하위 메뉴
+      if (current === "quarter") { current = "games"; GS.report = "분기에버"; GS.linked = null; }
+      const VM = [["members", "회원관리"], ["games", "게임기록"], ["ledger", "회계장부"], ["fees", "회비관리"], ["lockers", "락카관리"]];
+      const ms = h("select", { class: "pcmenusel", "aria-label": "메뉴 선택" }, VM.map(([k, t]) => h("option", { value: k }, t)));
+      ms.value = VM.some(([k]) => k === current) ? current : "games"; ms.onchange = () => go(ms.value);
+      $("authStatus").textContent = me ? `조회 · ${mgr}` : ""; $("logoutBtn").textContent = "홈으로";
+      $("pchead").hidden = false; $("appName").textContent = ""; $("appName").append(ms);
+      return;
+    }
     nav.append(h("button", { class: "tbbtn file pcbtn", type: "button", onclick: (e) => openFileMenu(e.currentTarget) }, "FILE"));
     for (const k of ["games", "ledger", "fees", "quarter"]) nav.append(h("button", { class: "tbbtn" + (current === k ? " sel" : ""), type: "button", onclick: () => go(k) }, TAB_LABEL[k]));
-    if (canIn()) {
-      const pill = h("span", { class: "tbpill", id: "tbpill" },
-        h("button", { type: "button", class: inputMode() ? "on" : "", onclick: () => { TB.input = true; render(); } }, "입력"),
-        h("button", { type: "button", class: inputMode() ? "" : "on", onclick: () => { TB.input = false; render(); } }, "조회"));
-      $("authStatus").before(pill);
-    }
     $("authStatus").textContent = me ? `${me.isAdmin ? "관리자" : VIEWONLY ? "조회" : "회원"} · ${mgr}` : "";
     $("authStatus").title = me ? `${me.siteName || me.name || ""} · 서버 v${S.dataVersion}` : "";
     $("logoutBtn").textContent = VIEWONLY ? "홈으로" : "로그아웃";

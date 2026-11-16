@@ -509,3 +509,15 @@ body.phmode .phmodebtn.in{background:transparent}
 .phrh .pav,.phrh .pdv,.phrh .pat,.phrh .ppa,.phrh .pn{display:inline;width:auto;height:auto;background:none;border-radius:0;font-size:inherit;color:inherit}
 .phrh .pos,.phst .pos{color:#356BD8}.phrh .neg,.phst .neg{color:#C0392B}
 .phst td:first-child{white-space:nowrap;font-size:13px}
+/* 환경설정 · 승인관리 */
+.envapproval{display:flex;flex-direction:column;min-height:0}
+.envapb{display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #C3D2E6;border-radius:8px;padding:10px 12px;flex:1;min-height:0}
+.envapb .aptitle{font-size:16px;color:#12285A}
+.aplist{flex:1;min-height:160px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.aprow{display:flex;justify-content:space-between;align-items:center;height:44px;padding:0 12px;border:1px solid #C3D2E6;border-radius:6px;background:#fff;cursor:pointer;font-size:15px;color:#12285A;flex:none}
+.aprow.on{background:#D6E4F7;border-color:#1A5BA8}
+.apchecks{display:flex;gap:10px}.apchk{flex:1;display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:#12285A;margin:0!important}.apchk input{width:18px;height:18px;margin:0}
+.apbtns{display:flex;gap:8px}.apbtns .pcbtn{min-width:100px;height:34px}
+body.tbon .tbcard{gap:6px}body.tbon .tbf{gap:6px}body.tbon .tbf .tblab{margin-left:4px}
+body.tbon .tbin.note{flex:1 1 60px!important;min-width:60px}body.tbon .tbf:has(.tbin.note){flex:1 1 60px;min-width:90px}
+body.tbon .tbin.num{width:50px!important}

@@ -1473,6 +1473,80 @@ const effShared = (key) => {
   return { key_management_name: S.programTitle, key_grade_list: S.gradeTypes.join("\n"), key_fee_amount: String(S.monthlyFee), key_locker_deposit: "0", key_locker_yearly_fee: "0", key_locker_contract_date: "01-01", key_locker_expiry_date: "12-31", key_meeting_types: S.meetingTypes.join("\n") }[key];
 };
 
+/* ----- 승인관리 (모바일 볼링클럽 12.4인치 환경설정 승인관리 이식) -----
+   홈페이지 연결: 홈페이지 관리자 + 연결된 클럽 계정도 관리자일 때만 (서버에서 다시 확인)
+   모바일 계정 로그인: 관리자 계정이면 모바일 앱과 같은 서버 함수를 그대로 사용 */
+const AP = { rows: [], sel: null, busy: false };
+const approvalAllowed = () => !!Conn.me && Conn.me.isAdmin && (Conn.mode === "mobile" || (Conn.mode === "site" && Conn.me.siteRole === "admin"));
+const Approval = {
+  async list() {
+    if (Conn.mode === "site") { const r = await Conn.bridge("approval_list"); if (!r.ok) throw new Error(r.d.error === "admin_required" ? "관리자 권한을 확인할 수 없습니다." : r.d.error || "승인 목록을 불러오지 못했습니다."); return r.d.rows; }
+    const r = await Conn.rest("rpc/bowlingclub_admin_list_user_profiles", { method: "POST", body: "{}" }); if (!r.ok) throw new Error("승인 목록을 불러오지 못했습니다."); return (r.d || []).filter((x) => String(x.requested_member_name || "").trim());
+  },
+  async set(row, read, write, admin) {
+    if (Conn.mode === "site") { const r = await Conn.bridge("approval_set", { user_id: row.user_id, approved: read, can_write: write, admin }); if (!r.ok) throw new Error(r.d.error || "승인 저장에 실패했습니다."); return; }
+    const name = String(row.requested_member_name || "").trim(), allow = read || write || admin;
+    let mid = null, mname = name;
+    if (allow) { const hit = S.members.filter((m) => !m.deletedAt && m.name.trim().toLowerCase() === name.toLowerCase()); if (!hit.length) throw new Error(`Supabase 회원관리 데이터에서 '${name}' 회원을 찾을 수 없습니다. 회원명을 정확히 확인해주세요.`); if (hit.length > 1) throw new Error(`동일한 회원명 '${name}'이 여러 명입니다.`); mid = hit[0].memberId; mname = hit[0].name; }
+    const r = await Conn.rest("rpc/bowlingclub_set_user_approval_role", { method: "POST", body: JSON.stringify({ p_user_id: row.user_id, p_approved: allow, p_can_write: allow && (write || admin), p_member_id: mid, p_member_name: mname, p_role: admin ? "admin" : "member" }) });
+    if (!r.ok) { const m = String((r.d && r.d.message) || ""); throw new Error(/last admin/.test(m) ? "마지막 관리자는 해제할 수 없습니다." : /already linked|duplicate/.test(m) ? "해당 회원은 이미 다른 로그인 계정에 연결되어 있습니다." : m || "승인 저장에 실패했습니다."); }
+  },
+  async del(row) {
+    if (Conn.mode === "site") { const r = await Conn.bridge("approval_delete", { user_id: row.user_id }); if (!r.ok) throw new Error(r.d.error || "계정 삭제에 실패했습니다."); return; }
+    const tok = await Conn.mobileToken();
+    const r = await fetch(VH_FN("bowlingclub-admin-delete-member-account"), { method: "POST", headers: { "Content-Type": "application/json", apikey: VH_KEY, Authorization: "Bearer " + tok }, body: JSON.stringify({ user_id: row.user_id }) });
+    if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error === "cannot_delete_admin" ? "관리자 계정은 삭제할 수 없습니다." : "계정 삭제에 실패했습니다."); }
+  },
+};
+function approvalPanel() {
+  const box = h("div", { class: "envpanel envapproval" });
+  if (!approvalAllowed()) {
+    box.append(h("div", { class: "envapb" }, h("b", {}, "승인관리 (관리자 전용)"), h("p", { class: "pcnote" }, "홈페이지 관리자이면서 연결된 클럽 계정도 관리자일 때 사용할 수 있어요.", h("br"), "모바일 관리자 계정으로 로그인해도 사용할 수 있어요.")));
+    return box;
+  }
+  const tier = (r) => (String(r.role).toLowerCase() === "admin" ? 0 : r.can_write ? 1 : r.approved ? 2 : 3);
+  const listHost = h("div", { class: "aplist" });
+  const chk = (t) => { const c = h("input", { type: "checkbox" }); return [c, h("label", { class: "apchk" }, c, t)]; };
+  const [readC, readL] = chk("조회 승인"), [writeC, writeL] = chk("입력 승인"), [adminC, adminL] = chk("관리자 승인");
+  readC.onchange = () => { if (!readC.checked) { writeC.checked = false; adminC.checked = false; } };
+  writeC.onchange = () => { if (writeC.checked) readC.checked = true; else adminC.checked = false; };
+  adminC.onchange = () => { if (adminC.checked) { readC.checked = true; writeC.checked = true; } };
+  const cur = () => AP.rows.find((r) => r.user_id === AP.sel);
+  const bind = () => { const r = cur(), isA = r && String(r.role).toLowerCase() === "admin"; [readC, writeC, adminC].forEach((c) => c.disabled = !r); readC.checked = !!r && (r.approved || r.can_write || isA); writeC.checked = !!r && (r.can_write || isA); adminC.checked = !!isA; };
+  const rebuild = () => {
+    AP.rows.sort((a, b) => tier(a) - tier(b) || String(a.requested_member_name).localeCompare(String(b.requested_member_name), "ko"));
+    listHost.textContent = "";
+    if (!AP.rows.length) { listHost.append(h("p", { class: "pcnote" }, "등록된 승인 계정이 없습니다.")); return bind(); }
+    if (!AP.rows.some((r) => r.user_id === AP.sel)) AP.sel = AP.rows[0].user_id;
+    for (const r of AP.rows) {
+      const t = tier(r), status = ["관리자", "입력 승인", "조회 승인", "승인 대기"][t], color = ["#6B3FB3", "#1A5BA8", "#0F9D45", "#AA7418"][t];
+      listHost.append(h("div", { class: "aprow" + (r.user_id === AP.sel ? " on" : ""), onclick: () => { if (!AP.busy) { AP.sel = r.user_id; rebuild(); } } }, h("b", {}, `${String(r.requested_member_name || "").trim() || "이름 없음"} (${r.login_id || "-"})`), h("b", { style: `color:${color}` }, status)));
+    }
+    bind();
+  };
+  const load = async () => { listHost.textContent = ""; listHost.append(h("p", { class: "pcnote" }, "불러오는 중...")); try { AP.rows = await Approval.list(); rebuild(); } catch (e) { listHost.textContent = ""; listHost.append(h("p", { class: "pcnote", style: "color:#c83237" }, e.message || "승인 목록을 불러오지 못했습니다.")); } };
+  const saveBtn = h("button", { class: "pcbtn", type: "button", style: "background:#1A5BA8;color:#fff;border-color:#0E4A91" }, "승인 저장");
+  saveBtn.onclick = async () => {
+    const r = cur(); if (!r || AP.busy) return; AP.busy = true; saveBtn.disabled = true;
+    const a = readC.checked, w = writeC.checked, ad = adminC.checked;
+    try { await Approval.set(r, a, w, ad); Object.assign(r, { approved: a || w || ad, can_write: (a || w || ad) && (w || ad), role: ad ? "admin" : "member" }); rebuild(); toast(`${String(r.requested_member_name).trim()} 회원 권한을 조회 ${a || w || ad ? "승인" : "해제"}, 입력 ${w || ad ? "승인" : "해제"}, 관리자 ${ad ? "지정" : "해제"} 상태로 저장했습니다.`, 3600); }
+    catch (e) { toast(e.message, 4200); }
+    AP.busy = false; saveBtn.disabled = false;
+  };
+  const delBtn = h("button", { class: "pcbtn", type: "button" }, "계정 삭제");
+  delBtn.onclick = async () => {
+    const r = cur(); if (!r || AP.busy) return;
+    if (!(await confirmBox(`${String(r.requested_member_name).trim()} (${r.login_id}) 계정을 삭제하시겠습니까?\n\n회원·게임·장부·회비·락카 자료는 삭제하지 않습니다.`))) return;
+    AP.busy = true;
+    try { await Approval.del(r); AP.rows = AP.rows.filter((x) => x.user_id !== r.user_id); rebuild(); toast("계정을 삭제했습니다. (로그인 계정과 승인 기록만 삭제)", 3600); } catch (e) { toast(e.message, 4200); }
+    AP.busy = false;
+  };
+  box.append(h("div", { class: "envapb" }, h("b", { class: "aptitle" }, "승인관리 (관리자 전용)"), listHost, h("div", { class: "apchecks" }, readL, writeL, adminL),
+    h("div", { class: "apbtns" }, saveBtn, delBtn, h("button", { class: "pcbtn", type: "button", onclick: load }, "새로고침"))));
+  load();
+  return box;
+}
+
 /* =====================================================================
    4-9) 환경설정 (PC openEnvironmentSettingsDialog: 기본 DATA / 서버관리 / 수입/지출)
         ※ PC '기초 자료' 탭의 모임구분·주차별·분기 에버 표·전분기 에버 수정은 환경설정 '기본 DATA'로 합쳤어요.
@@ -1568,8 +1642,9 @@ TABS.settings = {
       secBox("최근 작업", h("div", { class: "pctable-wrap", style: "max-height:180px" }, h("table", { class: "pct", style: "min-width:0" }, h("thead", {}, h("tr", {}, h("th", { style: "width:110px" }, "시간"), h("th", {}, "작업 내용"))), logBody))));
     drawLog(); setTimeout(check, 0);
     /* ---- 하단 확인/취소 ---- */
-    const panels = { basic, server, ledger }, tabsRow = h("div", { class: "envtabs" });
-    const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; };
+    const approval = approvalPanel();
+    const panels = { basic, server, ledger, approval }, tabsRow = h("div", { class: "envtabs" });
+    const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"], ["approval", "승인관리"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; };
     showSub();
     const okBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", disabled: ro }, "확인"), cancelBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", onclick: () => go(ST.back || "games") }, "취소");
     okBtn.onclick = async () => {
@@ -1594,7 +1669,7 @@ TABS.settings = {
         if (await save(ops, `환경설정이 저장되었습니다. (서버 공용 변경 ${ops.length}건)`)) { work(`환경설정 저장 ${ops.length}건`); go(ST.back || "games"); } else okBtn.disabled = false;
       } catch (e) { toast("환경설정을 저장하지 못했습니다.\n" + e.message, 4200); }
     };
-    const root = h("section", { class: "pcbox envroot" }, h("div", { class: "pcform envtop", style: "justify-content:space-between" }, tabsRow, roBadge()), basic, server, ledger,
+    const root = h("section", { class: "pcbox envroot" }, h("div", { class: "pcform envtop", style: "justify-content:space-between" }, tabsRow, roBadge()), basic, server, ledger, approval,
       h("div", { class: "envfoot", style: "text-align:center;margin-top:6px" }, okBtn, " ", cancelBtn));
     view.append(root);
     showSub();
