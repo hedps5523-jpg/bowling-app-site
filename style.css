@@ -348,17 +348,17 @@ table.cbt td.hi{color:#e68418;font-weight:700}.cbt .cup,.cbt td.cok{color:#1f4fd
 .cbro{font-size:11.5px;color:var(--sub);margin:8px 0 0}.cbro a{color:var(--brand-d);font-weight:700}
 @media (max-width:599px){.cbsum{grid-template-columns:repeat(2,1fr)}.hcolA .card{margin-top:0}}
 /* 넓은 화면: A(공지·다음 모임)와 클럽 기록이 한 화면에 꽉 차게, 로그아웃은 맨 아래 한 줄 */
-@media (min-width:600px) and (min-height:520px){
-  body.homefit .wrap{box-sizing:border-box;height:100vh;height:100dvh;min-height:0;padding-bottom:66px}
-  body.homefit .wrap>main{flex:1 1 0;min-height:0}
-  body.homefit #view.r-home{height:100%;grid-template-rows:auto minmax(0,1fr);align-items:stretch}
-  body.homefit .hcolA{display:flex;flex-direction:column;min-height:0;gap:12px}
-  body.homefit .hcolA>.card{flex:1 1 0;min-height:0;overflow:auto;margin:0}
-  body.homefit .cbcard{display:flex;flex-direction:column;min-height:0;margin:0}
-  body.homefit .cbwrap,body.homefit .cbbody,body.homefit .cbout{flex:1 1 auto;min-height:0}
-  body.homefit .cbscroll{flex:1 1 auto}
-  body.homefit footer.clubfoot{flex-direction:row;align-items:center;justify-content:space-between;padding-top:6px}
-  body.homefit footer.clubfoot .btn{width:200px}
+@media (min-height:520px){
+  html[data-dev="desktop"] body.homefit .wrap{box-sizing:border-box;height:100vh;height:100dvh;min-height:0;padding-bottom:66px}
+  html[data-dev="desktop"] body.homefit .wrap>main{flex:1 1 0;min-height:0}
+  html[data-dev="desktop"] body.homefit #view.r-home{height:100%;grid-template-rows:auto minmax(0,1fr);align-items:stretch}
+  html[data-dev="desktop"] body.homefit .hcolA{display:flex;flex-direction:column;min-height:0;gap:12px}
+  html[data-dev="desktop"] body.homefit .hcolA>.card{flex:1 1 0;min-height:0;overflow:auto;margin:0}
+  html[data-dev="desktop"] body.homefit .cbcard{display:flex;flex-direction:column;min-height:0;margin:0}
+  html[data-dev="desktop"] body.homefit .cbwrap,html[data-dev="desktop"] body.homefit .cbbody,html[data-dev="desktop"] body.homefit .cbout{flex:1 1 auto;min-height:0}
+  html[data-dev="desktop"] body.homefit .cbscroll{flex:1 1 auto}
+  html[data-dev="desktop"] body.homefit footer.clubfoot{flex-direction:row;align-items:center;justify-content:space-between;padding-top:6px}
+  html[data-dev="desktop"] body.homefit footer.clubfoot .btn{width:200px}
 }
 
 .cbseg{display:inline-flex;gap:4px;background:#e9f0fa;border-radius:10px;padding:3px}
@@ -371,6 +371,9 @@ table.cbt td.hi{color:#e68418;font-weight:700}.cbt .cup,.cbt td.cok{color:#1f4fd
 .cbmem button{appearance:none;font:inherit;font-size:13.5px;text-align:left;padding:7px 10px;border:1px solid #d5deea;background:#fff;border-radius:9px;display:flex;justify-content:space-between;gap:6px;cursor:pointer;color:#1c2333}
 .cbmem button small{color:var(--sub);font-size:11px;align-self:center}.cbmem button.on{background:var(--brand);border-color:var(--brand);color:#fff}.cbmem button.on small{color:#e6eeff}
 @media (max-width:599px){.cbfeewrap{grid-template-columns:1fr}.cbmem{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.cbmem button{flex:none}}
-@media (min-width:600px) and (min-height:520px){
-  body.homefit #view.r-home{grid-template-columns:minmax(0,3fr) minmax(0,7fr)!important}
+@media (min-height:520px){
+  html[data-dev="desktop"] body.homefit #view.r-home{grid-template-columns:minmax(0,3fr) minmax(0,7fr)!important}
 }
+
+/* 휴대폰·태블릿(터치 기기)은 가로로 돌려도 홈은 한 열로 */
+html[data-dev="mobile"] #view.r-home{display:block}

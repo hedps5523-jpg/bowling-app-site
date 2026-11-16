@@ -54,3 +54,13 @@ document.addEventListener("DOMContentLoaded", () => {
   if (p === "/" || p === "/index" || p === "/home") return; // 홈은 자체 라우터가 표시
   setBnav(p === "/myapps" || p === "/apps" ? "myapps" : "");
 });
+
+/* ---------- 기기 판별: PC·노트북(마우스, 넓은 창)만 가로 2단 화면, 나머지는 한 열 ---------- */
+(function () {
+  const root = document.documentElement;
+  const fine = window.matchMedia ? window.matchMedia("(hover: hover) and (pointer: fine)") : null;
+  const set = () => root.setAttribute("data-dev", fine && fine.matches && window.innerWidth >= 900 ? "desktop" : "mobile");
+  set();
+  window.addEventListener("resize", set);
+  window.addEventListener("orientationchange", set);
+})();
