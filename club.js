@@ -305,14 +305,17 @@ function drawHeader() {
   $("appName").textContent = TITLES[current] || "클럽관리";
 }
 function openFileMenu(btn) {
-  const m = $("fileMenu"); m.textContent = "";
+  const m = $("fileMenu");
+  if (!m.hidden) { m.hidden = true; return; }
+  m.textContent = "";
   const item = (t, fn) => h("button", { type: "button", onclick: () => { m.hidden = true; fn(); } }, t);
   m.append(item("회원관리", () => go("members")), item("락카 사용현황", () => go("lockers")), item("연락처(뷰)", contactView), h("hr"),
     item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
     ...(Conn.mode === "site" ? [item("클럽 계정 연결 해제", unlinkClub)] : []), item("로그아웃", logout));
   const r = btn.getBoundingClientRect(); m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
-  setTimeout(() => document.addEventListener("click", function off(e) { if (!m.contains(e.target)) { m.hidden = true; document.removeEventListener("click", off); } }), 0);
 }
+/* FILE 메뉴 바깥을 누르면 닫기 (문서에 한 번만 등록: 열 때마다 등록하면 다음 FILE 클릭이 바로 닫혀버림) */
+document.addEventListener("click", (e) => { const m = $("fileMenu"); if (m && !m.hidden && !m.contains(e.target) && !e.target.closest(".pcbtn.file")) m.hidden = true; });
 function go(k) { if (k === "settings" && current !== "settings") { ST.back = current; ST.sub = "basic"; } current = k; try { history.replaceState(null, "", "#" + k); } catch {} render(); }
 function render() {
   drawHeader();
