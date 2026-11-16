@@ -69,7 +69,7 @@ function auth(path, body) {
 }
 // 이미 인증된 기기면 바로 내 앱 화면으로
 const nextQ = new URLSearchParams(location.search).get("next");
-const DEST = nextQ === "/home" ? "/" : nextQ === "/myapps" ? "/myapps" : "/myapps";
+const DEST = nextQ === "/home" ? "/" : nextQ === "/records" ? "/records" : nextQ === "/myapps" ? "/myapps" : "/myapps";
 try { if (localStorage.getItem("authToken")) location.replace(DEST); } catch {}
 $("gBox").append(googleButton("Google 계정으로 바로 확인"));
 googleFinish().then((g) => {

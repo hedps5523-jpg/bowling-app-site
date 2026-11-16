@@ -35,7 +35,7 @@ function initMenu() {
 document.addEventListener("DOMContentLoaded", initMenu);
 
 /* ---------- 하단 메뉴 (모든 화면) : 회원 · 내 앱 · 홈 · 강의 · 공지·투표 ---------- */
-const BNAV = [["members", "/#/members", "👥", "회원"], ["myapps", "/myapps", "📲", "내 앱"], ["home", "/#/", "🏠", "홈"], ["club", "/club", "🎳", "클럽관리"], ["notices", "/#/notices", "📣", "공지·투표"]];
+const BNAV = [["members", "/#/members", "👥", "회원"], ["myapps", "/myapps", "📲", "내 앱"], ["home", "/#/", "🏠", "홈"], ["records", "/records", "📊", "기록 조회"], ["notices", "/#/notices", "📣", "공지·투표"]];
 function setBnav(active) {
   let nav = document.getElementById("bnav");
   if (!nav) {
@@ -52,7 +52,7 @@ function setBnav(active) {
 document.addEventListener("DOMContentLoaded", () => {
   const p = location.pathname.replace(/\.html$/, "");
   if (p === "/" || p === "/index" || p === "/home") return; // 홈은 자체 라우터가 표시
-  setBnav(p === "/myapps" || p === "/apps" ? "myapps" : p === "/club" ? "club" : "");
+  setBnav(p === "/myapps" || p === "/apps" ? "myapps" : p === "/records" ? "records" : "");
 });
 
 /* ---------- 기기 판별: PC·노트북(마우스, 넓은 창)만 가로 2단 화면, 나머지는 한 열 ---------- */

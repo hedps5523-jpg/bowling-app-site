@@ -237,4 +237,4 @@ body.print .contactwrap{max-height:none}
 .pcsub:empty{display:none}
 .pcsub .pcform{flex-wrap:nowrap;white-space:nowrap;flex:0 0 auto}
 @media (min-width:900px){.pchead{flex-wrap:nowrap}.pcnav{flex:0 0 auto}.pcwho{flex:0 0 auto}.pcwho #authStatus{white-space:nowrap}}
-@media (min-width:1300px){body.pc .wrap{max-width:1560px}}
+@media (min-width:1300px){body.viewonly .wrap{max-width:1560px}}

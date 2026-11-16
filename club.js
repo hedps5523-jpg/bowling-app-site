@@ -9,6 +9,7 @@ const VH_URL = "https://vhnqzjzqmtpibdhemihc.supabase.co";
 const VH_KEY = "sb_publishable_nV6zhjRw7_YEn3ddsfXfow_55v3NP_s"; // 볼링클럽 서버 공개용 키
 const VH_FN = (n) => `${VH_URL}/functions/v1/${n}`;
 const MOBILE_KEY = "bcMobileSession";
+const VIEWONLY = !!window.CLUB_VIEW_ONLY; // 기록 조회 화면(/records): 홈페이지 로그인만으로 조회 전용
 
 /* ---------- 작은 도우미 ---------- */
 function h(tag, props = {}, ...kids) {
@@ -99,19 +100,27 @@ const Conn = {
 
   /* 시작: 저장된 모바일 로그인 → 홈페이지 관리자·운영진 순으로 확인 */
   async start() {
-    const m = this.mobile();
+    const m = VIEWONLY ? null : this.mobile();
     if (m && m.profile) {
       const p = m.profile;
       this.mode = "mobile";
       this.me = { name: p.requested_member_name || p.login_id, loginId: p.login_id, role: p.role, isAdmin: p.role === "admin", canRead: p.role === "admin" || p.approved === true, canWrite: p.role === "admin" || (p.approved === true && p.can_write === true), source: "mobile" };
       try { const r = await this.rest("rpc/bowlingclub_my_profile", { method: "POST", body: "{}" }); const q = r.ok && Array.isArray(r.d) && r.d[0]; if (q) { m.profile = q; this.saveMobile(m); this.me = { ...this.me, role: q.role, isAdmin: q.role === "admin", canRead: q.role === "admin" || q.approved === true, canWrite: q.role === "admin" || (q.approved === true && q.can_write === true) }; } } catch (e) { if (e.message === "login") return { need: "login", reason: "expired" }; }
+      if (!this.me.isAdmin) { this.me = null; this.mode = null; return { need: "login", reason: "not_admin" }; } // 클럽관리는 관리자만
       return this.me.canRead ? { ok: true } : { need: "login", reason: "not_approved" };
     }
-    if (this.siteToken()) {
+    if (this.siteToken() && !VIEWONLY) {
       const r = await this.bridge("whoami");
-      if (r.ok && r.d.linked && r.d.me) { this.mode = "site"; this.me = r.d.me; return { ok: true }; }
-      if (r.status === 401) return { need: "login", reason: "site_expired" };
-      // 클럽 계정을 연결하지 않아도, 구글(홈페이지) 로그인만으로 조회 화면을 볼 수 있어요
+      if (r.ok) {
+        if (!r.d.linked) return { need: "link", site: r.d.site };
+        if (!r.d.me) return { need: "link", site: r.d.site, reason: "not_approved", club: r.d.club };
+        this.mode = "site"; this.me = r.d.me; return { ok: true };
+      }
+      if (r.status === 403) return { need: "login", reason: "site_member" };
+      return { need: "login", reason: r.status === 401 ? "site_expired" : "site_error" };
+    }
+    if (this.siteToken() && VIEWONLY) {
+      // 구글(홈페이지) 로그인만으로 조회 화면을 볼 수 있어요 (입력·수정은 불가)
       const v = await this.bridge("view_whoami");
       if (v.ok) {
         const w = v.d.viewer || {};
@@ -306,7 +315,7 @@ function drawHeader() {
   const ROLE_TXT = { admin: "관리자", staff: "운영진", member: "회원" };
   const permTxt = (m) => m.isAdmin ? "관리자" : m.canWrite ? "조회+입력" : "조회 전용";
   const full = me ? (me.source === "view" ? `홈페이지 ${ROLE_TXT[me.siteRole] || "회원"} ${me.siteName} · 조회 전용 · 서버 v${S.dataVersion}` : me.source === "site" ? `홈페이지 ${me.siteRole === "admin" ? "관리자" : "운영진"} ${me.siteName} · 클럽계정 ${me.loginId}(${permTxt(me)}) · 서버 v${S.dataVersion}` : `${permTxt(me)}: ${me.name} · 서버 v${S.dataVersion}`) : "";
-  $("authStatus").textContent = me ? permTxt(me) : ""; $("authStatus").title = full;
+  $("authStatus").textContent = me ? (VIEWONLY ? permTxt(me) : full) : ""; $("authStatus").title = full;
   $("logoutBtn").textContent = me && me.source === "view" ? "홈으로" : "로그아웃";
   $("pcsub").textContent = "";
   $("pchead").hidden = false;
@@ -317,11 +326,10 @@ function openFileMenu(btn) {
   if (!m.hidden) { m.hidden = true; return; }
   m.textContent = "";
   const item = (t, fn) => h("button", { type: "button", onclick: () => { m.hidden = true; fn(); } }, t);
-  const view1 = Conn.mode === "view";
+  const view1 = VIEWONLY;
   m.append(item("회원관리", () => go("members")), ...(view1 ? [] : [item("락카 사용현황", () => go("lockers")), item("연락처(뷰)", contactView)]), h("hr"),
     item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
     ...(Conn.mode === "site" ? [item("클럽 계정 연결 해제", unlinkClub)] : []),
-    ...(view1 && (Conn.me.siteRole === "admin" || Conn.me.siteRole === "staff") ? [item("클럽 계정 연결 (입력 권한)", () => linkView({ site: { name: Conn.me.siteName } }))] : []),
     item(view1 ? "홈으로" : "로그아웃", logout));
   const r = btn.getBoundingClientRect(); m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
 }
@@ -358,7 +366,7 @@ window.addEventListener("resize", fitSoon);
 /* 메뉴 탭 + 조회(하위 메뉴) 줄을 1행에: 넓은 화면에서만. 조회 전용이면 입력 줄은 숨겨서 결과표를 더 크게 */
 function mergeRow() {
   const sub = $("pcsub"); if (!sub || current === "settings") return;
-  if (window.innerWidth < 900 || narrowPortrait()) return;
+  if (!VIEWONLY || window.innerWidth < 900 || narrowPortrait()) return;
   const tw = view.querySelector(":scope > .pctable-wrap");
   if (tw && tw.dataset.merged) return; // 이 표는 이미 한 줄로 합쳤어요
   const boxes = [...view.children].filter((c) => c.classList && c.classList.contains("pcbox") && !c.classList.contains("envroot"));
@@ -1627,10 +1635,11 @@ async function contactView() {
    5) 로그인 화면 · 시작
    ===================================================================== */
 function loginView(reason) {
+  if (VIEWONLY) return viewLoginView(reason);
   $("pchead").hidden = true; $("appName").textContent = "클럽관리";
   view.textContent = "";
   const msg = h("div", { class: "msg" + (reason ? " info" : "") }, reason === "site_expired" ? "홈페이지 인증이 만료되었어요. 아래 \"홈페이지 관리자·운영진 인증하기\"로 다시 인증해 주세요." : reason === "site_error" ? "홈페이지 연결을 확인하지 못했어요. 잠시 후 다시 열거나 아래에서 다시 인증해 주세요." : reason === "site_member" ? "홈페이지 관리자·운영진만 홈페이지 계정으로 들어올 수 있어요. 모바일 볼링클럽 계정으로 로그인해 주세요."
-    : reason === "not_approved" ? "아직 승인되지 않은 모바일 계정이에요. 관리자 승인 후 이용할 수 있어요." : reason === "expired" ? "로그인이 만료되었어요. 다시 로그인해 주세요." : "");
+    : reason === "not_admin" ? "클럽관리는 관리자 계정만 들어올 수 있어요. 조회만 하시려면 하단의 \"기록 조회\"를 이용해 주세요." : reason === "not_approved" ? "아직 승인되지 않은 모바일 계정이에요. 관리자 승인 후 이용할 수 있어요." : reason === "expired" ? "로그인이 만료되었어요. 다시 로그인해 주세요." : "");
   const go2 = h("button", { class: "btn", type: "button" }, "로그인");
   const f = credForm(() => go2.click());
   go2.onclick = async () => {
@@ -1644,6 +1653,12 @@ function loginView(reason) {
     f.el, msg, go2);
   if (!Conn.siteToken() || reason === "site_expired" || reason === "site_error") box.append(h("div", { class: "orline" }, "또는"), h("a", { class: "btn ghost", href: "/apps?next=%2Fhome" }, "홈페이지 관리자·운영진 인증하기"), h("small", { class: "mut", style: "display:block;margin-top:6px" }, "인증 후 다시 클럽관리를 열면 바로 들어와요."));
   view.append(box);
+}
+function viewLoginView(reason) {
+  $("pchead").hidden = true; $("appName").textContent = "기록 조회"; view.textContent = "";
+  view.append(h("section", { class: "card pclogin" }, h("h2", {}, "📊 기록 조회"),
+    h("p", { class: "lead" }, reason === "site_expired" ? "홈페이지 인증이 만료되었어요. 다시 로그인해 주세요." : "홈페이지(구글) 로그인 후 게임기록·회계장부·회비관리를 조회할 수 있어요. (조회 전용)"),
+    h("a", { class: "btn", href: "/apps?next=%2Frecords" }, "구글로 로그인"), h("a", { class: "btn ghost", href: "/", style: "margin-top:8px" }, "홈으로")));
 }
 /* 클럽 계정 입력칸: 모바일 볼링클럽과 같은 클럽명 + 회원명 + PIN(6자리). 옛 아이디/비밀번호 방식도 선택 가능 */
 function credForm(onEnter) {
@@ -1691,7 +1706,7 @@ async function unlinkClub() {
   try { await Conn.unlinkClub(); await Conn.logout(); sessionStorage.removeItem("clubSkipSite"); await boot(); } catch (e) { toast(e.message); }
 }
 async function logout() {
-  if (Conn.mode === "view") { location.href = "/"; return; }
+  if (VIEWONLY) { location.href = "/"; return; }
   if (Conn.mode === "site") { if (!(await confirmBox("홈페이지 계정으로 들어와 있어요.\n클럽관리에서만 나가고, 모바일 계정으로 로그인 화면을 열까요?"))) return; }
   await Conn.logout(); sessionStorage.setItem("clubSkipSite", "1"); loginView();
 }
