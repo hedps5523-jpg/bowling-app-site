@@ -11,8 +11,8 @@
   const TB_ON = () => window.innerWidth >= 900 && document.documentElement.getAttribute("data-dev") === "desktop";
   const PHONE = () => !TB_ON(); // 휴대폰·일반 태블릿 세로(좁은 화면): 모바일 볼링클럽 세로화면 배치
   const MODE_KEY = () => (TB_ON() ? "tb" : "ph");
-  const TB_KEYS = ["games", "ledger", "fees", "quarter", "members", "lockers"];
-  const TAB_LABEL = { games: "게임기록", ledger: "회계장부", fees: "회비관리", quarter: "분기에버" };
+  const TB_KEYS = ["games", "ledger", "fees", "quarter", "album", "members", "lockers"];
+  const TAB_LABEL = { games: "게임기록", ledger: "회계장부", fees: "회비관리", quarter: "분기에버", album: "기록앨범" };
   const canIn = () => !VIEWONLY && canWrite();
   // PC·노트북 클럽관리는 입력모드 전용 (입력/조회 전환 없음), 세로 화면은 앱처럼 전환
   const inputMode = () => { if (TB_ON() && !VIEWONLY) return canIn(); if (TB.input == null) TB.input = canIn(); return TB.input && canIn(); };
@@ -1000,7 +1000,7 @@
     const gi = (g) => { const i = grades.indexOf(g); return i < 0 ? 99 : i; };
     let list = all.filter((m) => (!QS.mq || m.memberId === +QS.mq) && (!QS.grade || m.grade === QS.grade));
     list.sort((a, b) => gi(a.grade) - gi(b.grade) || ko.compare(a.name, b.name));
-    const rows = list.map((m) => { const lk = lockerOf(m.memberId), b = qBase(m); return h("tr", {}, h("td", {}, m.name), h("td", { class: "tel" }, m.phone ? [h("span", {}, m.phone), h("a", { href: "tel:" + m.phone.replace(/[^\d+]/g, ""), class: "call", title: "전화 걸기" }, "📞")] : "-"), h("td", {}, m.grade || "-"), h("td", {}, b > 0 ? String(b) : "-"), h("td", {}, lk ? String(lk.locker_number) : "-")); });
+    const rows = list.map((m) => { const lk = lockerOf(m.memberId), b = qBase(m); return h("tr", {}, h("td", {}, m.name), h("td", { class: "tel" }, m.phone ? [h("span", {}, m.phone), VIEWONLY ? null : h("a", { href: "tel:" + m.phone.replace(/[^\d+]/g, ""), class: "call", title: "전화 걸기" }, "📞")] : "-"), h("td", {}, m.grade || "-"), h("td", {}, b > 0 ? String(b) : "-"), h("td", {}, lk ? String(lk.locker_number) : "-")); });
     phRoot(fbar(fsel([["", "회원ALL"], ...all.slice().sort((a, b) => ko.compare(a.name, b.name)).map((m) => [String(m.memberId), m.name])], QS.mq, (v) => { QS.mq = v; phqMembers(); }),
       fsel([["", "등급ALL"], ...[...new Set(all.map((m) => m.grade).filter(Boolean))].sort((a, b) => gi(a) - gi(b)).map((g) => [g, g])], QS.grade, (v) => { QS.grade = v; phqMembers(); })),
       h("div", { class: "phmtable" }, h("table", {}, h("thead", {}, h("tr", {}, ["회원명", "연락처", "구분", "기준에버", "락카번호"].map((x) => h("th", {}, x)))), h("tbody", {}, rows))));
@@ -1140,6 +1140,7 @@
 
   const RENDER = { games: () => (phIn() ? phGames() : phQ() ? phqGames() : renderGames(false)), quarter: () => (phIn() ? phQuarter() : phQ() ? phqGames() : renderGames(true)),
     ledger: () => (phQ() ? phqLedger() : renderLedger()), fees: () => (phIn() ? phFees() : phQ() ? phqFees() : renderFees()),
+    album: () => window.ClubAlbum.render(),
     members: () => (phQ() ? phqMembers() : renderMembers()), lockers: () => (phIn() ? phLockers() : phQ() ? phqLockers() : renderLockers()) };
   const PC = {}; TB_KEYS.forEach((k) => { PC[k] = TABS[k]; TABS[k] = { render() { TB.wasOn = MODE_KEY(); RENDER[k](); } }; });
   const pcHeader = drawHeader;
@@ -1158,6 +1159,7 @@
     const nav = $("pcnav"); nav.textContent = "";
     $("pcsub").textContent = "";
     const me = Conn.me, mgr = cleanTitle(S.settings.key_management_name || "");
+    if (current === "album" && (phone || VIEWONLY)) current = "games";
     if (phone) {
       // 조회모드에는 분기에버 구역이 없어요 → 게임기록의 분기에버 보고서로 보여 줘요
       if (!inputMode() && current === "quarter") { current = "games"; GS.report = "분기에버"; GS.linked = null; }
@@ -1187,7 +1189,7 @@
       return;
     }
     nav.append(h("button", { class: "tbbtn file pcbtn", type: "button", onclick: (e) => openFileMenu(e.currentTarget) }, "FILE"));
-    for (const k of ["games", "ledger", "fees", "quarter"]) nav.append(h("button", { class: "tbbtn" + (current === k ? " sel" : ""), type: "button", onclick: () => go(k) }, TAB_LABEL[k]));
+    for (const k of ["games", "ledger", "fees", "quarter", "album"]) nav.append(h("button", { class: "tbbtn" + (current === k ? " sel" : ""), type: "button", onclick: () => go(k) }, TAB_LABEL[k]));
     $("authStatus").textContent = me ? `${me.isAdmin ? "관리자" : VIEWONLY ? "조회" : "회원"} · ${mgr}` : "";
     $("authStatus").title = me ? `${me.siteName || me.name || ""} · 서버 v${S.dataVersion}` : "";
     $("logoutBtn").textContent = VIEWONLY ? "홈으로" : "로그아웃";

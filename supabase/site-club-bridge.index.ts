@@ -73,6 +73,14 @@ async function verifyPin(value: string, stored: string) {
   const got = enc.encode(await hashPin(value, p[2])), want = enc.encode(stored); if (got.length !== want.length) return false;
   let d = 0; for (let i = 0; i < got.length; i++) d |= got[i] ^ want[i]; return d === 0;
 }
+/** 연락처 가운데 4자리 가리기 (010-1234-5678 → 010-****-5678) */
+const maskPhone = (v: unknown): string => {
+  const raw = String(v ?? "").trim();
+  if (!raw) return "";
+  const p = raw.split("-");
+  if (p.length === 3) return `${p[0]}-****-${p[2]}`;
+  return raw.length >= 8 ? raw.slice(0, 3) + "****" + raw.slice(-4) : raw;
+};
 const PCOLS = "user_id,login_id,contact_email,contact_phone,requested_member_name,member_id,role,approved,can_write,must_change_password,created_at,approved_at,last_seen_at,club_name,club_key,member_key,pin_hash,pin_failed_attempts,pin_locked_until";
 async function clubList() {
   const { data } = await db.from("user_profiles").select("club_name").not("club_name", "is", null).limit(1000);
@@ -132,14 +140,14 @@ Deno.serve(async (req) => {
   const w = await who(String(b.token ?? ""));
   if (!w || !("ok" in w)) return json({ error: (w as { status?: number })?.status === 403 ? "not_member" : "expired" }, 401);
   const action0b = String(b.action ?? "");
-  // 구글(홈페이지) 로그인만으로 조회 전용 열람: 회원 연락처는 내보내지 않음 (락카 번호는 조회 화면에 표시)
+  // 구글(홈페이지) 로그인만으로 조회 전용 열람: 회원 연락처는 가운데 4자리를 가려서 내보냄 (락카 번호는 조회 화면에 표시)
   if (action0b === "view_whoami") return json({ ok: true, viewer: { name: w.name, role: w.role, email: w.email } });
   if (action0b === "view_snapshot") {
     try {
       const out: Record<string, unknown> = {};
       for (const [t, o] of TABLES) {
         let rows = await readAll(t, o);
-        if (t === "members") rows = (rows as Record<string, unknown>[]).map((r) => { const c = { ...r }; delete c.phone; return c; });
+        if (t === "members") rows = (rows as Record<string, unknown>[]).map((r) => { const c = { ...r }; c.phone = maskPhone(c.phone); return c; });
         out[t] = rows;
       }
       const { data: meta } = await db.from("club_data_meta").select("data_version").eq("id", 1).maybeSingle();
