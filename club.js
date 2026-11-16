@@ -178,8 +178,9 @@ function buildSnapshot(snap) {
   S.fees = (t.fee_payments || []).map((r) => { S.rv.fees[`${r.member_id}|${r.fee_year}|${r.fee_month}`] = r.row_version; return { feeId: r.payment_id, memberId: r.member_id, year: r.fee_year, month: r.fee_month, paidDate: normDate(r.paid_date), amount: int(r.amount), note: r.note || "" }; });
   S.lockers = {}; S.lockerRows = t.lockers || [];
   for (const r of S.lockerRows) { S.rv.lockers[r.locker_id] = r.row_version; const mid = int(r.member_id); if (mid > 0) S.lockers[mid] = { memberId: mid, lockerId: r.locker_id, mainLocker: r.locker_number || "", deposit: int(r.deposit), yearFee: int(r.yearly_fee), contractDate: r.contract_date || "", expireDate: r.expiry_date || "", status: r.status || "", note: r.note || "" }; }
-  S.yearBaseSeeds = []; S.quarterAdjustments = [];
+  S.yearBaseSeeds = []; S.quarterAdjustments = []; S.sq = {};
   for (const r of t.quarter_base_averages || []) {
+    S.sq[`${r.member_id}|${r.year}|${r.quarter}`] = int(r.average);
     S.rv.quarters[`${r.member_id}|${r.year}|${r.quarter}`] = r.row_version;
     if (r.quarter === 1) S.yearBaseSeeds.push({ year: r.year, memberId: r.member_id, baseAverage: int(r.average), stored: true });
     else if (r.quarter >= 2 && r.quarter <= 4) S.quarterAdjustments.push({ year: r.year, quarter: r.quarter - 1, memberId: r.member_id, adjustedBaseAverage: int(r.average) });
@@ -1174,6 +1175,74 @@ TABS.ranking = {
     const rep = h("button", { class: "pcbtn", type: "button" }, "보고서");
     rep.onclick = () => reportModal("랭킹 현황", "", pcTable([{ t: "순위", get: (r, i) => i + 1 }, { t: "회원명(에버)", get: (r) => r.nameWithBase }, ...cols.slice(3)], rows));
     view.append(h("section", { class: "pcbox" }, h("div", { class: "pcform" }, refresh, rep, summary)), pcTable(cols, rows));
+  },
+};
+
+/* =====================================================================
+   4-6) 분기 기준에버 (PC createQuarterPanel / getQuarterRows / saveQuarterAdjustments)
+   ===================================================================== */
+const lastWednesday = (y, month) => { const d = new Date(y, month, 0); while (d.getDay() !== 3) d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+Object.assign(Svc, {
+  quarterEntryOpen(q) { if (q < 1 || q > 4) return false; return !(todayStr() < addDays(lastWednesday(S.year, q * 3), -2)); },
+  displayedAdjustment(m, y, q) {
+    if (!m) return null;
+    if (q === 4) { const s = this.findYearBaseSeed(y + 1, m.memberId); return s > 0 ? s : null; }
+    const a = S.quarterAdjustments.find((x) => x.year === y && x.quarter === q && x.memberId === m.memberId && x.adjustedBaseAverage > 0);
+    return a ? a.adjustedBaseAverage : null;
+  },
+  quarterRows(q) {
+    const years = new Set([S.year, S.year + 1]);
+    S.games.forEach((g) => years.add(yearOf(g.gameDate))); S.fees.forEach((f) => years.add(f.year)); S.quarterAdjustments.forEach((a) => years.add(a.year));
+    years.forEach((y) => this.ensureYearBaseSeeds(y));
+    const rows = [];
+    for (const m of this.getMembers()) {
+      if (this.isWithdrawn(m)) continue;
+      rows.push({ memberId: m.memberId, name: m.name, grade: m.grade, base: this.quarterBaseAverage(m, S.year, q), cum: this.cumulativeAverage(m.memberId, S.year, q), adj: this.displayedAdjustment(m, S.year, q) });
+    }
+    return rows;
+  },
+});
+const QV = { q: null, edits: new Map() };
+TABS.quarter = {
+  render() {
+    if (!QV.q) QV.q = Math.floor(new Date().getMonth() / 3) + 1;
+    const q = QV.q, open = Svc.quarterEntryOpen(q), rows = Svc.quarterRows(q);
+    const cell = (r) => QV.edits.has(r.memberId) ? QV.edits.get(r.memberId) : (r.adj != null ? String(r.adj) : (open && r.base > 0 ? String(r.base) : ""));
+    const qSel = selectEl([["1", "1분기"], ["2", "2분기"], ["3", "3분기"], ["4", "4분기"]], String(q)); qSel.onchange = () => { QV.q = +qSel.value; QV.edits = new Map(); render(); };
+    const cols = [{ t: "순번", get: (r, i) => i + 1 }, { t: "회원명", get: (r) => r.name }, { t: "등급", get: (r) => r.grade }, { t: "기준에버", get: (r) => r.base }, { t: "누적에버", get: (r) => fmt1(r.cum) }, { t: "조정에버", cls: "qadj", get: (r) => cell(r) }];
+    const edit = async (r) => {
+      if (!open) return toast("선택한 분기의 다음 분기 책정에버는 해당 분기 마지막 달의 마지막 주부터 입력할 수 있습니다.", 4200);
+      const inp = h("input", { class: "pcin", inputmode: "numeric", value: cell(r) });
+      const res = await modal("조정에버", h("div", { class: "pcgrid" }, h("label", {}, `${r.name} 조정에버`), inp), canWrite() ? [["확인", "ok"], ["취소", "cancel"]] : [["닫기", "cancel"]]);
+      if (res !== "ok") return;
+      const v = inp.value.trim().replace(/,/g, "");
+      if (v && !/^-?\d+$/.test(v)) return toast("숫자로 입력하세요.");
+      QV.edits.set(r.memberId, v); render();
+    };
+    const saveBtn = h("button", { class: "pcbtn", type: "button", disabled: !canWrite() }, "조정에버 저장");
+    saveBtn.onclick = async () => {
+      if (!open) return toast("선택한 분기의 다음 분기 책정에버는 해당 분기 마지막 달의 마지막 주부터 저장할 수 있습니다.", 4200);
+      const ty = q === 4 ? S.year + 1 : S.year, tq = q === 4 ? 1 : q + 1, serverQ = q === 4 ? 1 : q + 1, ops = [];
+      for (const r of rows) {
+        const val = cell(r).trim().replace(/,/g, "");
+        let adj = val === "" ? null : (/^-?\d+$/.test(val) ? parseInt(val, 10) : NaN);
+        if (Number.isNaN(adj)) return toast("조정에버는 숫자로 입력하세요.");
+        if (adj != null && adj < 0) return toast("조정에버는 0 이상이어야 합니다.");
+        if ((adj == null || adj === 0) && r.base > 0) adj = r.base;
+        const key = `${r.memberId}|${ty}|${serverQ}`, exists = key in S.sq, remove = adj == null || adj <= 0;
+        const payload = { member_id: r.memberId, year: ty, quarter: serverQ };
+        if (remove) { if (exists) ops.push(op("quarter_base_averages", "delete", payload, S.rv.quarters[key])); }
+        else { payload.average = adj; if (!exists) ops.push(op("quarter_base_averages", "insert", payload)); else if (S.sq[key] !== adj) ops.push(op("quarter_base_averages", "update", payload, S.rv.quarters[key])); }
+      }
+      const msg = `${q}분기 조정에버가 ${ty}년 ${tq}분기에 저장되었습니다.`;
+      if (!ops.length) { toast(msg); return; }
+      saveBtn.disabled = true;
+      if (await save(ops, msg)) { QV.edits = new Map(); render(); } else saveBtn.disabled = false;
+    };
+    const rep = h("button", { class: "pcbtn", type: "button" }, "보고서"); rep.onclick = () => reportModal("분기 기준에버", "", pcTable(cols, rows));
+    view.append(h("section", { class: "pcbox" }, h("div", { class: "pcform" }, h("label", {}, "분기"), qSel, h("button", { class: "pcbtn", type: "button", onclick: () => { QV.edits = new Map(); render(); } }, "조회"), saveBtn, rep, roBadge())),
+      h("div", { class: "pcnote" }, open ? "조정에버 칸을 두 번 누르면 값을 고칠 수 있어요." : "다음 분기 책정에버는 해당 분기 마지막 달의 마지막 주부터 입력할 수 있어요."),
+      pcTable(cols, rows, { onSelect: (r, i, dbl) => { if (dbl) edit(r); } }));
   },
 };
 
