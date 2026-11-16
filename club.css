@@ -657,3 +657,5 @@ body.phmode .phfixed .phqbar{padding:2px 6px 2px 12px;margin-bottom:2px}
 body.phmode .tbroot.phfixroot{height:var(--phh,auto)!important}
 body.phmode:has(.phfixroot),html:has(body.phmode .phfixroot){overflow:hidden}
 .phscroll .phtable{overflow:visible}.phscroll .phtable table{border-collapse:separate;border-spacing:0}
+.phfixroot>.phsticky.phfoot{position:static;margin:0;padding:6px 0 4px;flex:none;background:#F1F5FB}
+.phfixroot>.phsticky.phfoot .phbtn{box-shadow:none;height:46px;font-size:16px}

@@ -786,8 +786,8 @@
   const pbtn = (t, onclick, cls = "") => h("button", { type: "button", class: "phbtn " + cls, onclick }, t);
   /* 앞의 n개는 고정, 나머지는 아래에서만 스크롤 (세로 입력모드) */
   function phRootF(n, ...kids) {
-    const ks = kids.filter(Boolean), sc = h("div", { class: "phscroll" }, ...ks.slice(n));
-    const r = h("div", { class: "tbroot phroot phfixroot" }, h("div", { class: "phfixed" }, ...ks.slice(0, n)), sc);
+    const ks = kids.filter(Boolean), foot = ks.filter((k, i) => i >= n && k.classList && k.classList.contains("phsticky")), sc = h("div", { class: "phscroll" }, ...ks.slice(n).filter((k) => !foot.includes(k)));
+    const r = h("div", { class: "tbroot phroot phfixroot" }, h("div", { class: "phfixed" }, ...ks.slice(0, n)), sc, ...foot.map((f) => { f.classList.add("phfoot"); return f; }));
     view.textContent = ""; view.append(r);
     const size = () => { const top = r.getBoundingClientRect().top, bn = document.querySelector(".bnav"), bh = bn && !bn.hidden ? bn.offsetHeight : 0; r.style.setProperty("--phh", Math.max(240, window.innerHeight - top - bh - 4) + "px"); };
     size(); requestAnimationFrame(size); window.onresize = size; return r;
