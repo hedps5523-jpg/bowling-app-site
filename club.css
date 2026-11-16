@@ -107,3 +107,11 @@ table.amon th{background:#051f56;color:#fff}
 .acat table.pct{width:100%}.acat table.pct td,.acat table.pct th{white-space:normal;padding:4px 3px}
 .arow{grid-template-columns:76px minmax(10px,1fr) 40px !important}.arow span{font-size:10.5px}
 .acat table.pct{font-size:12px}.acat table.pct td.r{white-space:nowrap}.acat table.pct td,.acat table.pct th{padding:4px 2px}
+/* 회비관리 */
+table.pct td.f-bad{background:#ffeded !important;color:#b33535}
+table.pct td.f-soon{background:#fff8e1 !important;color:#b07000}
+table.pct td.f-ok{background:#e8f5e9 !important;color:#2e7d32}
+table.pct.feet{min-width:900px}
+table.pct.feet tbody tr.sel td{background:#ffe082 !important;color:#1e1e1e;font-weight:800}
+table.feeedit{min-width:0;width:100%}table.feeedit td{padding:3px 6px}table.feeedit td:first-child{text-align:left}
+.pcform input[type=checkbox]{width:18px;height:18px}

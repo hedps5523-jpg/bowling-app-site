@@ -314,7 +314,7 @@ const confirmBox = (msg) => modal("확인", h("p", { style: "white-space:pre-lin
 function pcTable(cols, rows, { onSelect, rowClass } = {}) {
   const tb = h("tbody");
   rows.forEach((r, i) => {
-    const tr = h("tr", { class: rowClass ? rowClass(r, i) || "" : "" }, cols.map((c) => h("td", { class: c.cls || "" }, c.get(r, i))));
+    const tr = h("tr", { class: rowClass ? rowClass(r, i) || "" : "" }, cols.map((c) => h("td", { class: (typeof c.cls === "function" ? c.cls(r, i) : c.cls) || "" }, c.get(r, i))));
     tr.onclick = () => { tb.querySelectorAll("tr.sel").forEach((x) => x.classList.remove("sel")); tr.classList.add("sel"); onSelect && onSelect(r, i); };
     if (onSelect) tr.ondblclick = () => onSelect(r, i, true);
     tb.append(tr);
@@ -927,6 +927,214 @@ function annualSettlement() {
     h("div", { class: "acols" }, sec("2. 수입 분류표", cat(AN.summarize(rows, true), ti, "#008080", "수입 총합계")), sec("3. 지출 분류표", cat(AN.summarize(rows, false), te, "#2058a3", "지출 총합계"))),
     h("div", { class: "anotes" }, ["• 회비(개인명)는 회원수입 > 월 회비로 통합", "• 정산금 / 정산 금액 / 정모 정산금 / 팀벌금 / 에버벌금은 행사·운영수입 > 정산금으로 통합", "• 불참 벌금 / 정모 벌금은 행사·운영수입 > 벌금으로 통합", "• 회계장부의 현재 입력 데이터를 기준으로 1~12월을 자동 집계"].map((t) => h("div", {}, t))));
   reportModal(`${S.year}년 ${cleanTitle(S.programTitle)} 회계 현황`, "회계장부 입력 데이터 기준 / 1~12월 자동 집계", body);
+}
+
+/* =====================================================================
+   4-4) 회비관리 (PC createFeePanel / registerFeeRange / editFeeDialog / getFeeStatusRows)
+   ===================================================================== */
+const plusMonth1 = (d) => { const y = yearOf(d), m = monthOf(d); return m === 12 ? `${y + 1}-01-01` : `${y}-${pad2(m + 1)}-01`; };
+Object.assign(Svc, {
+  feeStartMonth(m, y) { if (!m) return 1; if (m.feeStartYear > 0 && y < m.feeStartYear) return 13; if (m.feeStartYear === y) return Math.min(12, Math.max(1, m.feeStartMonth)); return 1; },
+  execExempt: (m, mo) => !!m && !!m.executiveThreeMonthExempt && mo >= 10 && mo <= 12,
+  rejoinChargeStart(m) { if (!m || !m.rejoinDate || m.rejoinFeeStartMonth <= 0 || m.rejoinFeeStartYear <= 0) return null; return `${m.rejoinFeeStartYear}-${pad2(Math.min(12, Math.max(1, m.rejoinFeeStartMonth)))}-01`; },
+  lastPaidBeforeWithdrawal(m) {
+    if (!m || !m.withdrawalDate) return null; const wm = m.withdrawalDate.slice(0, 7) + "-01"; let best = null;
+    for (const f of S.fees) { if (f.memberId !== m.memberId) continue; const d = `${f.year}-${pad2(f.month)}-01`; if (d <= wm && (!best || d > best)) best = d; }
+    return best;
+  },
+  withdrawalMarker(m) { if (!m || !m.withdrawalDate) return null; const l = this.lastPaidBeforeWithdrawal(m); return l ? plusMonth1(l) : m.withdrawalDate.slice(0, 7) + "-01"; },
+  activeForFee(m, y, mo) {
+    if (!m || mo < 1 || mo > 12) return false;
+    const sm = this.feeStartMonth(m, y); if (sm > 12 || mo < sm) return false;
+    const md = `${y}-${pad2(mo)}-01`, rj = this.rejoinChargeStart(m);
+    if (rj && md >= rj) return true;
+    const wm = this.withdrawalMarker(m); if (!wm) return true;
+    return md < wm;
+  },
+  withdrawalMarkerMonth(m, y, mo) {
+    if (!m || mo < 1 || mo > 12) return false; const mk = this.withdrawalMarker(m); if (!mk) return false;
+    const md = `${y}-${pad2(mo)}-01`; if (md !== mk) return false;
+    const rj = this.rejoinChargeStart(m); return !rj || md < rj;
+  },
+  inactiveFeeMonth(m, y, mo) { return !this.activeForFee(m, y, mo) && !this.withdrawalMarkerMonth(m, y, mo) && mo >= this.feeStartMonth(m, y); },
+  chargeable(m, y, mo) { return this.activeForFee(m, y, mo) && !this.execExempt(m, mo); },
+  findFee: (y, id, mo) => S.fees.find((f) => f.year === y && f.memberId === id && f.month === mo) || null,
+  feeEligible() { return this.getMembers().filter((m) => !m.feeExempt); },
+  feeStatusRows(target) {
+    const rows = [], now = todayStr(), ny = yearOf(now), nm = monthOf(now);
+    const due = S.year < ny ? 12 : S.year === ny ? nm : 0, dispMonth = Math.max(target, due);
+    for (const m of this.feeEligible()) {
+      if (this.isWithdrawn(m)) continue;
+      const disp = []; let count = 0, total = 0, hasUnpaid = false, curUnpaid = false, allPaid = true, req = 0;
+      const sm = this.feeStartMonth(m, S.year);
+      for (let mo = 1; mo <= 12; mo++) {
+        if (mo < sm) { disp.push(""); continue; }
+        const fp = this.findFee(S.year, m.memberId, mo), active = this.activeForFee(m, S.year, mo), ex = active && this.execExempt(m, mo);
+        const isDue = mo <= due, curMonth = S.year === ny && mo === nm;
+        if (active && !ex) { req++; if (!fp) allPaid = false; }
+        if (fp) { count++; total += fp.amount; disp.push(`${monthOf(fp.paidDate)}/${+fp.paidDate.slice(8, 10)}`); }
+        else if (!active) disp.push("");
+        else if (ex) disp.push("면제");
+        else if (mo <= dispMonth && isDue) { if (curMonth) { disp.push("예정"); curUnpaid = true; } else { disp.push("미납"); hasUnpaid = true; } }
+        else disp.push("");
+      }
+      const status = req > 0 && allPaid ? "완납" : hasUnpaid ? "미납" : curUnpaid ? "예정" : "정상";
+      rows.push({ memberId: m.memberId, name: m.name, grade: m.grade, status, disp, count, total });
+    }
+    return rows;
+  },
+  suggestFeeStart(m, id) {
+    const first = Math.max(1, this.feeStartMonth(m, S.year));
+    for (let mo = first; mo <= 12; mo++) { if (!this.chargeable(m, S.year, mo)) continue; if (!this.findFee(S.year, id, mo)) return mo; }
+    for (let mo = 12; mo >= first; mo--) if (this.chargeable(m, S.year, mo)) return mo;
+    return first;
+  },
+  suggestFeeEnd(m, start) { for (let mo = Math.max(1, start + 1); mo <= 12; mo++) if (this.chargeable(m, S.year, mo)) return mo; return Math.max(1, Math.min(12, start)); },
+  feeMonthsNote(name, months) {
+    const parts = []; let i = 0;
+    while (i < months.length) { let j = i; while (j + 1 < months.length && months[j + 1] === months[j] + 1) j++; parts.push(i === j ? String(months[i]) : `${months[i]}~${months[j]}`); i = j + 1; }
+    return `${name}(${parts.join(",")}월)`;
+  },
+});
+const feeKey = (d, n) => d + "\u001f" + String(n || "").trim();
+/* 회원의 해당 연도 회비(desired)로부터 서버 업로드 작업(회비 + 회비 연동 장부)을 만든다 (PC PcFeeOutboxStore 와 같은 차이 계산) */
+function feeOps(memberId, year, desired) {
+  const ops = [], want = new Map(desired.map((f) => [f.month, f]));
+  for (let mo = 1; mo <= 12; mo++) {
+    const local = want.get(mo), remote = Svc.findFee(year, memberId, mo);
+    if (!local && !remote) continue;
+    const src = local || remote;
+    const payload = { member_id: memberId, fee_year: year, fee_month: mo, amount: src.amount, paid_date: src.paidDate, note: src.note || "" };
+    if (!local) ops.push(op("fee_payments", "delete", payload, S.rv.fees[`${memberId}|${year}|${mo}`]));
+    else if (!remote) ops.push(op("fee_payments", "insert", payload));
+    else if (remote.amount === local.amount && remote.paidDate === local.paidDate && String(remote.note || "").trim() === String(local.note || "").trim()) continue;
+    else ops.push(op("fee_payments", "update", payload, S.rv.fees[`${memberId}|${year}|${mo}`]));
+  }
+  // 장부: 회비 연동 줄 다시 만들기
+  const m = Svc.findMember(memberId), groups = new Map();
+  for (const f of desired.filter((f) => Svc.chargeable(m, year, f.month)).sort((a, b) => a.month - b.month)) { const k = feeKey(f.paidDate, f.note); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(f); }
+  const des = new Map();
+  [...groups.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).forEach(([k, list]) => des.set(k, { date: list[0].paidDate, amount: list.reduce((a, f) => a + f.amount, 0), note: String(list[0].note || "").trim() }));
+  const ex = new Map();
+  S.ledger.filter((l) => l.fromFee && l.memberId === memberId && l.date.startsWith(year + "-")).sort((a, b) => a.ledgerId - b.ledgerId).forEach((l) => { const k = feeKey(l.date, l.note); if (!ex.has(k)) ex.set(k, []); ex.get(k).push(l); });
+  const lp = (e, r) => { const p = { member_id: memberId, entry_date: e ? e.date : r.date, type: e ? "수입" : r.type, category: e ? "회비" : r.category, amount: e ? e.amount : r.amount, note: e ? e.note : r.note, from_fee: true }; if (r) p.ledger_id = r.ledgerId; return p; };
+  for (const k of new Set([...des.keys(), ...ex.keys()])) {
+    const e = des.get(k), rs = ex.get(k) || [], r0 = rs[0];
+    if (e && !r0) ops.push(op("ledger_entries", "insert", lp(e, null)));
+    else if (!e && r0) rs.forEach((r) => ops.push(op("ledger_entries", "delete", lp(null, r), S.rv.ledger[r.ledgerId])));
+    else if (e) {
+      if (!(r0.date === e.date && r0.type === "수입" && r0.category === "회비" && r0.amount === e.amount && String(r0.note).trim() === e.note && r0.fromFee)) ops.push(op("ledger_entries", "update", lp(e, r0), S.rv.ledger[r0.ledgerId]));
+      rs.slice(1).forEach((r) => ops.push(op("ledger_entries", "delete", lp(null, r), S.rv.ledger[r.ledgerId])));
+    }
+  }
+  return ops;
+}
+const feeCopy = (id, y) => S.fees.filter((f) => f.memberId === id && f.year === y).map((f) => ({ ...f }));
+const shortMD = (d) => d ? `${monthOf(d)}/${+d.slice(8, 10)}` : "";
+const FV = { memberId: null, prepay: false, start: 1, end: 1, date: null, month: null };
+
+TABS.fees = {
+  render() {
+    if (!FV.month) FV.month = String(Math.min(12, new Date().getMonth() + 1));
+    if (!FV.date) FV.date = todayStr();
+    const members = Svc.activeInputMembers();
+    if (!members.some((m) => m.memberId === FV.memberId)) { FV.memberId = members.length ? members[0].memberId : null; applyDefaults(); }
+    const memSel = h("select", { class: "pcsel" }, members.map((m) => h("option", { value: m.memberId }, m.name))); if (FV.memberId) memSel.value = FV.memberId;
+    const pre = h("input", { type: "checkbox", checked: FV.prepay });
+    const mo = () => Array.from({ length: 12 }, (_, i) => [String(i + 1), `${i + 1}월`]);
+    const sSel = selectEl(mo(), String(FV.start)), eSel = selectEl(mo(), String(FV.end)); eSel.disabled = !FV.prepay;
+    const date = h("input", { class: "pcin", type: "date", value: FV.date });
+    const note = h("input", { class: "pcin w20", readonly: true });
+    const mem = () => Svc.findMember(FV.memberId);
+    function applyDefaults() {
+      const m = Svc.findMember(FV.memberId); if (!m) return;
+      FV.start = Svc.suggestFeeStart(m, FV.memberId); FV.end = FV.prepay ? Svc.suggestFeeEnd(m, FV.start) : FV.start;
+    }
+    const sync = () => {
+      if (!FV.prepay) FV.end = FV.start;
+      if (FV.start > FV.end) [FV.start, FV.end] = [FV.end, FV.start];
+      sSel.value = String(FV.start); eSel.value = String(FV.end); eSel.disabled = !FV.prepay;
+      const m = mem(), lab = FV.start === FV.end ? `${FV.start}월` : `${FV.start}~${FV.end}월`;
+      note.value = m ? `${m.name.trim()}(${lab})` : lab;
+    };
+    memSel.onchange = () => { FV.memberId = +memSel.value; applyDefaults(); sync(); markRow(); };
+    pre.onchange = () => { FV.prepay = pre.checked; if (!FV.prepay) FV.end = FV.start; else { const m = mem(); FV.end = Svc.suggestFeeEnd(m, FV.start); } sync(); };
+    sSel.onchange = () => { FV.start = +sSel.value; if (FV.prepay && FV.end <= FV.start) FV.end = Svc.suggestFeeEnd(mem(), FV.start); sync(); };
+    eSel.onchange = () => { FV.end = +eSel.value; sync(); };
+    date.onchange = () => FV.date = date.value;
+
+    const addBtn = h("button", { class: "pcbtn", type: "button", disabled: !canWrite() }, "회비 등록");
+    addBtn.onclick = async () => {
+      const m = mem(); if (!m) return toast("회원명을 선택하세요.");
+      let s = FV.start, e = FV.prepay ? FV.end : FV.start; if (s > e) [s, e] = [e, s];
+      const lab = s === e ? `${s}월` : `${s}~${e}월`, nt = `${m.name.trim()}(${lab})`;
+      if (m.feeExempt) return toast("회비 면제 회원은 회비관리 대상에서 제외됩니다.");
+      if (Svc.isWithdrawn(m)) return toast("탈퇴 회원은 회비를 저장할 수 없습니다.");
+      const paid = smartDate(date.value), fee = S.monthlyFee, list = feeCopy(m.memberId, S.year);
+      for (let k = s; k <= e; k++) { if (!Svc.chargeable(m, S.year, k)) continue; const i = list.findIndex((f) => f.month === k); const nf = { feeId: 0, memberId: m.memberId, year: S.year, month: k, paidDate: paid, amount: fee, note: nt }; if (i >= 0) list[i] = nf; else list.push(nf); }
+      const ops = feeOps(m.memberId, S.year, list);
+      addBtn.disabled = true;
+      if (!ops.length) { toast("회비가 등록되었습니다."); addBtn.disabled = false; return; }
+      if (await save(ops, "회비가 등록되었습니다.")) { FV.date = todayStr(); FV.prepay = false; applyDefaults(); render(); } else addBtn.disabled = false;
+    };
+    const editBtn = h("button", { class: "pcbtn", type: "button" }, "수정");
+    editBtn.onclick = () => FV.sel ? editFee(FV.sel) : toast("수정할 회원을 선택하세요.");
+
+    const monthSel = selectEl(mo(), FV.month); monthSel.onchange = () => FV.month = monthSel.value;
+    const summary = h("span", { class: "pctitle", style: "font-size:15px;margin:0 0 0 8px;white-space:pre-wrap" });
+    const rows = Svc.feeStatusRows(+FV.month);
+    const cnt = (s) => rows.filter((r) => r.status === s).length;
+    const paidCnt = rows.reduce((a, r) => a + r.count, 0), totalAmt = rows.reduce((a, r) => a + r.total, 0);
+    summary.textContent = `조회월 ${FV.month}월 / 월회비 ${money(S.monthlyFee)}원 / 완납 ${cnt("완납")}명 / 정상 ${cnt("정상")}명 / 예정 ${cnt("예정")}명 / 미납 ${cnt("미납")}명 / 총납부건수 ${paidCnt}건 / 총합계 ${money(totalAmt)}원`;
+    const cellCls = (v) => v.includes("미납") ? "f-bad" : v === "예정" ? "f-soon" : "";
+    const cols = [{ t: "순번", get: (r, i) => i + 1 }, { t: "회원명", get: (r) => r.name }, { t: "등급", get: (r) => r.grade },
+      { t: "납부여부", cls: (r) => r.status === "미납" ? "f-bad" : r.status === "예정" ? "f-soon" : "f-ok", get: (r) => r.status },
+      ...Array.from({ length: 12 }, (_, k) => ({ t: `${k + 1}월`, cls: (r) => cellCls(r.disp[k]), get: (r) => r.disp[k] })),
+      { t: "합계금액", cls: "r", get: (r) => r.total <= 0 ? "" : money(r.total) }];
+    let syncing = false;
+    const table = pcTable(cols, rows, { onSelect: (r, i, dbl) => { FV.sel = r; if (syncing) return; FV.memberId = r.memberId; if (members.some((m) => m.memberId === r.memberId)) { memSel.value = r.memberId; applyDefaults(); sync(); } if (dbl) editFee(r); } });
+    table.firstChild.classList.add("feet");
+    function markRow() {
+      const k = rows.findIndex((r) => r.memberId === FV.memberId), trs = table.querySelectorAll("tbody tr");
+      trs.forEach((t) => t.classList.remove("sel")); if (k >= 0) { trs[k].classList.add("sel"); trs[k].scrollIntoView({ block: "nearest" }); FV.sel = rows[k]; } else FV.sel = null;
+    }
+    const repBtn = h("button", { class: "pcbtn", type: "button" }, "보고서");
+    repBtn.onclick = () => { const c = cols.filter((x) => x.t !== "등급"); reportModal("회비관리", "", pcTable(c, rows)); };
+    sync();
+    view.append(
+      h("section", { class: "pcbox" }, h("div", { class: "pcform" }, h("label", {}, "회원명"), memSel, h("label", {}, "선납"), pre, h("label", {}, "시작월"), sSel, h("label", {}, "종료월"), eSel, h("label", {}, "납부일"), date, h("label", {}, "비고"), note, addBtn, editBtn, repBtn, roBadge())),
+      h("section", { class: "pcbox", style: "margin-top:4px" }, h("div", { class: "pcform" }, h("label", {}, "조회월"), monthSel, h("button", { class: "pcbtn", type: "button", onclick: () => render() }, "회비 현황 조회"), summary)),
+      table);
+    setTimeout(markRow, 30);
+  },
+};
+
+async function editFee(row) {
+  const m = Svc.findMember(row.memberId);
+  if (Svc.isWithdrawn(m)) return toast("탈퇴 회원은 회비를 수정할 수 없습니다.");
+  const sm = Svc.feeStartMonth(m, S.year), trs = [], chk = [], dts = [];
+  for (let i = 1; i <= 12; i++) {
+    const fp = Svc.findFee(S.year, m.memberId, i), ok = Svc.chargeable(m, S.year, i);
+    const cb = h("input", { type: "checkbox", checked: !!fp && ok, disabled: !ok }), dt = h("input", { class: "pcin w8", value: fp && ok ? shortMD(fp.paidDate) : "", disabled: !ok });
+    let st = fp ? "등록" : "";
+    if (!ok) st = Svc.inactiveFeeMonth(m, S.year, i) ? "공란" : i < sm ? "제외" : Svc.execExempt(m, i) ? "면제" : "제외";
+    chk.push(cb); dts.push(dt);
+    trs.push(h("tr", {}, h("td", {}, h("label", {}, cb, ` ${i}월`)), h("td", {}, st), h("td", {}, dt)));
+  }
+  const note = h("input", { class: "pcin w20" });
+  const body = h("div", {}, h("div", { class: "pcnote", style: "margin:0 0 6px" }, `${m.name} · ${S.year}년`),
+    h("table", { class: "pct feeedit" }, h("thead", {}, h("tr", {}, ["월", "납부", "납부일(M/D 또는 YYYY-MM-DD)"].map((x) => h("th", {}, x)))), h("tbody", {}, trs)),
+    h("div", { class: "pcform", style: "margin-top:8px" }, h("label", {}, "비고(비우면 자동)"), note));
+  const r = await modal("회비 수정", body, canWrite() ? [["확인", "ok"], ["취소", "cancel"]] : [["닫기", "cancel"]]);
+  if (r !== "ok") return;
+  const sel = new Map(); for (let i = 1; i <= 12; i++) if (chk[i - 1].checked) sel.set(i, smartDate(dts[i - 1].value));
+  const noteText = sel.size ? note.value.trim() : "", auto = !noteText, byDate = new Map();
+  for (const [k, d] of [...sel.entries()].sort((a, b) => a[0] - b[0])) { if (!Svc.chargeable(m, S.year, k)) continue; if (!byDate.has(d)) byDate.set(d, []); byDate.get(d).push(k); }
+  const list = [];
+  for (const [k, d] of [...sel.entries()].sort((a, b) => a[0] - b[0])) { if (!Svc.chargeable(m, S.year, k)) continue; list.push({ feeId: 0, memberId: m.memberId, year: S.year, month: k, paidDate: d, amount: S.monthlyFee, note: auto ? Svc.feeMonthsNote(m.name, byDate.get(d)) : noteText }); }
+  const ops = feeOps(m.memberId, S.year, list);
+  if (!ops.length) return toast("회비가 수정되었습니다.");
+  if (await save(ops, "회비가 수정되었습니다.")) { FV.memberId = m.memberId; render(); }
 }
 
 /* =====================================================================
