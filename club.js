@@ -340,7 +340,8 @@ function openFileMenu(btn) {
     item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
     ...(Conn.mode === "site" ? [item("클럽 계정 연결 해제", unlinkClub)] : []),
     item(view1 ? "홈으로" : "로그아웃", logout));
-  const r = btn.getBoundingClientRect(); m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
+  const r = btn.getBoundingClientRect(); m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px"; m.style.maxWidth = (innerWidth - 16) + "px"; m.hidden = false;
+  m.style.width = ""; m.style.left = "0px"; const w = m.offsetWidth; m.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px"; m.style.width = w + "px";
 }
 /* FILE 메뉴 바깥을 누르면 닫기 (문서에 한 번만 등록: 열 때마다 등록하면 다음 FILE 클릭이 바로 닫혀버림) */
 document.addEventListener("click", (e) => { const m = $("fileMenu"); if (m && !m.hidden && !m.contains(e.target) && !e.target.closest(".pcbtn.file")) m.hidden = true; });
