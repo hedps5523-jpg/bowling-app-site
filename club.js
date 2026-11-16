@@ -268,7 +268,7 @@ async function reload(msg) {
 const TABS = {};       // key → { title, render }
 let current = "members";
 const HEADER_TABS = ["games", "ledger", "fees", "ranking", "quarter"];
-const TITLES = { members: "회원관리", games: "게임기록", ledger: "회계장부", fees: "회비관리", ranking: "랭킹/현황", quarter: "분기 기준에버", lockers: "락카 사용현황", basic: "기초 자료", settings: "환경설정", contacts: "연락처(뷰)" };
+const TITLES = { members: "회원관리", games: "게임기록", ledger: "회계장부", fees: "회비관리", ranking: "랭킹/현황", quarter: "분기 기준에버", lockers: "락카 사용현황", settings: "환경설정", contacts: "연락처(뷰)" };
 
 function drawHeader() {
   const nav = $("pcnav"); nav.textContent = "";
@@ -283,12 +283,12 @@ function openFileMenu(btn) {
   const m = $("fileMenu"); m.textContent = "";
   const item = (t, fn) => h("button", { type: "button", onclick: () => { m.hidden = true; fn(); } }, t);
   m.append(item("회원관리", () => go("members")), item("락카 사용현황", () => go("lockers")), item("연락처(뷰)", () => go("contacts")), h("hr"),
-    item("기초 자료", () => go("basic")), item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
+    item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
     item("로그아웃", logout));
   const r = btn.getBoundingClientRect(); m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
   setTimeout(() => document.addEventListener("click", function off(e) { if (!m.contains(e.target)) { m.hidden = true; document.removeEventListener("click", off); } }), 0);
 }
-function go(k) { current = k; try { history.replaceState(null, "", "#" + k); } catch {} render(); }
+function go(k) { if (k === "settings" && current !== "settings") { ST.back = current; ST.sub = "basic"; } current = k; try { history.replaceState(null, "", "#" + k); } catch {} render(); }
 function render() {
   drawHeader();
   view.textContent = "";
@@ -1304,7 +1304,7 @@ async function editLocker(r) {
 }
 
 /* =====================================================================
-   4-8) 기초 자료 (PC createBasicPanel / refreshBasicTable / 모임구분 저장 / 전분기 에버 수정)
+   4-8) 설정 저장 도우미 · 전분기 에버 수정
    ===================================================================== */
 const settingOp = (key, value) => {
   const exists = Object.prototype.hasOwnProperty.call(S.settings, key);
@@ -1329,36 +1329,181 @@ Object.assign(Svc, {
   },
 });
 const nz = (n) => n != null && n > 0 ? String(n) : "";
-const BV = { sel: null };
-TABS.basic = {
-  render() {
-    const types = S.meetingTypes, fields = Array.from({ length: 10 }, (_, i) => h("input", { class: "pcin", style: "width:100%", maxlength: "20", value: types[i] || "" }));
-    const saveTypes = h("button", { class: "pcbtn", type: "button", disabled: !canWrite() }, "모임구분 저장");
-    saveTypes.onclick = async () => {
-      const vals = [...new Set(fields.map((f) => f.value.trim()).filter(Boolean))]; if (!vals.length) vals.push("정모", "비모");
-      const raw = vals.join("\n"), o = settingOp("key_meeting_types", raw);
-      const exists = Object.prototype.hasOwnProperty.call(S.settings, "key_meeting_types");
-      if (!o || (!exists && raw === S.meetingTypes.join("\n"))) return toast("모임구분이 저장되었습니다.");
-      saveTypes.disabled = true;
-      if (await save([o], "모임구분이 저장되었습니다.")) render(); else saveTypes.disabled = false;
-    };
-    const dq = () => Math.max(1, Math.floor(new Date().getMonth() / 3) + 1 - 1);
-    const editBtn = h("button", { class: "pcbtn", type: "button" }, "전분기 에버 수정"); editBtn.onclick = () => editBasicQuarter(BV.sel, dq());
-    const weeks = Svc.basicWeeksUntilNextFebruary(), members = Svc.getMembers(), rows = [];
-    for (let i = 0; i < Math.max(Math.max(1, weeks.length), members.length); i++) {
-      const w = weeks[i] || null, m = members[i] || null;
-      rows.push({ w, m, date: w ? shortMD(w.date) : "", label: w ? w.label : "", name: m ? m.name : "", base: m ? String(Svc.effectiveBaseAverage(m)) : "",
-        q: [1, 2, 3, 4].map((q) => !m ? "" : nz(q === 1 ? Svc.quarterBaseAverage(m, S.year, 1) : Svc.quarterStored(m, q))), dec: m ? nz(Svc.decisionAverage(m)) : "" });
+/* ---- 환경설정 도우미 (PC PcSettingsOutboxStore.validateAndNormalize / LedgerCategorySettings) ---- */
+Object.assign(LC, {
+  LINKS: ["일반", "게임기록", "회비관리", "락카관리", "정모/비모", "이벤트·상주전", "회원관리", "외부·금융"],
+  groupsOf(type) { return type === "지출" ? this.EX_GROUPS : this.IN_GROUPS; },
+  serialize(items) { return items.map((i) => `${i.type}\t${i.name}\t${i.group}\t${i.link}\t${i.use ? "1" : "0"}`).join("\n"); },
+  isLocked: (i) => i.type === "수입" && i.name === "회비",
+  validate(raw) {
+    const clean = [], seen = new Set(); let hasFee = false;
+    for (const it of this.parse(raw)) {
+      const k = it.type + "|" + it.name; if (seen.has(k)) throw new Error("같은 대분류에 중복된 항목이 있습니다: " + it.name); seen.add(k);
+      if (/[\t\n]/.test(it.name)) throw new Error("항목 이름에 사용할 수 없는 문자가 있습니다.");
+      const gs = this.groupsOf(it.type), locked = this.isLocked(it); if (locked) hasFee = true;
+      clean.push({ ...it, group: gs.includes(it.group) ? it.group : gs[gs.length - 1], use: locked || it.use });
     }
-    const cols = [{ t: "게임일", get: (r) => r.date }, { t: "주차", get: (r) => r.label }, { t: "회원명", get: (r) => r.name }, { t: "기준에버", get: (r) => r.base },
-      ...[0, 1, 2, 3].map((k) => ({ t: `${k + 1}분기에버`, get: (r) => r.q[k] })), { t: "결정에버", get: (r) => r.dec }];
-    const table = pcTable(cols, rows, { onSelect: (r, i, dbl) => { BV.sel = r.m; } });
-    table.querySelectorAll("tbody tr").forEach((tr, i) => tr.addEventListener("dblclick", (e) => {
-      const td = e.target.closest("td"); if (!td) return; const c = [...tr.children].indexOf(td);
-      if (c >= 4 && c <= 7) { BV.sel = rows[i].m; editBasicQuarter(rows[i].m, c - 3); }
-    }));
-    view.append(h("section", { class: "pcbox" }, h("div", { class: "pcgrid5" }, fields.map((f, i) => h("div", {}, h("label", { class: "pcl" }, `구분${i + 1}`), f))),
-      h("div", { style: "text-align:right;margin-top:6px" }, saveTypes, " ", editBtn, " ", roBadge())), table);
+    if (!hasFee) clean.unshift({ type: "수입", name: "회비", group: "회원수입", link: "회비관리", use: true });
+    return this.serialize(clean);
+  },
+});
+const uniqLines = (v) => [...new Set(String(v || "").replace(/\r/g, "").split("\n").map((x) => x.trim()).filter(Boolean))];
+function validateSetting(key, raw) {
+  const v = String(raw ?? "").replace(/\r/g, "").trim();
+  if (key === "key_management_name") { if (!v) throw new Error("관리 명칭을 입력하세요."); return v; }
+  if (key === "key_grade_list") { const g = uniqLines(v); if (!g.length) throw new Error("등급을 한 개 이상 입력하세요."); return g.join("\n"); }
+  if (["key_fee_amount", "key_locker_deposit", "key_locker_yearly_fee"].includes(key)) {
+    const s = v.replace(/,/g, ""); const n = /^[+-]?\d+$/.test(s) ? parseInt(s, 10) : NaN;
+    if (!Number.isFinite(n) || n < 0 || n > 2147483647) throw new Error("회비·락카 금액은 0 이상의 정수로 입력하세요.");
+    return String(n);
+  }
+  if (key === "key_locker_contract_date" || key === "key_locker_expiry_date") {
+    const m = v.match(/^(\d{2})-(\d{2})$/), dim = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (!m || +m[1] < 1 || +m[1] > 12 || +m[2] < 1 || +m[2] > dim[+m[1] - 1]) throw new Error("락카 기본일은 MM-dd 형식으로 입력하세요.");
+    return v;
+  }
+  if (key === "key_meeting_types") { const t = uniqLines(v); if (!t.length) t.push("정모", "비모"); if (t.length > 10) throw new Error("모임구분은 최대 10개까지 입력할 수 있습니다."); return t.join("\n"); }
+  if (key === "key_ledger_categories") return LC.validate(v);
+  throw new Error("지원하지 않는 공용 환경설정 키입니다: " + key);
+}
+const fmtThousands = (raw) => { if (raw == null) return ""; const d = String(raw).replace(/,/g, "").trim(); return /^\d{1,15}$/.test(d) ? Number(d).toLocaleString("en-US") : String(raw).trim(); };
+const lockerDisp = (raw, year) => {
+  if (raw == null || !String(raw).trim()) return ""; const p = (String(raw).match(/\d+/g) || []).slice(0, 3).map(Number);
+  if (p.length === 2) return `${pad2(year % 100)}/${pad2(p[0])}/${pad2(p[1])}`;
+  if (p.length === 3) return `${pad2(p[0] % 100)}/${pad2(p[1])}/${pad2(p[2])}`;
+  return String(raw).trim();
+};
+const lockerParse = (text) => { const t = String(text || "").trim(); if (!t) return ""; const p = (t.match(/\d+/g) || []).slice(0, 4).map(Number); return p.length === 2 || p.length === 3 ? `${pad2(p[p.length - 2])}-${pad2(p[p.length - 1])}` : t; };
+const envWeek = (l) => { const m = /^(\d+)월\s*(\d+)주차$/.exec(l || ""); return m ? `${pad2(+m[1])}월${pad2(+m[2])}주` : l; };
+const effShared = (key) => {
+  if (Object.prototype.hasOwnProperty.call(S.settings, key)) return String(S.settings[key]);
+  return { key_management_name: S.programTitle, key_grade_list: S.gradeTypes.join("\n"), key_fee_amount: String(S.monthlyFee), key_locker_deposit: "0", key_locker_yearly_fee: "0", key_locker_contract_date: "01-01", key_locker_expiry_date: "12-31", key_meeting_types: S.meetingTypes.join("\n") }[key];
+};
+
+/* =====================================================================
+   4-9) 환경설정 (PC openEnvironmentSettingsDialog: 기본 DATA / 서버관리 / 수입/지출)
+        ※ PC '기초 자료' 탭의 모임구분·주차별·분기 에버 표·전분기 에버 수정은 환경설정 '기본 DATA'로 합쳤어요.
+   ===================================================================== */
+const ST = { sub: "basic", logs: [], sel: null };
+const stLog = (t) => { ST.logs.unshift([new Date().toLocaleTimeString("ko-KR", { hour12: false }), t]); };
+const secBox = (title, ...kids) => h("section", { class: "envsec" }, h("div", { class: "envsec-h" }, title), h("div", { class: "envsec-b" }, kids));
+const numList = (title, fields) => secBox(title, h("div", { class: "envlist" }, fields.map((f, i) => h("div", { class: "envitem" }, h("span", {}, String(i + 1)), f))));
+TABS.settings = {
+  render() {
+    const ro = !canWrite(), year = new Date().getFullYear();
+    const inp = (v, o = {}) => h("input", { class: "pcin", style: "width:100%", value: v ?? "", disabled: ro, ...o });
+    /* ---- 기본 DATA ---- */
+    const nameF = inp(effShared("key_management_name"), { maxlength: "60", style: "width:100%;text-align:left" });
+    const mFields = Array.from({ length: 10 }, (_, i) => inp(S.meetingTypes[i] || "", { maxlength: "20" }));
+    const gFields = Array.from({ length: 10 }, (_, i) => inp(S.gradeTypes[i] || "", { maxlength: "20" }));
+    const feeF = inp(fmtThousands(effShared("key_fee_amount")), { inputmode: "numeric" }), depF = inp(fmtThousands(effShared("key_locker_deposit")), { inputmode: "numeric" }), yfF = inp(fmtThousands(effShared("key_locker_yearly_fee")), { inputmode: "numeric" });
+    const cdF = inp(lockerDisp(effShared("key_locker_contract_date"), year)), edF = inp(lockerDisp(effShared("key_locker_expiry_date"), year));
+    const yearF = inp(`${year}년`, { readonly: true, disabled: false });
+    [feeF, depF, yfF].forEach((f) => f.onblur = () => { f.value = fmtThousands(f.value); }); [cdF, edF].forEach((f) => f.onblur = () => { f.value = lockerDisp(f.value, year); });
+    const pair = (l, f) => h("div", { class: "envitem env2" }, h("label", {}, l), f);
+    const other = secBox("기타", h("div", { class: "envother" }, pair("해당년도", yearF), pair("월회비", feeF), pair("락카 보증금", depF), pair("락카 연사용료", yfF), pair("락카 계약일", cdF), pair("락카 만료일", edF)));
+    const weeks = Svc.basicWeeksUntilNextFebruary(), members = Svc.getMembers();
+    const weekT = pcTable([{ t: "게임일", get: (r) => shortMD(r.date) }, { t: "주차", get: (r) => envWeek(r.label) }], weeks.length ? weeks : [{ date: "", label: "" }]);
+    const qrows = members.map((m) => ({ m, name: m.name, base: String(Svc.effectiveBaseAverage(m)), q: [1, 2, 3, 4].map((q) => nz(q === 1 ? Svc.quarterBaseAverage(m, S.year, 1) : Svc.quarterStored(m, q))), dec: nz(Svc.decisionAverage(m)) }));
+    const qcols = [{ t: "회원명", get: (r) => r.name }, { t: "기준에버", get: (r) => r.base }, ...[0, 1, 2, 3].map((k) => ({ t: `${k + 1}분기에버`, get: (r) => r.q[k] })), { t: "결정에버", get: (r) => r.dec }];
+    const qT = pcTable(qcols, qrows, { onSelect: (r) => { ST.sel = r.m; } });
+    const dq = () => Math.max(1, Math.floor(new Date().getMonth() / 3) + 1 - 1);
+    qT.querySelectorAll("tbody tr").forEach((tr, i) => tr.addEventListener("dblclick", (e) => { const td = e.target.closest("td"); if (!td) return; const c = [...tr.children].indexOf(td); if (c >= 2 && c <= 5) { ST.sel = qrows[i].m; editBasicQuarter(qrows[i].m, c - 1); } }));
+    const editQ = h("button", { class: "pcbtn", type: "button", onclick: () => editBasicQuarter(ST.sel, dq()) }, "전분기 에버 수정");
+    const basic = h("div", {}, h("div", { class: "pcform", style: "margin:6px 0" }, h("label", { style: "font-size:16px" }, "관리 명칭"), h("div", { style: "flex:1;min-width:220px;max-width:420px" }, nameF)),
+      h("div", { class: "envband" }, numList("모임", mFields), numList("등급", gFields), other),
+      h("div", { class: "envdata" }, secBox("주차별", weekT), secBox("분기 에버", h("div", { style: "text-align:right;margin-bottom:6px" }, editQ), qT)),
+      h("p", { class: "pcnote" }, "관리 명칭·모임구분·등급·회비·락카 기본값·수입/지출 목록은 서버 공용입니다."));
+    /* ---- 수입/지출 ---- */
+    const E = { rows: { 수입: [], 지출: [] }, type: "수입", sel: -1 };
+    const loadE = (items) => { E.rows = { 수입: [], 지출: [] }; items.forEach((i) => E.rows[i.type].push({ name: i.name, group: i.group, link: i.link, use: i.use, locked: LC.isLocked(i) })); };
+    loadE(LC.items());
+    const edBody = h("div"), typeBox = h("div", { class: "envtypes" });
+    const drawE = () => {
+      const rows = E.rows[E.type]; typeBox.textContent = "";
+      for (const t of ["수입", "지출"]) typeBox.append(h("button", { type: "button", class: "envtype " + (t === "수입" ? "in" : "ex") + (E.type === t ? " on" : ""), onclick: () => { E.type = t; E.sel = -1; drawE(); } }, `${t}  (중분류 ${E.rows[t].length}개)`));
+      const body = h("tbody");
+      rows.forEach((r, i) => {
+        const dis = ro || r.locked;
+        const nm = h("input", { class: "pcin", style: "width:100%;text-align:left", value: r.name, disabled: dis, maxlength: "40", "data-n": String(i), oninput: (e) => { r.name = e.target.value; } });
+        const gp = selectEl(LC.groupsOf(E.type), r.group); gp.disabled = dis; gp.onchange = () => { r.group = gp.value; };
+        const lk = selectEl(LC.LINKS, LC.LINKS.includes(r.link) ? r.link : "일반"); lk.disabled = dis; lk.onchange = () => { r.link = lk.value; };
+        const us = h("input", { type: "checkbox", disabled: dis }); us.checked = r.locked || r.use; us.onchange = () => { r.use = us.checked; };
+        const tr = h("tr", { class: E.sel === i ? "sel" : "" }, h("td", {}, String(i + 1)), h("td", {}, nm), h("td", {}, gp), h("td", {}, lk), h("td", {}, us));
+        tr.onclick = (e) => { if (E.sel === i) return; body.querySelectorAll("tr.sel").forEach((x) => x.classList.remove("sel")); tr.classList.add("sel"); E.sel = i; };
+        body.append(tr);
+      });
+      edBody.textContent = ""; edBody.append(h("div", { class: "rsec", style: `color:${E.type === "수입" ? "#1b64da" : "#c83237"};font-size:17px` }, `${E.type} 항목 (중분류)`),
+        h("div", { class: "pctable-wrap", style: "max-height:420px" }, h("table", { class: "pct", style: "min-width:520px" }, h("thead", {}, h("tr", {}, ["번호", "중분류 항목", "연간집계 구분", "연동 위치", "사용"].map((t) => h("th", {}, t)))), body)));
+    };
+    const rowsNow = () => E.rows[E.type];
+    const needSel = (msg) => { if (E.sel < 0 || E.sel >= rowsNow().length) { toast(msg); return false; } return true; };
+    const edBtn = (t, fn) => h("button", { class: "pcbtn", type: "button", disabled: ro, onclick: fn }, t);
+    const btns = h("div", { class: "envbtns" },
+      edBtn("항목 추가", () => { const gs = LC.groupsOf(E.type); rowsNow().push({ name: "", group: gs[gs.length - 1], link: "일반", use: true, locked: false }); E.sel = rowsNow().length - 1; drawE(); const n = edBody.querySelector(`[data-n="${E.sel}"]`); n && n.focus(); }),
+      edBtn("항목 수정", () => { if (!needSel("수정할 항목을 선택하세요.")) return; if (rowsNow()[E.sel].locked) return toast("'회비'는 회비관리와 연동되어 수정할 수 없습니다."); const n = edBody.querySelector(`[data-n="${E.sel}"]`); n && n.focus(); }),
+      edBtn("항목 삭제", async () => { if (!needSel("삭제할 항목을 선택하세요.")) return; const r = rowsNow()[E.sel]; if (r.locked) return toast("'회비'는 회비관리와 연동되어 삭제할 수 없습니다."); if (!(await confirmBox(`'${r.name}' 항목을 목록에서 삭제하시겠습니까?\n(이미 입력된 장부 내역은 변경되지 않습니다.)`))) return; rowsNow().splice(E.sel, 1); E.sel = Math.min(E.sel, rowsNow().length - 1); drawE(); }),
+      edBtn("▲ 위로", () => { const i = E.sel, rs = rowsNow(); if (i < 1) return; [rs[i - 1], rs[i]] = [rs[i], rs[i - 1]]; E.sel = i - 1; drawE(); }),
+      edBtn("▼ 아래로", () => { const i = E.sel, rs = rowsNow(); if (i < 0 || i >= rs.length - 1) return; [rs[i + 1], rs[i]] = [rs[i], rs[i + 1]]; E.sel = i + 1; drawE(); }),
+      edBtn("기본값 복원", async () => { if (!(await confirmBox("수입·지출 중분류 목록을 기본값으로 되돌립니다.\n(확인 버튼을 눌러 저장하기 전까지는 서버에 반영되지 않습니다.)"))) return; loadE(LC.defaults()); E.sel = -1; drawE(); }));
+    const ledger = h("div", { class: "enved" }, h("div", {}, h("div", { class: "rsec", style: "font-size:17px" }, "대분류"), typeBox,
+      h("p", { class: "pcnote" }, "대분류를 선택하면 해당 중분류 목록이 표시됩니다.", h("br"), "※ 대분류(수입/지출)는 고정이며 중분류만 추가·수정·삭제합니다.", h("br"), "※ 장부 입력의 '내역'은 구분(수입/지출) 선택에 따라 이 목록이 표시되고, 목록에 없는 내역도 직접 입력할 수 있습니다.", h("br"), "※ 이 목록은 서버 공용 설정으로 PC·모바일이 함께 사용합니다.")), edBody, btns);
+    drawE();
+    /* ---- 서버관리 ---- */
+    const statusV = h("b", { style: "color:#566070" }, "●  상태 확인 전"), logBody = h("tbody");
+    const drawLog = () => { logBody.textContent = ""; ST.logs.slice(0, 30).forEach(([t, w]) => logBody.append(h("tr", {}, h("td", {}, t), h("td", { class: "l" }, w)))); };
+    const work = (t) => { stLog(t); drawLog(); };
+    const checkBtn = h("button", { class: "pcbtn sm", type: "button" }, "상태 확인");
+    const check = async () => {
+      checkBtn.disabled = true; statusV.textContent = "●  확인 중..."; statusV.style.color = "#c98019";
+      try { const snap = await Conn.snapshot(); statusV.textContent = `●  정상 (서버 v${snap.dataVersion})`; statusV.style.color = "#12a442"; work(`서버 상태 확인: 정상 (v${snap.dataVersion})`); }
+      catch (e) { statusV.textContent = "●  확인 실패"; statusV.style.color = "#c83237"; work("서버 상태 확인 실패: " + e.message); }
+      checkBtn.disabled = false;
+    };
+    checkBtn.onclick = check;
+    const bigBtn = (t, fn, dis) => h("button", { class: "pcbtn envbig", type: "button", disabled: !!dis, onclick: fn }, t);
+    const backup = () => {
+      const snap = { exportedAt: new Date().toISOString(), dataVersion: S.dataVersion, settings: S.settings, members: S.members, games: S.games, ledger: S.ledger, fees: S.fees, lockers: S.lockers, quarterAdjustments: S.quarterAdjustments, yearBaseSeeds: S.yearBaseSeeds };
+      const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(snap, null, 1)], { type: "application/json" })), download: `bowling-club-backup-${todayStr()}.json` }); document.body.append(a); a.click(); a.remove(); work("자료 백업 파일 저장");
+    };
+    const server = h("div", {}, h("div", { class: "envtwo" },
+      secBox("자료 관리", h("div", { class: "envbtnrow" }, bigBtn("↥  자료 백업", backup), bigBtn("↧  자료 복원", () => toast("자료 복원·초기화는 PC 프로그램에서 사용해요."), true), bigBtn("⚙  초기화", () => toast("자료 복원·초기화는 PC 프로그램에서 사용해요."), true))),
+      secBox("동기화 관리", h("div", { class: "envbtnrow" }, bigBtn("↻  서버 원본 동기화", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); work("서버 원본 동기화"); render(); } catch (e) { toast(e.message); } }), bigBtn("↥  UpLoad", () => toast("웹에서는 저장하는 즉시 서버에 반영돼요."))))),
+      secBox("서버 정보 및 관리", h("div", { class: "envinfo" }, h("span", {}, "Supabase 프로젝트 URL"), h("span", {}, "https://***********.supabase.co ", h("button", { class: "pcbtn sm", type: "button", onclick: async () => { try { await navigator.clipboard.writeText(VH_URL); work("Supabase 프로젝트 URL 복사"); toast("복사했어요."); } catch { toast("복사하지 못했어요."); } } }, "복사")),
+        h("span", {}, "프로젝트 상태"), h("span", {}, statusV, " ", checkBtn), h("span", {}, "마지막 재시작 시간"), h("span", {}, "-"), h("span", {}, "앱 버전"), h("span", {}, "웹 클럽관리")),
+        h("p", { class: "pcnote" }, "✓ 서버 상태를 확인하여 PC/모바일이 최신 자료로 동작합니다.", h("br"), "✓ 프로젝트 URL은 보안상 일부만 표시됩니다.", h("br"), "※ 승인관리·서버 재실행은 모바일 볼링클럽/서버 관리 화면에서 처리해요.")),
+      secBox("최근 작업", h("div", { class: "pctable-wrap", style: "max-height:180px" }, h("table", { class: "pct", style: "min-width:0" }, h("thead", {}, h("tr", {}, h("th", { style: "width:110px" }, "시간"), h("th", {}, "작업 내용"))), logBody))));
+    drawLog(); setTimeout(check, 0);
+    /* ---- 하단 확인/취소 ---- */
+    const panels = { basic, server, ledger }, tabsRow = h("div", { class: "envtabs" });
+    const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; };
+    showSub();
+    const okBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", disabled: ro }, "확인"), cancelBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", onclick: () => go(ST.back || "games") }, "취소");
+    okBtn.onclick = async () => {
+      const lines = (fs) => fs.map((f) => f.value.trim()).filter(Boolean);
+      const meet = [...new Set(lines(mFields))]; if (!meet.length) meet.push("정모", "비모");
+      const proposed = { key_management_name: nameF.value, key_fee_amount: feeF.value.replace(/[, ]/g, "").trim(), key_locker_deposit: depF.value.replace(/[, ]/g, "").trim(), key_locker_yearly_fee: yfF.value.replace(/[, ]/g, "").trim(), key_locker_contract_date: lockerParse(cdF.value), key_locker_expiry_date: lockerParse(edF.value), key_grade_list: lines(gFields).join("\n") };
+      try {
+        const catRaw = LC.validate(LC.serialize(["수입", "지출"].flatMap((t) => E.rows[t].filter((r) => r.name.trim()).map((r) => ({ type: t, name: r.name.trim(), group: r.group, link: r.link, use: r.locked || r.use })))));
+        const curCat = Object.prototype.hasOwnProperty.call(S.settings, "key_ledger_categories") ? S.settings.key_ledger_categories : null;
+        if (curCat != null || catRaw !== LC.validate(LC.serialize(LC.defaults()))) proposed.key_ledger_categories = catRaw;
+        const meetRaw = meet.join("\n"), curMeet = Object.prototype.hasOwnProperty.call(S.settings, "key_meeting_types") ? S.settings.key_meeting_types : null;
+        if (curMeet != null || meetRaw !== S.meetingTypes.join("\n")) proposed.key_meeting_types = meetRaw;
+        const ops = [];
+        for (const [k, v] of Object.entries(proposed)) {
+          const n = validateSetting(k, v), exists = Object.prototype.hasOwnProperty.call(S.settings, k);
+          const def = k === "key_ledger_categories" ? LC.serialize(LC.defaults()) : effShared(k);
+          if (!exists && def != null && validateSetting(k, def) === n) continue;
+          const o = settingOp(k, n); if (o) ops.push(o);
+        }
+        if (!ops.length) { toast("변경된 내용이 없어요."); return go(ST.back || "games"); }
+        okBtn.disabled = true;
+        if (await save(ops, `환경설정이 저장되었습니다. (서버 공용 변경 ${ops.length}건)`)) { work(`환경설정 저장 ${ops.length}건`); go(ST.back || "games"); } else okBtn.disabled = false;
+      } catch (e) { toast("환경설정을 저장하지 못했습니다.\n" + e.message, 4200); }
+    };
+    view.append(h("section", { class: "pcbox" }, h("div", { class: "pcform", style: "justify-content:space-between" }, tabsRow, roBadge()), basic, server, ledger,
+      h("div", { style: "text-align:center;margin-top:10px" }, okBtn, " ", cancelBtn)));
+    showSub();
   },
 };
 async function editBasicQuarter(m, defQ) {
