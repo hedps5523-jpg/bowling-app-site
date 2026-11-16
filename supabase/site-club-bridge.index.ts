@@ -132,13 +132,12 @@ Deno.serve(async (req) => {
   const w = await who(String(b.token ?? ""));
   if (!w || !("ok" in w)) return json({ error: (w as { status?: number })?.status === 403 ? "not_member" : "expired" }, 401);
   const action0b = String(b.action ?? "");
-  // 구글(홈페이지) 로그인만으로 조회 전용 열람: 회원 연락처·락카 자료는 내보내지 않음
+  // 구글(홈페이지) 로그인만으로 조회 전용 열람: 회원 연락처는 내보내지 않음 (락카 번호는 조회 화면에 표시)
   if (action0b === "view_whoami") return json({ ok: true, viewer: { name: w.name, role: w.role, email: w.email } });
   if (action0b === "view_snapshot") {
     try {
       const out: Record<string, unknown> = {};
       for (const [t, o] of TABLES) {
-        if (t === "lockers") continue;
         let rows = await readAll(t, o);
         if (t === "members") rows = (rows as Record<string, unknown>[]).map((r) => { const c = { ...r }; delete c.phone; return c; });
         out[t] = rows;
