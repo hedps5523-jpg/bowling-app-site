@@ -702,6 +702,234 @@ function cumulativeReport() {
 }
 
 /* =====================================================================
+   4-3) 회계장부 (PC createLedgerPanel / addLedger / editLedgerDialog / 보고서 / 1년결산)
+   ===================================================================== */
+const LC = {
+  IN_GROUPS: ["회원수입", "기초/금융수입", "행사/운영수입", "대회/기타수입", "기타수입"],
+  EX_GROUPS: ["행사/운영지출", "시설/운영지출", "대회/행사지출", "환급/정산지출", "기타지출"],
+  defaults() {
+    const a = (type, name, group, link) => ({ type, name, group, link, use: true });
+    return [a("수입", "회비", "회원수입", "회비관리"), a("수입", "입회비", "회원수입", "회원관리"), a("수입", "이자", "기초/금융수입", "외부·금융"), a("수입", "이월금", "기초/금융수입", "외부·금융"),
+      a("수입", "정산금", "행사/운영수입", "게임기록"), a("수입", "불참벌금", "행사/운영수입", "게임기록"), a("수입", "이벤트 수입", "행사/운영수입", "이벤트·상주전"), a("수입", "시상금", "대회/기타수입", "외부·금융"),
+      a("수입", "협찬금", "기타수입", "외부·금융"), a("수입", "락카비", "기타수입", "락카관리"), a("수입", "보증금", "기타수입", "락카관리"), a("수입", "기타 수입", "기타수입", "일반"),
+      a("지출", "회식비", "행사/운영지출", "일반"), a("지출", "유니폼", "행사/운영지출", "일반"), a("지출", "야유회", "행사/운영지출", "이벤트·상주전"), a("지출", "이벤트", "행사/운영지출", "이벤트·상주전"), a("지출", "지원금", "행사/운영지출", "일반"),
+      a("지출", "락카관리", "시설/운영지출", "락카관리"), a("지출", "수수료", "시설/운영지출", "외부·금융"), a("지출", "비품·소모품", "시설/운영지출", "일반"), a("지출", "시상금", "대회/행사지출", "게임기록"),
+      a("지출", "참가비", "대회/행사지출", "이벤트·상주전"), a("지출", "상주전", "대회/행사지출", "이벤트·상주전"), a("지출", "보증금 반환", "환급/정산지출", "락카관리"), a("지출", "탈퇴 반환", "환급/정산지출", "회원관리"), a("지출", "기타 지출", "기타지출", "일반")];
+  },
+  parse(raw) {
+    if (!raw || !String(raw).trim()) return this.defaults();
+    const list = [];
+    for (const line of String(raw).replace(/\r/g, "").split("\n")) {
+      if (!line.trim()) continue;
+      const f = line.split("\t"); if (f.length < 2) continue;
+      const type = f[0].trim(), name = f[1].trim();
+      if (!(type === "수입" || type === "지출") || !name) continue;
+      list.push({ type, name, group: (f[2] || "").trim(), link: ((f[3] || "일반").trim() || "일반"), use: f.length <= 4 || f[4].trim() !== "0" });
+    }
+    return list.length ? list : this.defaults();
+  },
+  items() { return this.parse(S.settings.key_ledger_categories); },
+  names(type) { const out = []; for (const i of this.items()) if (i.type === type && i.use && !out.includes(i.name)) out.push(i.name); return out; },
+  annualMatch(type, category) {
+    const t = String(category || "").trim().replace(/ /g, ""); if (!t) return null;
+    for (const i of this.items()) if (i.type === type && i.name.replace(/ /g, "") === t) return [i.group, i.name];
+    return null;
+  },
+};
+const money = (n) => Number(n || 0).toLocaleString("ko-KR");
+const won = (n) => money(n) + "원";
+const yymmdd = (s) => s ? s.slice(2, 4) + "/" + s.slice(5, 7) + "/" + s.slice(8, 10) : "";
+const cleanTitle = (t) => { let x = (t || "").trim(); if (!x) return "볼링클럽관리프로그램 v4"; const k = x.indexOf("[저장:"); if (k >= 0) x = x.slice(0, k).trim(); return x || "볼링클럽관리프로그램 v4"; };
+Object.assign(Svc, {
+  ledgerSorted(rows) { return [...rows].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || a.ledgerId - b.ledgerId); },
+  getLedgerEntries(prefix) { return this.ledgerSorted(S.ledger.filter((l) => l.date && (prefix == null || l.date.startsWith(prefix)))); },
+  income(rows) { return rows.filter((r) => r.type === "수입").reduce((a, r) => a + r.amount, 0); },
+  expense(rows) { return rows.filter((r) => r.type === "지출").reduce((a, r) => a + r.amount, 0); },
+  balance(rows) { return this.income(rows) - this.expense(rows); },
+  latestLedgerDate() { const d = S.ledger.map((l) => l.date).filter(Boolean).sort(); return d.length ? d[d.length - 1] : null; },
+  suggestNextLedgerDate() { const l = this.latestLedgerDate(); return l ? addDays(l, 1) : todayStr(); },
+  rangeRows(from, to) { return this.getLedgerEntries(null).filter((e) => yearOf(e.date) === S.year && monthOf(e.date) >= from && monthOf(e.date) <= to); },
+});
+function ledgerPayload(e) { return { ledger_id: e.ledgerId || 0, entry_date: e.date, type: e.type, category: e.category, amount: e.amount, note: e.note || "", from_fee: !!e.fromFee, member_id: e.memberId || 0 }; }
+function parseAmount(v) { const s = String(v || "").trim().replace(/,/g, ""); if (!/^-?\d+$/.test(s)) { toast("금액을 숫자로 입력하세요."); return null; } const n = parseInt(s, 10); if (n < 0) { toast("금액은 0 이상이어야 합니다."); return null; } return n; }
+function smartDate(v) {
+  const t = String(v || "").trim().replace(/[./]/g, "-"); if (!t) return todayStr();
+  if (isDate(t)) return t;
+  const a = t.split("-").map((x) => parseInt(x, 10));
+  if (a.length === 3 && a.every(Number.isFinite)) { const y = a[0] < 100 ? a[0] + 2000 : a[0]; return `${y}-${pad2(a[1])}-${pad2(a[2])}`; }
+  if (a.length === 2 && a.every(Number.isFinite)) return `${S.year}-${pad2(a[0])}-${pad2(a[1])}`;
+  toast("날짜 형식이 올바르지 않아 오늘 날짜를 사용합니다."); return todayStr();
+}
+const LV = { mode: "all", from: 1, to: 1, month: null, sel: null, hi: null, bottom: null, date: null, type: "수입" };
+function catInput(typeSel, value, cls = "pcin w12") {
+  const id = "cat" + Math.random().toString(36).slice(2, 7);
+  const inp = h("input", { class: cls, list: id, value: value || "", maxlength: "40", autocomplete: "off" });
+  const dl = h("datalist", { id });
+  const fill = () => { dl.textContent = ""; LC.names(typeSel.value).forEach((n) => dl.append(h("option", { value: n }))); };
+  typeSel.addEventListener("change", fill); fill();
+  return [inp, dl];
+}
+
+TABS.ledger = {
+  render() {
+    if (!LV.month) LV.month = String(Math.min(12, Math.max(1, new Date().getMonth() + 1)));
+    if (!LV.date) LV.date = Svc.suggestNextLedgerDate();
+    const date = h("input", { class: "pcin", type: "date", value: LV.date });
+    const type = selectEl(["수입", "지출"], LV.type); type.onchange = () => LV.type = type.value;
+    const [cat, catDl] = catInput(type, "");
+    const amt = h("input", { class: "pcin w8", inputmode: "numeric", maxlength: "12" });
+    const note = h("input", { class: "pcin w20", maxlength: "100" });
+    [date, type, cat, amt].forEach((x, i, a) => x.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); (a[i + 1] || note).focus(); } });
+    note.onkeydown = (e) => { if (e.key === "Enter") addBtn.click(); };
+    const addBtn = h("button", { class: "pcbtn", type: "button", disabled: !canWrite() }, "장부 저장");
+    addBtn.onclick = async () => {
+      const a = parseAmount(amt.value); if (a == null) return;
+      if (!cat.value.trim()) return toast("내역을 입력하세요.");
+      const d = smartDate(date.value);
+      addBtn.disabled = true;
+      const e = { ledgerId: 0, date: d, type: type.value, category: cat.value.trim(), amount: a, note: note.value.trim(), fromFee: false, memberId: 0 };
+      const before = new Set(S.ledger.map((x) => x.ledgerId));
+      if (await save([op("ledger_entries", "insert", ledgerPayload(e))], "장부가 저장되었습니다.")) {
+        const added = S.ledger.filter((x) => !before.has(x.ledgerId)).sort((x, y) => y.ledgerId - x.ledgerId)[0];
+        LV.date = d; LV.hi = null; LV.bottom = added ? added.ledgerId : null; LV.sel = added || null;
+        LV.mode = "all"; render();
+        setTimeout(() => { const t = view.querySelector("tr.sel"); t && t.scrollIntoView({ block: "nearest" }); const s = view.querySelector("select.pcsel"); s && s.focus(); }, 50);
+      } else addBtn.disabled = false;
+    };
+    const editBtn = h("button", { class: "pcbtn", type: "button" }, "장부수정");
+    editBtn.onclick = () => LV.sel ? editLedger(LV.sel) : toast("수정할 장부를 선택하세요.");
+    const annBtn = h("button", { class: "pcbtn", type: "button" }, "1년결산"); annBtn.onclick = annualSettlement;
+
+    const monthSel = selectEl(monthOptions(), LV.month); monthSel.onchange = () => LV.month = monthSel.value;
+    const q = (label, fn) => h("button", { class: "pcbtn", type: "button", onclick: fn }, label);
+    const summary = h("span", { class: "pctitle", style: "font-size:15px;margin:0 0 0 8px;white-space:pre-wrap" });
+
+    let rows;
+    if (LV.mode === "all") rows = Svc.getLedgerEntries(null);
+    else if (LV.mode === "month") rows = Svc.getLedgerEntries(`${S.year}-${pad2(LV.month)}`);
+    else rows = Svc.rangeRows(LV.from, LV.to);
+    if (LV.bottom != null) { const t = rows.find((r) => r.ledgerId === LV.bottom); if (t) rows = [...rows.filter((r) => r !== t), t]; }
+    const all = Svc.getLedgerEntries(null);
+    if (LV.mode === "all") summary.textContent = `전체 수입: ${money(Svc.income(rows))}원   전체 지출: ${money(Svc.expense(rows))}원   총 잔액: ${money(Svc.balance(rows))}원`;
+    else { const rl = LV.from === LV.to ? `${LV.from}월` : `${LV.from}-${LV.to}월`; summary.textContent = `${rl} 수입: ${money(Svc.income(rows))}원   ${rl} 지출: ${money(Svc.expense(rows))}원   ${rl} 잔액: ${money(Svc.balance(rows))}원   총 잔액: ${money(Svc.balance(all))}원`; }
+
+    const table = pcTable([
+      { t: "번호", get: (r, i) => i + 1, w: "56px" }, { t: "일자", get: (r) => r.date }, { t: "구분", get: (r) => r.type },
+      { t: "내역", get: (r) => r.category }, { t: "금액", cls: "r", get: (r) => money(r.amount) }, { t: "비고", cls: "l", get: (r) => r.note },
+    ], rows, { onSelect: (r, i, dbl) => { LV.sel = r; if (LV.hi != null && LV.hi !== r.ledgerId) LV.hi = null; if (dbl) editLedger(r); }, rowClass: (r) => (LV.hi === r.ledgerId ? "hi" : "") + (r.fromFee ? " fee" : "") });
+    if (LV.sel) { const k = rows.findIndex((r) => r.ledgerId === LV.sel.ledgerId); if (k >= 0) table.querySelectorAll("tbody tr")[k].classList.add("sel"); }
+    LV.bottom = null;
+
+    view.append(
+      h("section", { class: "pcbox" }, h("div", { class: "pcform" }, h("label", {}, "일자"), date, h("label", {}, "구분"), type, h("label", {}, "내역"), cat, catDl, h("label", {}, "금액"), amt, h("label", {}, "비고"), note, addBtn, editBtn, annBtn, roBadge())),
+      h("section", { class: "pcbox", style: "margin-top:4px" }, h("div", { class: "pcform" }, h("label", {}, "조회월"), monthSel,
+        q("월별 조회", () => { LV.mode = "month"; LV.sel = null; render(); }), q("전체 조회", () => { LV.mode = "all"; LV.sel = null; render(); }),
+        q("월별 보고서", () => { LV.from = LV.to = +monthSel.value; ledgerReport(); }), q("기간 보고서", rangeReport), summary)),
+      table);
+    setTimeout(() => { const t = view.querySelector("tr.sel"); t && t.scrollIntoView({ block: "nearest" }); }, 30);
+  },
+};
+
+async function editLedger(entry) {
+  if (entry.fromFee) return toast("회비에서 생성된 장부는 회비관리 화면에서 수정하거나 삭제하세요.");
+  const date = h("input", { class: "pcin", type: "date", value: entry.date });
+  const type = selectEl(["수입", "지출"], entry.type);
+  const [cat, catDl] = catInput(type, entry.category, "pcin");
+  const amt = h("input", { class: "pcin", inputmode: "numeric", value: String(entry.amount) });
+  const note = h("input", { class: "pcin", value: entry.note, maxlength: "100" });
+  const g = h("div", { class: "pcgrid" }, h("label", {}, "일자"), date, h("label", {}, "구분"), type, h("label", {}, "내역"), h("div", {}, cat, catDl), h("label", {}, "금액"), amt, h("label", {}, "비고"), note);
+  const r = await modal("장부 수정", g, canWrite() ? [["수정", "ok"], ["취소", "cancel"], ["삭제", "del", "danger"]] : [["닫기", "cancel"]]);
+  if (r === "ok") {
+    const a = parseAmount(amt.value); if (a == null) return;
+    if (!cat.value.trim()) return toast("내역을 입력하세요.");
+    const e = { ...entry, date: smartDate(date.value), type: type.value, category: cat.value.trim(), amount: a, note: note.value.trim() };
+    if (await save([op("ledger_entries", "update", ledgerPayload(e), S.rv.ledger[entry.ledgerId])], "장부가 수정되었습니다.")) { LV.hi = entry.ledgerId; LV.sel = S.ledger.find((x) => x.ledgerId === entry.ledgerId) || null; render(); }
+  } else if (r === "del") {
+    if (!(await confirmBox("선택한 장부를 삭제하시겠습니까?"))) return;
+    if (await save([op("ledger_entries", "delete", ledgerPayload(entry), S.rv.ledger[entry.ledgerId])], "장부가 삭제되었습니다.")) { LV.sel = null; render(); }
+  }
+}
+
+/* 월별/기간 보고서 */
+function ledgerReport() {
+  const from = LV.from, to = LV.to, rows = Svc.rangeRows(from, to), all = Svc.getLedgerEntries(null);
+  const rl = from === to ? `${from}월` : `${from}-${to}월`;
+  const box = (items) => h("div", { class: "rbox" }, items.map(([k, v]) => h("div", {}, h("small", {}, k), h("b", {}, v))));
+  const sub = `${S.year}년 ${from}월${from === to ? "" : " ~ " + to + "월"} / 생성일 ${todayStr()}`;
+  const body = h("div", {}, h("div", { class: "rsum" }, box([[`${rl} 수입`, won(Svc.income(rows))], [`${rl} 지출`, won(Svc.expense(rows))], [`${rl} 잔액`, won(Svc.balance(rows))]]), box([["총 잔액", won(Svc.balance(all))]])),
+    h("div", { class: "rsec" }, "장부 내역"),
+    pcTable([{ t: "일자", get: (r) => yymmdd(r.date) }, { t: "구분", get: (r) => r.type }, { t: "내역", get: (r) => r.category }, { t: "금액", cls: "r", get: (r) => money(r.amount) }, { t: "비고", cls: "l", get: (r) => r.note }], rows));
+  reportModal(`${cleanTitle(S.programTitle)} | 회계 보고서`, sub, body);
+}
+async function rangeReport() {
+  const mk = (v) => h("input", { class: "pcin w5", inputmode: "numeric", value: v, maxlength: "2" });
+  const a = mk(String(LV.from)), b = mk(String(LV.to));
+  const r = await modal("기간 보고서", h("div", { class: "pcgrid" }, h("label", {}, "기간 시작 월(1~12)"), a, h("label", {}, "기간 종료 월(1~12)"), b), [["확인", "ok"], ["취소", "cancel"]]);
+  if (r !== "ok") return;
+  const fm = parseInt(a.value, 10), tm = parseInt(b.value, 10);
+  if (!Number.isFinite(fm) || !Number.isFinite(tm)) return toast("월은 숫자로 입력하세요.");
+  LV.from = Math.min(fm, tm); LV.to = Math.max(fm, tm); LV.mode = "range"; LV.sel = null;
+  render(); ledgerReport();
+}
+
+/* 1년결산 */
+const AN = {
+  note: (s) => String(s || "").trim().replace(/ /g, ""),
+  fallback(c) { if (!c || !c.trim()) return "기타"; let t = c.trim(); const p = t.indexOf("("); if (p > 0) t = t.slice(0, p).trim(); return t || "기타"; },
+  income(r) {
+    const c = this.note(r.category), t = (c + " " + this.note(r.note)).trim();
+    if (t.includes("입회비")) return ["회원수입", "입회비"]; if (t.includes("회비")) return ["회원수입", "월 회비"];
+    if (t.includes("이월")) return ["기초/금융수입", "이월금"]; if (t.includes("이자")) return ["기초/금융수입", "이자"];
+    if (t.includes("정산")) return ["행사/운영수입", "정산금"]; if (t.includes("팀벌금") || t.includes("에버벌금")) return ["행사/운영수입", "정산금"];
+    if (t.includes("벌금")) return ["행사/운영수입", "벌금"]; if (t.includes("시상금")) return ["대회/기타수입", "대회 시상금"]; if (t.includes("보증금")) return ["기타수입", "보증금"];
+    return LC.annualMatch("수입", r.category) || ["기타수입", this.fallback(c)];
+  },
+  expense(r) {
+    const c = this.note(r.category), t = (c + " " + this.note(r.note)).trim();
+    if (t.includes("회식")) return ["행사/운영지출", "회식비"]; if (t.includes("유니폼")) return ["행사/운영지출", "유니폼"]; if (t.includes("야유회")) return ["행사/운영지출", "야유회"]; if (t.includes("지원금")) return ["행사/운영지출", "지원금"];
+    if (t.includes("락카")) return ["시설/운영지출", "락카비"]; if (t.includes("참가")) return ["대회/행사지출", "참가비"]; if (t.includes("시상")) return ["대회/행사지출", "시상금"];
+    if (t.includes("탈퇴") || t.includes("반환") || t.includes("환급")) return ["환급/정산지출", "탈퇴 반환"];
+    return LC.annualMatch("지출", r.category) || ["기타지출", this.fallback(c)];
+  },
+  summarize(rows, income) {
+    const map = new Map(); for (const g of income ? LC.IN_GROUPS : LC.EX_GROUPS) map.set(g, { major: g, total: 0, mid: new Map() });
+    for (const r of rows) {
+      if (r.type !== (income ? "수입" : "지출")) continue;
+      const [maj, mid] = income ? this.income(r) : this.expense(r);
+      if (!map.has(maj)) map.set(maj, { major: maj, total: 0, mid: new Map() });
+      const s = map.get(maj), k = mid || "기타"; s.mid.set(k, (s.mid.get(k) || 0) + r.amount); s.total += r.amount;
+    }
+    return map;
+  },
+};
+function annualSettlement() {
+  const rows = Svc.getLedgerEntries(null).filter((e) => yearOf(e.date) === S.year);
+  const mi = Array(13).fill(0), me = Array(13).fill(0), has = Array(13).fill(false);
+  for (const r of rows) { const m = monthOf(r.date); if (m < 1 || m > 12) continue; has[m] = true; if (r.type === "수입") mi[m] += r.amount; else if (r.type === "지출") me[m] += r.amount; }
+  let ti = 0, te = 0; for (let m = 1; m <= 12; m++) { ti += mi[m]; te += me[m]; }
+  const tb = ti - te;
+  const card = (t, v, cls, mk) => h("div", { class: "acard " + cls }, h("span", { class: "amk" }, "₩" + mk), h("div", {}, h("div", { class: "a-t" }, t), h("div", { class: "a-v" }, won(v))));
+  const sec = (t, body) => h("section", { class: "asec" }, h("div", { class: "ash" }, t), h("div", { class: "asb" }, body));
+  const mon = h("table", { class: "pct amon" }, h("thead", {}, h("tr", {}, ["구분", ...Array.from({ length: 12 }, (_, i) => `${i + 1}월`)].map((x) => h("th", {}, x)))),
+    h("tbody", {}, [["수입", "in", (m) => mi[m]], ["지출", "ex", (m) => me[m]], ["잔액", "ba", (m) => mi[m] - me[m]]].map(([lab, cl, f]) =>
+      h("tr", {}, h("td", { class: "k " + cl }, lab), ...Array.from({ length: 12 }, (_, i) => { const m = i + 1; return h("td", { class: has[m] ? (cl === "ba" && f(m) < 0 ? "neg" : "") : "none" }, has[m] ? won(f(m)) : "-"); })))));
+  const cat = (map, total, color, label) => {
+    const trs = [];
+    for (const s of map.values()) { if (s.total <= 0) continue; let first = true; for (const [k, v] of s.mid) { if (!(v > 0)) continue; trs.push(h("tr", {}, h("td", { class: "b" }, first ? s.major : ""), h("td", {}, k), h("td", { class: "r" }, won(v)), h("td", { class: "r b", style: `color:${color}` }, first ? won(s.total) : ""))); first = false; } }
+    if (!trs.length) trs.push(h("tr", {}, h("td", {}, "-"), h("td", {}, "입력 데이터 없음"), h("td", { class: "r" }, "-"), h("td", { class: "r" }, "-")));
+    const ratio = h("div", { class: "aratio" }, h("b", { style: `color:${color}` }, "대분류 비중"), [...map.values()].filter((s) => s.total > 0).map((s) => { const p = total <= 0 ? 0 : s.total * 100 / total; return h("div", { class: "arow" }, h("span", {}, s.major), h("i", {}, h("u", { style: `width:${Math.max(2, Math.min(100, p))}%;background:${color}` })), h("em", {}, p.toFixed(1) + "%")); }));
+    return h("div", { class: "acat" }, h("div", {}, h("table", { class: "pct" }, h("thead", {}, h("tr", {}, ["대분류", "중분류", "금액", "소계"].map((x) => h("th", {}, x)))), h("tbody", {}, trs)),
+      h("div", { class: "atot", style: `background:${color}` }, h("span", {}, label), h("b", {}, won(total)))), ratio);
+  };
+  const body = h("div", { class: "annual" },
+    h("div", { class: "acards" }, card("총수입", ti, "in", "↗"), card("총지출", te, "ex", "↘"), card("수지차액", tb, tb < 0 ? "neg" : "ba", "=")),
+    sec("1. 월별 수입·지출 현황 (1~12월)", h("div", { class: "pctable-wrap", style: "max-height:none" }, mon)),
+    h("div", { class: "acols" }, sec("2. 수입 분류표", cat(AN.summarize(rows, true), ti, "#008080", "수입 총합계")), sec("3. 지출 분류표", cat(AN.summarize(rows, false), te, "#2058a3", "지출 총합계"))),
+    h("div", { class: "anotes" }, ["• 회비(개인명)는 회원수입 > 월 회비로 통합", "• 정산금 / 정산 금액 / 정모 정산금 / 팀벌금 / 에버벌금은 행사·운영수입 > 정산금으로 통합", "• 불참 벌금 / 정모 벌금은 행사·운영수입 > 벌금으로 통합", "• 회계장부의 현재 입력 데이터를 기준으로 1~12월을 자동 집계"].map((t) => h("div", {}, t))));
+  reportModal(`${S.year}년 ${cleanTitle(S.programTitle)} 회계 현황`, "회계장부 입력 데이터 기준 / 1~12월 자동 집계", body);
+}
+
+/* =====================================================================
    5) 로그인 화면 · 시작
    ===================================================================== */
 function loginView(reason) {

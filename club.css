@@ -73,3 +73,37 @@ table.pct td.note{text-align:center;max-width:220px;overflow:hidden;text-overflo
 .rpt-h{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}.rpt-h b{font-size:20px;color:#1f4fd1}.rpt-h span{color:#465262;font-weight:600}
 .rpt .pctable-wrap{max-height:calc(100dvh - 220px)}
 body.print{background:#fff;padding:16px}body.print .pctable-wrap{max-height:none;overflow:visible}
+/* 회계장부 */
+.pcbtn.danger{color:#b22222;border-color:#e3b3b3;background:#fdeeee}
+table.pct tbody tr.hi td{background:#fff7c4 !important}
+table.pct tbody tr.fee td{color:#5b6478}
+.rsum{display:grid;grid-template-columns:3fr 2fr;gap:8px;margin-bottom:8px}
+.rbox{display:flex;flex-wrap:wrap;gap:6px 18px;border:1px solid #cfd8e3;border-radius:4px;padding:8px 12px;background:#f7f9fc}
+.rbox>div{display:flex;flex-direction:column;min-width:120px}.rbox small{color:#5b6478;font-size:12px}.rbox b{font-size:17px;color:#1f4fd1}
+.rsec{font-weight:800;margin:6px 0 2px;color:#1c2333}
+.annual{display:flex;flex-direction:column;gap:8px}
+.acards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.acard{display:flex;align-items:center;gap:10px;border:1px solid;border-radius:6px;padding:8px 14px;background:#fff}
+.acard.in{color:#185cb4;border-color:#185cb4}.acard.ex{color:#dc4c1c;border-color:#dc4c1c}.acard.ba{color:#008080;border-color:#008080}.acard.neg{color:#d23030;border-color:#d23030}
+.acard .amk{font-size:22px;font-weight:800}.acard .a-t{font-size:14px;font-weight:700;color:#202a3a;text-align:center}.acard .a-v{font-size:22px;font-weight:800;text-align:center;white-space:nowrap}
+.asec{border:1px solid #284c7e;border-radius:6px;overflow:hidden;background:#fff}
+.ash{background:#051f56;color:#fff;font-weight:800;font-size:15px;padding:6px 10px}
+.asb{padding:8px}
+.acols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+table.amon{min-width:0;width:100%}table.amon td,table.amon th{padding:6px 3px;font-size:12.5px}table.amon td.k{font-weight:800;background:#fff !important}
+table.amon td.k.in{color:#185cb4}table.amon td.k.ex{color:#dc4c1c}table.amon td.k.ba{color:#008080}
+table.amon td.none{background:#f5f7fa !important;color:#8a93a3}table.amon td.neg{color:#dc2626}
+table.amon th{background:#051f56;color:#fff}
+.acat{display:grid;grid-template-columns:1fr 230px;gap:10px}
+.acat table.pct{min-width:0;font-size:12.5px}.acat table.pct tbody tr{cursor:default}
+.atot{display:flex;justify-content:space-between;color:#fff;padding:6px 10px;font-size:13px;margin-top:2px}
+.aratio{display:flex;flex-direction:column;gap:6px;font-size:11.5px}.aratio>b{text-align:center;font-size:13px}
+.arow{display:grid;grid-template-columns:86px 1fr 44px;align-items:center;gap:4px}.arow span{text-align:right;white-space:nowrap;font-size:11px}
+.arow i{display:block;height:13px;background:#eaf0f7}.arow u{display:block;height:13px}.arow em{font-style:normal;text-align:right}
+.anotes{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;border:1px solid #c7d7e8;border-radius:6px;padding:8px 14px;font-size:12px;color:#2a3648}
+@media (max-width:760px){.acards,.acols,.anotes,.rsum,.acat{grid-template-columns:1fr}}
+.acat>*{min-width:0}.arow{grid-template-columns:84px minmax(20px,1fr) 42px !important}.arow i{min-width:0}.arow em{white-space:nowrap}
+.acat{grid-template-columns:minmax(0,1fr) 196px !important}
+.acat table.pct{width:100%}.acat table.pct td,.acat table.pct th{white-space:normal;padding:4px 3px}
+.arow{grid-template-columns:76px minmax(10px,1fr) 40px !important}.arow span{font-size:10.5px}
+.acat table.pct{font-size:12px}.acat table.pct td.r{white-space:nowrap}.acat table.pct td,.acat table.pct th{padding:4px 2px}
