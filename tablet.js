@@ -786,7 +786,7 @@
   const pbtn = (t, onclick, cls = "") => h("button", { type: "button", class: "phbtn " + cls, onclick }, t);
   /* 앞의 n개는 고정, 나머지는 아래에서만 스크롤 (세로 입력모드) */
   function phRootF(n, ...kids) {
-    const ks = kids.filter(Boolean), foot = ks.filter((k, i) => i >= n && k.classList && k.classList.contains("phsticky")), sc = h("div", { class: "phscroll" }, ...ks.slice(n).filter((k) => !foot.includes(k)));
+    const ks = kids.filter(Boolean), foot = ks.filter((k, i) => i >= n && k.classList && /\b(phsticky|phsettle|phdet)\b/.test(k.className)), sc = h("div", { class: "phscroll" }, ...ks.slice(n).filter((k) => !foot.includes(k)));
     const r = h("div", { class: "tbroot phroot phfixroot" }, h("div", { class: "phfixed" }, ...ks.slice(0, n)), sc, ...foot.map((f) => { f.classList.add("phfoot"); return f; }));
     view.textContent = ""; view.append(r);
     const size = () => { const top = r.getBoundingClientRect().top, bn = document.querySelector(".bnav"), bh = bn && !bn.hidden ? bn.offsetHeight : 0; r.style.setProperty("--phh", Math.max(240, window.innerHeight - top - bh - 4) + "px"); };
@@ -1009,7 +1009,7 @@
     let list = all.filter((m) => (!QS.mq || m.memberId === +QS.mq) && (!QS.grade || m.grade === QS.grade));
     list.sort((a, b) => gi(a.grade) - gi(b.grade) || ko.compare(a.name, b.name));
     const rows = list.map((m) => { const lk = lockerOf(m.memberId), b = qBase(m); return h("tr", {}, h("td", {}, m.name), h("td", { class: "tel" }, m.phone ? [h("span", {}, m.phone), VIEWONLY ? null : h("a", { href: "tel:" + m.phone.replace(/[^\d+]/g, ""), class: "call", title: "전화 걸기" }, "📞")] : "-"), h("td", {}, m.grade || "-"), h("td", {}, b > 0 ? String(b) : "-"), h("td", {}, lk ? String(lk.locker_number) : "-")); });
-    phRoot(fbar(fsel([["", "회원ALL"], ...all.slice().sort((a, b) => ko.compare(a.name, b.name)).map((m) => [String(m.memberId), m.name])], QS.mq, (v) => { QS.mq = v; phqMembers(); }),
+    phRootF(1, fbar(fsel([["", "회원ALL"], ...all.slice().sort((a, b) => ko.compare(a.name, b.name)).map((m) => [String(m.memberId), m.name])], QS.mq, (v) => { QS.mq = v; phqMembers(); }),
       fsel([["", "등급ALL"], ...[...new Set(all.map((m) => m.grade).filter(Boolean))].sort((a, b) => gi(a) - gi(b)).map((g) => [g, g])], QS.grade, (v) => { QS.grade = v; phqMembers(); })),
       h("div", { class: "phmtable" }, h("table", {}, h("thead", {}, h("tr", {}, ["회원명", "연락처", "구분", "기준에버", "락카번호"].map((x) => h("th", {}, x)))), h("tbody", {}, rows))));
   }
@@ -1081,7 +1081,7 @@
         });
     }
     if (body.length <= 1) body.push(h("div", { class: "phempty" }, "조회된 자료가 없습니다."));
-    phRoot(bar, ...body);
+    phRootF(2, bar, ...body);
   }
 
   /* ---- 장부 ---- */
@@ -1098,7 +1098,7 @@
       h("div", { class: "l1" }, h("b", {}, QS.all ? e.date.slice(2) : e.date.slice(5)), h("span", { class: "tag " + (e.type === "수입" ? "in" : "out") }, e.type), h("b", { class: "amt" }, won(e.amount) + "원")),
       h("div", { class: "l2" }, `${e.category}${e.note ? " – " + e.note : ""}`)));
     const tile = (ic, cls, lb, v, big) => h("div", { class: "phti" + (big ? " big" : "") }, h("i", { class: cls }, ic), h("div", {}, h("small", {}, lb), h("b", { class: cls }, v)));
-    phRoot(h("div", { class: "phlbar" }, fsel(mk.map((k) => [k, ynum(k + "-01") === ynum(today()) ? `${+k.slice(5)}월` : k]), LS.month, (v) => { LS.month = v; QS.all = false; phqLedger(); }),
+    phRootF(2, h("div", { class: "phlbar" }, fsel(mk.map((k) => [k, ynum(k + "-01") === ynum(today()) ? `${+k.slice(5)}월` : k]), LS.month, (v) => { LS.month = v; QS.all = false; phqLedger(); }),
       h("button", { type: "button", class: "phpillbtn" + (QS.all ? "" : " on"), onclick: () => { QS.all = false; phqLedger(); } }, "월별"), h("button", { type: "button", class: "phpillbtn" + (QS.all ? " on" : ""), onclick: () => { QS.all = true; phqLedger(); } }, "전체")),
       h("div", { class: "phqt center" }, h("b", {}, QS.all ? "전체 장부 현황" : "월별 장부 현황")),
       h("div", { class: "phllist2" }, items.length ? items : h("div", { class: "phempty" }, "해당 장부 내역이 없습니다.")),
@@ -1129,7 +1129,7 @@
         h("b", { class: "sec" }, "납부 정보"), kv([[`${tm}월 회비`, won(cp ? cp.amount : S.monthlyFee) + "원"], ["납부상태", r.status], ["납부일", cp ? yy(cp.paidDate) : "-"], ["누적 미납", won(r.unpaid * S.monthlyFee) + "원"], ["완납 납부일", r.status === "완납" && lastPaid ? lastPaid.slice(2).replace(/-/g, "/") : "-"], ["누적 납부", won(r.total) + "원"]]),
         h("b", { class: "sec" }, "메모"), h("div", { class: "memo" }, (cp && cp.note) || (r.pays.length ? r.pays[r.pays.length - 1].note : "") || "-"));
     }
-    phRoot(h("div", { class: "phqt center" }, h("b", {}, "회비 현황")), h("div", { class: "phflist" }, items.length ? items : h("div", { class: "phempty" }, "회원 자료가 없습니다.")), det);
+    phRootF(1, h("div", { class: "phqt center" }, h("b", {}, "회비 현황")), h("div", { class: "phflist" }, items.length ? items : h("div", { class: "phempty" }, "회원 자료가 없습니다.")), det);
   }
 
   /* ---- 락카 ---- */
@@ -1142,7 +1142,7 @@
     const det = s0 ? h("section", { class: "phdet white" }, h("div", { class: "top" }, h("b", { class: "big" }, String(s0.l.locker_number)), h("span", { class: "dot ok" }, "● 사용중")), h("div", { class: "who" }, s0.m.name),
       h("b", { class: "sec" }, "회원 정보"), kv([["회원명", s0.m.name], ["회원구분", s0.m.grade || "-"], ["연락처", s0.m.phone || "-"], ["성별", s0.m.gender === "MALE" ? "남자" : s0.m.gender === "FEMALE" ? "여자" : "-"], ["가입일", yy(s0.m.joinDate)], ["", ""]]),
       h("b", { class: "sec" }, "락카 정보"), kv([["락카번호", String(s0.l.locker_number)], ["상태", "사용중"], ["보증금", won(int(s0.l.deposit) || dDep) + "원"], ["1년사용료", won(int(s0.l.yearly_fee) || dFee) + "원"], ["계약일", s0.l.contract_date || st.key_locker_contract_date || "-"], ["만료일", s0.l.expiry_date || st.key_locker_expiry_date || "-"], ["비고", s0.l.note || "-"], ["", ""]])) : null;
-    phRoot(h("div", { class: "phqt center" }, h("b", {}, "락카 현황")), h("div", { class: "phlkgrid" }, tiles.length ? tiles : h("div", { class: "phempty" }, "사용 중인 락카가 없습니다.")), det);
+    phRootF(1, h("div", { class: "phqt center" }, h("b", {}, "락카 현황")), h("div", { class: "phlkgrid" }, tiles.length ? tiles : h("div", { class: "phempty" }, "사용 중인 락카가 없습니다.")), det);
   }
   const phQ = () => PHONE() && !inputMode();
 
@@ -1234,7 +1234,7 @@
       secSel.onchange = () => go(secSel.value);
       nav.append(h("b", { class: "phclub" }, mgr || "클럽관리"), secSel);
       const tools = h("span", { class: "phtools", id: "tbpill" });
-      tools.append(h("button", { type: "button", class: "phmenu pcbtn file", title: "메뉴", onclick: (e) => openFileMenu(e.currentTarget) }, "☰"));
+      if (inputMode()) tools.append(h("button", { type: "button", class: "phmenu pcbtn file", title: "메뉴", onclick: (e) => openFileMenu(e.currentTarget) }, "☰"));
       $("authStatus").before(tools);
       $("authStatus").textContent = "";
       $("appName").textContent = mgr || (VIEWONLY ? "기록 조회" : "클럽관리");

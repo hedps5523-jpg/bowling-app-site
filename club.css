@@ -659,3 +659,21 @@ body.phmode:has(.phfixroot),html:has(body.phmode .phfixroot){overflow:hidden}
 .phscroll .phtable{overflow:visible}.phscroll .phtable table{border-collapse:separate;border-spacing:0}
 .phfixroot>.phsticky.phfoot{position:static;margin:0;padding:6px 0 4px;flex:none;background:#F1F5FB}
 .phfixroot>.phsticky.phfoot .phbtn{box-shadow:none;height:46px;font-size:16px}
+
+/* ===== 세로 조회모드: 고정 + 목록 스크롤 ===== */
+.phscroll .phflist,.phscroll .phlkgrid{max-height:none;min-height:0;overflow:visible}
+.phscroll .phmtable{overflow:visible;border-radius:0}
+.phscroll .phmtable table{border-collapse:separate;border-spacing:0}
+.phscroll .phmtable th{position:sticky;top:0;z-index:2}
+.phfixroot>.phdet,.phfixroot>.phsettle{flex:none;margin:6px 0 0;max-height:42%;overflow:auto;padding:8px 12px}
+.phfixroot>.phdet .big{font-size:22px}.phfixroot>.phdet .sec{font-size:15px;margin:6px 0 3px;padding-top:4px}
+.phfixroot>.phdet .who{font-size:15px;padding-bottom:4px}
+.phfixroot>.phdet .phkv{font-size:13px;gap:2px 10px}.phfixroot>.phdet .memo{font-size:13px}.phfixroot>.phdet .dot{font-size:14px}
+.phfixroot>.phsettle .hd{margin-bottom:4px}.phfixroot>.phsettle .hd b{font-size:15px}
+body.phmode .phfixed .phfbar{padding:0 8px 0 14px;margin-bottom:4px}
+body.phmode .phfixed .phfsel{height:34px!important;font-size:15px!important}
+body.phmode .phfixed .phref{height:34px}
+body.phmode .phfixed .phqt{margin:2px 0}
+body.phmode .phfixed .phlbar .phpillbtn{height:34px}body.phmode .phfixed .phlbar .phfsel{height:34px!important}
+.phfixroot>.phsettle .phti{padding:6px 8px;gap:6px;min-width:0}.phfixroot>.phsettle .phti b{font-size:13.5px;white-space:nowrap}.phfixroot>.phsettle .phti small{font-size:11px}
+.phfixroot>.phsettle .phti i{width:30px;height:30px;font-size:15px;flex:none}
