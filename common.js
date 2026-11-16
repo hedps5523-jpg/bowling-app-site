@@ -31,8 +31,38 @@ function initMenu() {
   b.addEventListener("click", () => set(dd.hidden));
   dim.addEventListener("click", () => set(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") set(false); });
+  initAppItems(dd, set);
 }
 document.addEventListener("DOMContentLoaded", initMenu);
+
+/* ---------- 앱으로 설치 · 전체화면 (PC·노트북) ---------- */
+let deferredInstall = null, refreshAppItems = () => {};
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredInstall = e; refreshAppItems(); });
+window.addEventListener("appinstalled", () => { deferredInstall = null; refreshAppItems(); });
+const dispMode = (m) => window.matchMedia && matchMedia(`(display-mode: ${m})`).matches;
+function appNote(msg) { if (typeof toast === "function") toast(msg, 6000); else alert(msg); }
+function initAppItems(dd, close) {
+  const mk = (ic, title, sub, fn) => { const a = document.createElement("a"); a.className = "it"; a.href = "#"; a.hidden = true;
+    const sp = document.createElement("span"); sp.textContent = ic; const d = document.createElement("div"), b = document.createElement("b"), sm = document.createElement("small"); b.textContent = title; sm.textContent = sub; d.append(b, sm); a.append(sp, d);
+    a.addEventListener("click", (e) => { e.preventDefault(); close(false); fn(); }); dd.append(a); return { a, b, sm }; };
+  const pcLike = matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const inst = mk("💻", "PC 앱으로 설치", "바탕화면·시작메뉴 아이콘으로 전체화면 실행", async () => {
+    if (deferredInstall) { deferredInstall.prompt(); try { await deferredInstall.userChoice; } catch {} deferredInstall = null; refreshAppItems(); }
+    else appNote("브라우저 주소창 오른쪽의 설치 아이콘(⊕) 또는 메뉴 › ‘앱 설치 / 이 사이트를 앱으로 설치’를 눌러 주세요.");
+  });
+  const full = mk("⛶", "전체화면", "화면 전체로 보기 (끄기: Esc 또는 다시 선택)", async () => {
+    try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { appNote("이 브라우저에서는 전체화면을 켤 수 없어요. F11 키를 눌러 보세요."); }
+  });
+  refreshAppItems = () => {
+    const app = dispMode("fullscreen") || dispMode("standalone") || navigator.standalone;
+    inst.a.hidden = !pcLike || app;
+    full.a.hidden = !pcLike || dispMode("fullscreen") || !document.documentElement.requestFullscreen;
+    full.b.textContent = document.fullscreenElement ? "전체화면 끄기" : "전체화면";
+  };
+  document.addEventListener("fullscreenchange", refreshAppItems);
+  refreshAppItems();
+}
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 
 /* ---------- 하단 메뉴 (모든 화면) : 회원 · 내 앱 · 홈 · 강의 · 공지·투표 ---------- */
 const BNAV = [["members", "/#/members", "👥", "회원"], ["myapps", "/myapps", "📲", "내 앱"], ["home", "/#/", "🏠", "홈"], ["records", "/records", "📊", "기록 조회"], ["notices", "/#/notices", "📣", "공지·투표"]];
