@@ -251,6 +251,9 @@ function cbGames(t, st) {
     if (!list.length) return out.append(cbEmpty("게임 기록이 아직 없어요."));
     if (!st.game || !groups.has(st.game)) st.game = `${list[0].d}|${list[0].type}`;
     const body = h("div", { class: "cbout" });
+    const opts = list.map((g) => [`${g.d}|${g.type}`, `${g.d.replace(/-/g, ".")} ${g.type}`]);
+    st.pick = (v) => { st.game = v; draw(); };
+    st.opts = opts;
     const draw = () => {
       body.textContent = "";
       const g = groups.get(st.game), y = +g.d.slice(0, 4), q = Math.floor((+g.d.slice(5, 7) - 1) / 3) + 1;
@@ -259,7 +262,7 @@ function cbGames(t, st) {
       body.append(cbSumRow([["참가", `${rs.length}명`], ["모임 평균", all.length ? (tot / all.length).toFixed(1) : "-"], ["최고 점수", all.length ? Math.max(...all) : "-"], ["200+ 게임", `${all.filter((v) => v >= 200).length}회`]]),
         cbTable(["순번", "회원명(에버)", "1G", "2G", "3G", "4G", "평균", "에버편차"], rs.map((r, i) => h("tr", {}, h("td", {}, i + 1), h("td", { class: "nm" }, `${r.name}${r.base ? `(${r.base})` : ""}`), r.sc.map((v) => h("td", { class: v >= 200 ? "hi" : "" }, v || "")), h("td", {}, r.avg ? r.avg.toFixed(1) : ""), cbDev(r.dev)))));
     };
-    out.append(h("div", { class: "cbflt" }, h("b", {}, "모임"), cbSelect(list.map((g) => [`${g.d}|${g.type}`, `${g.d.replace(/-/g, ".")} ${g.type}`]), st.game, (v) => { st.game = v; draw(); })), body); draw();
+    out.append(body); draw();
   };
 
   const quarter = () => {
@@ -285,10 +288,11 @@ function cbGames(t, st) {
   const bar = h("div", { class: "cbflt" });
   const drawBar = () => {
     bar.textContent = "";
-    bar.append(cbSeg([["meeting", "모임기록"], ["quarter", "분기에버"], ["rank", "순위표"]], st.gsub, (k) => { st.gsub = k; drawBar(); draw(); }));
+    bar.append(cbSeg([["meeting", "모임기록"], ["quarter", "분기에버"], ["rank", "순위표"]], st.gsub, (k) => { st.gsub = k; draw(); drawBar(); }));
     if (st.gsub !== "meeting") bar.append(cbSelect(years.map((y) => [y, `${y}년`]), st.gy, (v) => { st.gy = +v; draw(); }));
+    else if (st.opts && st.opts.length) bar.append(cbSelect(st.opts, st.game, (v) => st.pick(v)));
   };
-  drawBar(); draw();
+  draw(); drawBar();
   box.append(bar, out);
   return box;
 }
@@ -344,20 +348,19 @@ function cbFees(t, settings, st) {
     const due = y < now.getFullYear() || (y === now.getFullYear() && mo <= now.getMonth() + 1);
     return due ? (y === now.getFullYear() && mo === now.getMonth() + 1 ? { t: "예정", c: "cpd" } : { t: "미납", c: "cno" }) : { t: "-", c: "" };
   };
-  const list = h("div", { class: "cbmem" }), detail = h("div", { class: "cbout" });
-  const drawList = () => { list.textContent = ""; for (const m of members) list.append(h("button", { type: "button", class: m.member_id === st.fm ? "on" : "", onclick: () => { st.fm = m.member_id; drawList(); drawDetail(); } }, h("span", {}, (m.name || "").trim()), h("small", {}, m.grade || ""))); };
+  const detail = h("div", { class: "cbout" });
   const drawDetail = () => {
     detail.textContent = "";
     const m = members.find((x) => x.member_id === st.fm), y = st.fy, paid = new Map();
     for (const r of t.fee_payments || []) if (r.member_id === m.member_id && r.fee_year === y) paid.set(r.fee_month, r);
     const ms = Array.from({ length: 12 }, (_, i) => ({ mo: i + 1, p: paid.get(i + 1) })).map((x) => ({ ...x, s: state(m, y, x.mo, x.p) }));
     const n = ms.filter((x) => x.s.c === "cok").length, miss = ms.filter((x) => x.s.c === "cno").length, tot = ms.reduce((a, x) => a + (x.p ? cbInt(x.p.amount) : 0), 0);
-    detail.append(h("div", { class: "cbflt" }, h("b", {}, `${(m.name || "").trim()} ${m.grade || ""}`), cbSelect(years.map((v) => [v, `${v}년`]), y, (v) => { st.fy = +v; drawDetail(); })),
+    detail.append(h("div", { class: "cbflt" }, cbSelect(members.map((x) => [x.member_id, `${(x.name || "").trim()} (${x.grade || "회원"})`]), m.member_id, (v) => { st.fm = +v; drawDetail(); }), cbSelect(years.map((v) => [v, `${v}년`]), y, (v) => { st.fy = +v; drawDetail(); })),
       cbSumRow([["월회비", `${cbMoney(fee)}원`], ["납부", `${n}개월`], ["미납", `${miss}개월`], [`${y}년 납부 합계`, `${cbMoney(tot)}원`]]),
       cbTable(["월", "상태", "납부일", "금액", "비고"], ms.map((x) => h("tr", {}, h("td", {}, `${x.mo}월`), h("td", { class: x.s.c }, x.s.t), h("td", {}, x.p ? cbMD(cbDate(x.p.paid_date)) : ""), h("td", {}, x.p ? cbMoney(x.p.amount) : ""), h("td", { class: "nt" }, x.p ? x.p.note || "" : "")))));
   };
-  drawList(); drawDetail();
-  box.append(h("div", { class: "cbfeewrap" }, list, detail));
+  drawDetail();
+  box.append(detail);
   return box;
 }
 
