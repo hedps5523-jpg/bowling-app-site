@@ -1435,7 +1435,7 @@ TABS.settings = {
     const dq = () => Math.max(1, Math.floor(new Date().getMonth() / 3) + 1 - 1);
     qT.querySelectorAll("tbody tr").forEach((tr, i) => tr.addEventListener("dblclick", (e) => { const td = e.target.closest("td"); if (!td) return; const c = [...tr.children].indexOf(td); if (c >= 2 && c <= 5) { ST.sel = qrows[i].m; editBasicQuarter(qrows[i].m, c - 1); } }));
     const editQ = h("button", { class: "pcbtn", type: "button", onclick: () => editBasicQuarter(ST.sel, dq()) }, "전분기 에버 수정");
-    const basic = h("div", {}, h("div", { class: "pcform", style: "margin:6px 0" }, h("label", { style: "font-size:16px" }, "관리 명칭"), h("div", { style: "flex:1;min-width:220px;max-width:420px" }, nameF)),
+    const basic = h("div", { class: "envpanel" }, h("div", { class: "pcform", style: "margin:2px 0 4px" }, h("label", { style: "font-size:16px" }, "관리 명칭"), h("div", { style: "flex:1;min-width:220px;max-width:420px" }, nameF)),
       h("div", { class: "envband" }, numList("모임", mFields), numList("등급", gFields), other),
       h("div", { class: "envdata" }, secBox("주차별", weekT), secBox("분기 에버", h("div", { style: "text-align:right;margin-bottom:6px" }, editQ), qT)),
       h("p", { class: "pcnote" }, "관리 명칭·모임구분·등급·회비·락카 기본값·수입/지출 목록은 서버 공용입니다."));
@@ -1459,7 +1459,7 @@ TABS.settings = {
         body.append(tr);
       });
       edBody.textContent = ""; edBody.append(h("div", { class: "rsec", style: `color:${E.type === "수입" ? "#1b64da" : "#c83237"};font-size:17px` }, `${E.type} 항목 (중분류)`),
-        h("div", { class: "pctable-wrap", style: "max-height:420px" }, h("table", { class: "pct", style: "min-width:520px" }, h("thead", {}, h("tr", {}, ["번호", "중분류 항목", "연간집계 구분", "연동 위치", "사용"].map((t) => h("th", {}, t)))), body)));
+        h("div", { class: "pctable-wrap envfill" }, h("table", { class: "pct", style: "min-width:520px" }, h("thead", {}, h("tr", {}, ["번호", "중분류 항목", "연간집계 구분", "연동 위치", "사용"].map((t) => h("th", {}, t)))), body)));
     };
     const rowsNow = () => E.rows[E.type];
     const needSel = (msg) => { if (E.sel < 0 || E.sel >= rowsNow().length) { toast(msg); return false; } return true; };
@@ -1471,7 +1471,7 @@ TABS.settings = {
       edBtn("▲ 위로", () => { const i = E.sel, rs = rowsNow(); if (i < 1) return; [rs[i - 1], rs[i]] = [rs[i], rs[i - 1]]; E.sel = i - 1; drawE(); }),
       edBtn("▼ 아래로", () => { const i = E.sel, rs = rowsNow(); if (i < 0 || i >= rs.length - 1) return; [rs[i + 1], rs[i]] = [rs[i], rs[i + 1]]; E.sel = i + 1; drawE(); }),
       edBtn("기본값 복원", async () => { if (!(await confirmBox("수입·지출 중분류 목록을 기본값으로 되돌립니다.\n(확인 버튼을 눌러 저장하기 전까지는 서버에 반영되지 않습니다.)"))) return; loadE(LC.defaults()); E.sel = -1; drawE(); }));
-    const ledger = h("div", { class: "enved" }, h("div", {}, h("div", { class: "rsec", style: "font-size:17px" }, "대분류"), typeBox,
+    const ledger = h("div", { class: "enved envpanel" }, h("div", {}, h("div", { class: "rsec", style: "font-size:17px" }, "대분류"), typeBox,
       h("p", { class: "pcnote" }, "대분류를 선택하면 해당 중분류 목록이 표시됩니다.", h("br"), "※ 대분류(수입/지출)는 고정이며 중분류만 추가·수정·삭제합니다.", h("br"), "※ 장부 입력의 '내역'은 구분(수입/지출) 선택에 따라 이 목록이 표시되고, 목록에 없는 내역도 직접 입력할 수 있습니다.", h("br"), "※ 이 목록은 서버 공용 설정으로 PC·모바일이 함께 사용합니다.")), edBody, btns);
     drawE();
     /* ---- 서버관리 ---- */
@@ -1491,7 +1491,7 @@ TABS.settings = {
       const snap = { exportedAt: new Date().toISOString(), dataVersion: S.dataVersion, settings: S.settings, members: S.members, games: S.games, ledger: S.ledger, fees: S.fees, lockers: S.lockers, quarterAdjustments: S.quarterAdjustments, yearBaseSeeds: S.yearBaseSeeds };
       const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(snap, null, 1)], { type: "application/json" })), download: `bowling-club-backup-${todayStr()}.json` }); document.body.append(a); a.click(); a.remove(); work("자료 백업 파일 저장");
     };
-    const server = h("div", {}, h("div", { class: "envtwo" },
+    const server = h("div", { class: "envpanel envscroll" }, h("div", { class: "envtwo" },
       secBox("자료 관리", h("div", { class: "envbtnrow" }, bigBtn("↥  자료 백업", backup), bigBtn("↧  자료 복원", () => toast("자료 복원·초기화는 PC 프로그램에서 사용해요."), true), bigBtn("⚙  초기화", () => toast("자료 복원·초기화는 PC 프로그램에서 사용해요."), true))),
       secBox("동기화 관리", h("div", { class: "envbtnrow" }, bigBtn("↻  서버 원본 동기화", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); work("서버 원본 동기화"); render(); } catch (e) { toast(e.message); } }), bigBtn("↥  UpLoad", () => toast("웹에서는 저장하는 즉시 서버에 반영돼요."))))),
       secBox("서버 정보 및 관리", h("div", { class: "envinfo" }, h("span", {}, "Supabase 프로젝트 URL"), h("span", {}, "https://***********.supabase.co ", h("button", { class: "pcbtn sm", type: "button", onclick: async () => { try { await navigator.clipboard.writeText(VH_URL); work("Supabase 프로젝트 URL 복사"); toast("복사했어요."); } catch { toast("복사하지 못했어요."); } } }, "복사")),
@@ -1526,9 +1526,19 @@ TABS.settings = {
         if (await save(ops, `환경설정이 저장되었습니다. (서버 공용 변경 ${ops.length}건)`)) { work(`환경설정 저장 ${ops.length}건`); go(ST.back || "games"); } else okBtn.disabled = false;
       } catch (e) { toast("환경설정을 저장하지 못했습니다.\n" + e.message, 4200); }
     };
-    view.append(h("section", { class: "pcbox" }, h("div", { class: "pcform", style: "justify-content:space-between" }, tabsRow, roBadge()), basic, server, ledger,
-      h("div", { style: "text-align:center;margin-top:10px" }, okBtn, " ", cancelBtn)));
+    const root = h("section", { class: "pcbox envroot" }, h("div", { class: "pcform envtop", style: "justify-content:space-between" }, tabsRow, roBadge()), basic, server, ledger,
+      h("div", { class: "envfoot", style: "text-align:center;margin-top:6px" }, okBtn, " ", cancelBtn));
+    view.append(root);
     showSub();
+    /* 기기 화면 한 화면에 맞추기 (가로가 넓은 화면). 좁은 화면(세로 폰)은 쌓아서 스크롤 */
+    const fit = () => {
+      if (!root.isConnected) { window.removeEventListener("resize", fit); return; }
+      if (window.innerWidth <= 860) { root.style.height = ""; return; }
+      const top = root.getBoundingClientRect().top + window.scrollY;
+      const nav = document.getElementById("bnav"), navH = nav && !nav.hidden ? nav.getBoundingClientRect().height : 0;
+      root.style.height = Math.max(380, window.innerHeight - top - navH - 8) + "px";
+    };
+    window.scrollTo(0, 0); fit(); window.addEventListener("resize", fit); setTimeout(fit, 150);
   },
 };
 async function editBasicQuarter(m, defQ) {
