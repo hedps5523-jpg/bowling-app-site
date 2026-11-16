@@ -258,7 +258,7 @@
       const add = btn("등록", () => saveInput(false), "pri"), edit = btn("수정", () => saveInput(true));
       add.disabled = GS.editing > 0; edit.disabled = !(GS.editing > 0);
       inputCard = card(lab("게임일"), dSel, lab("모임 구분"), tSel, lab("회원명"), mSel, ...scoreIn.flatMap((e, i) => [lab(`${i + 1}G`), e]), lab("비고"), noteIn, add, edit);
-      batchRow = h("div", { class: "tbbatch" }, GS.editing > 0 ? btn("입력 취소", () => { clearInput(); draw(); }) : null, btn("일괄변경", bulkChange));
+      batchRow = h("div", { class: "tbbatch" }, h("span", { class: "tbbtitle" }, `게임기록 · ${weekLabel(GS.date)}`), GS.editing > 0 ? btn("입력 취소", () => { clearInput(); draw(); }) : null, btn("일괄변경", bulkChange));
     }
 
     // 2행: 보고서 종류 / 연결 필드 / 조회
@@ -406,7 +406,7 @@
       await save(ops, `조정에버 ${ops.length}명이 저장되었습니다.`);
     }
 
-    root(inputCard, batchRow, queryCard, h("div", { class: "tbtitle" }, title), h("div", { class: "tbbody" }, body));
+    root(inputCard, batchRow, queryCard, inMode ? null : h("div", { class: "tbtitle" }, title), h("div", { class: "tbbody" }, body));
   }
 
   function renderQuarter(o, stat, games) {
