@@ -374,13 +374,20 @@
         const tot = per.reduce((a, b) => a + b, 0), avg = recAvg(rs), bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c;
         return [lbl, ...per.map((v) => (v > 0 ? String(v) : "-")), String(tot), fmt1(avg), bw > 0 ? sgn1(avg - bw) : "-"];
       };
+      // 월 Total 줄: 1G~4G는 각 게임의 에버(평균), Total은 그 에버들의 합, Avg는 월 에버
+      const lineAvg = (lbl, rs) => {
+        const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "-", "-", "-", "-", "-", "-", "-"];
+        const per = [0, 1, 2, 3].map((i) => { const v = rs.map((g) => sc(g)[i]).filter((x) => x > 0); return v.length ? v.reduce((a, x) => a + x, 0) / v.length : 0; });
+        const avg = recAvg(rs), bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c;
+        return [lbl, ...per.map((v) => (v > 0 ? fmt1(v) : "-")), fmt1(per.reduce((a, x) => a + x, 0)), fmt1(avg), bw > 0 ? sgn1(avg - bw) : "-"];
+      };
       for (let mo = 1; mo <= 12; mo++) {
         const recs = mine.filter((g) => mnum(g.gameDate) === mo), k = `r${year}-${mo}`, isOpen = MOPEN.has(k);
         rdet.append(h("div", { class: "tbmh tgl", onclick: () => toggleM(k) }, h("b", {}, h("i", { class: "chv" }, isOpen ? "▾" : "▸"), `${mo}월`), h("b", { class: "blue" }, "에버 : " + (recs.some((g) => cnt(g) > 0) ? fmt1(recAvg(recs)) : "-"))));
         const wc = recs.some((g) => Math.floor((dnum(g.gameDate) - 1) / 7) >= 4) ? 5 : 4;
         rdet.append(h("table", { class: "tbmini rk" }, h("tbody", {}, trr(["구분", "1G", "2G", "3G", "4G", "Total", "Avg", "편차"], "hd"),
           ...(isOpen ? Array.from({ length: wc }, (_, w) => trr(line(`${w + 1}주`, recs.filter((g) => Math.floor((dnum(g.gameDate) - 1) / 7) === w)), w % 2 ? "alt" : "")) : []),
-          trr(line("Total", recs), "tot"))));
+          trr(lineAvg("Total", recs), "tot"))));
       }
       body = h("div", { class: "tbsplit" }, h("div", { style: "flex:55;min-width:0;display:flex" }, rtbl), h("div", { style: "flex:45;min-width:0;display:flex" }, rdet));
     } else {
