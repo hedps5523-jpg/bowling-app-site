@@ -254,11 +254,13 @@
     };
     months.forEach((mo) => {
       const recs = recsAll.filter((g) => ynum(g.gameDate) === y && mnum(g.gameDate) === mo), wc = recs.some((g) => Math.floor((dnum(g.gameDate) - 1) / 7) >= 4) ? 5 : 4;
-      body.append(h("div", { class: "tbmh" }, h("b", {}, `${mo}월`), h("b", { class: "blue" }, "에버 : " + (recs.some((g) => cnt(g) > 0) ? fmt1(recAvg(recs)) : "-"))),
+      body.append(h("div", { class: "rkmo" }, h("div", { class: "tbmh" }, h("b", {}, `${mo}월`), h("b", { class: "blue" }, "에버 : " + (recs.some((g) => cnt(g) > 0) ? fmt1(recAvg(recs)) : "-"))),
         h("table", { class: "tbmini rk" }, h("tbody", {}, trr(["구분", "1G", "2G", "3G", "4G", "Total", "Avg", "편차"], "hd"),
-          ...Array.from({ length: wc }, (_, w) => trr(line(`${w + 1}주`, recs.filter((g) => Math.floor((dnum(g.gameDate) - 1) / 7) === w)), w % 2 ? "alt" : "")), trr(lineAvg("Total", recs), "tot"))));
+          ...Array.from({ length: wc }, (_, w) => trr(line(`${w + 1}주`, recs.filter((g) => Math.floor((dnum(g.gameDate) - 1) / 7) === w)), w % 2 ? "alt" : "")), trr(lineAvg("Total", recs), "tot")))));
     });
-    return modal(`${m.name} · ${y}년 ${q}분기`, body, [["닫기", "close"]]);
+    const md = $("modal"); md.classList.add("rkm");
+    const pr = modal(`${m.name} · ${y}년 ${q}분기`, body, [["닫기", "close"]]);
+    return pr.then((v) => { md.classList.remove("rkm"); return v; });
   }
   const MOPEN = new Set(); // 펼친 월 (접힘이 기본)
   const toggleM = (k) => { MOPEN.has(k) ? MOPEN.delete(k) : MOPEN.add(k); KEEP_SCROLL = true; RENDER[current](); };

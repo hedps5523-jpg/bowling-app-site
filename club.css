@@ -795,3 +795,13 @@ body.phmode .phpickit{font-size:15px}
 .phst tr.qtap{cursor:pointer}.phst tr.qtap td{text-decoration:underline;text-decoration-color:#C9D6EA;text-underline-offset:3px}.phst tr.qtap:active td{background:#D5E3F7!important}
 .rkpop{max-height:68vh;overflow-y:auto;-webkit-overflow-scrolling:touch;min-width:min(86vw,520px)}
 .rkpop .tbmh{margin:8px 0 3px}.rkpop .tbmini.rk td{height:28px}
+.pcmodal.rkm .pcdlg{width:98vw!important;max-width:98vw!important;height:min(94vh,94dvh,760px)!important;max-height:none!important;display:flex!important;flex-direction:column}
+.pcmodal.rkm .pcdlg-h{padding:7px 12px!important;font-size:15px!important;flex:none}
+.pcmodal.rkm .pcdlg-b{padding:4px 6px!important;overflow:hidden!important;flex:1 1 0;min-height:0}
+.pcmodal.rkm .pcdlg-f{padding:5px 10px!important;flex:none}
+.rkpop{height:100%;display:flex;flex-direction:column;overflow:hidden!important;min-width:0!important;max-height:none!important}
+.rkmo{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
+.rkpop .tbmh{margin:2px 2px 1px!important;height:22px;flex:none;display:flex;align-items:center;justify-content:space-between}
+.rkpop .tbmini.rk{width:100%;flex:1;table-layout:fixed;height:100%}
+.rkpop .tbmini.rk td{height:auto!important;padding:0 1px!important;font-size:12.5px;line-height:1.1}
+.pcmodal.rkm *{scrollbar-width:none}.pcmodal.rkm *::-webkit-scrollbar{display:none}
