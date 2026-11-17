@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const dd = document.getElementById("dd");
   if (!dd || dd.querySelector(".exitit")) return;
   const a = document.createElement("a"); a.className = "it exitit"; a.href = "#";
-  const sp = document.createElement("span"); sp.textContent = "⏻"; const d = document.createElement("div"), b = document.createElement("b"), sm = document.createElement("small"); b.textContent = "종료"; sm.textContent = "모든 작업을 마무리하고 닫기"; d.append(b, sm); a.append(sp, d);
+  const sp = document.createElement("span"); sp.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#D93025" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block;margin:0 auto"><path d="M12 3v8"/><path d="M6.4 6.8a8 8 0 1 0 11.2 0"/></svg>'; const d = document.createElement("div"), b = document.createElement("b"), sm = document.createElement("small"); b.textContent = "종료"; sm.textContent = "모든 작업을 마무리하고 닫기"; d.append(b, sm); a.append(sp, d);
   a.addEventListener("click", (e) => { e.preventDefault(); const dim = document.getElementById("dim"), bg = document.getElementById("burger"); dd.hidden = true; if (dim) dim.hidden = true; if (bg) { bg.textContent = "☰"; bg.setAttribute("aria-expanded", "false"); } exitApp(); });
   dd.append(a);
 });
