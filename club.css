@@ -817,3 +817,11 @@ body.phmode .phpickit{font-size:15px}
 .pcmodal.rkm.rk1 .rkmo{flex:1 1 0}
 @keyframes rkL{from{transform:translateX(40px);opacity:.2}to{transform:none;opacity:1}}@keyframes rkR{from{transform:translateX(-40px);opacity:.2}to{transform:none;opacity:1}}
 .rkpop.slL{animation:rkL .18s ease-out}.rkpop.slR{animation:rkR .18s ease-out}
+/* 분기에버 월 팝업: 글자 크기는 유지, 행 높이는 최소 여백만 */
+.pcmodal.rkm.rk1 .pcdlg{height:auto!important}
+.pcmodal.rkm.rk1 .pcdlg-b{flex:none!important}
+.pcmodal.rkm.rk1 .rkpop{height:auto!important}
+.pcmodal.rkm.rk1 .rkmo{flex:none!important}
+.pcmodal.rkm.rk1 .tbmini.rk{flex:none!important;height:auto!important}
+.pcmodal.rkm.rk1 .tbmini.rk td{height:auto!important;padding:3px 1px!important;line-height:1.15!important}
+.pcmodal.rkm.rk1 .tbmh{height:32px!important;margin:0 2px 2px!important}
