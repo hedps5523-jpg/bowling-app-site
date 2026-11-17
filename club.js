@@ -1635,7 +1635,7 @@ TABS.settings = {
       const snap = { exportedAt: new Date().toISOString(), dataVersion: S.dataVersion, settings: S.settings, members: S.members, games: S.games, ledger: S.ledger, fees: S.fees, lockers: S.lockers, quarterAdjustments: S.quarterAdjustments, yearBaseSeeds: S.yearBaseSeeds };
       const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(snap, null, 1)], { type: "application/json" })), download: `bowling-club-backup-${todayStr()}.json` }); document.body.append(a); a.click(); a.remove(); work("자료 백업 파일 저장");
     };
-    const server = h("div", { class: "envpanel envscroll" }, h("div", { class: "envtwo" },
+    const server = h("div", { class: "envpanel envscroll envserver" }, h("div", { class: "envtwo" },
       secBox("자료 관리", h("div", { class: "envbtnrow" }, bigBtn("↥  자료 백업", backup), bigBtn("↧  자료 복원", () => toast("자료 복원·초기화는 PC 프로그램에서 사용해요."), true), bigBtn("⚙  초기화", () => toast("자료 복원·초기화는 PC 프로그램에서 사용해요."), true))),
       secBox("동기화 관리", h("div", { class: "envbtnrow" }, bigBtn("↻  서버 원본 동기화", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); work("서버 원본 동기화"); render(); } catch (e) { toast(e.message); } }), bigBtn("↥  UpLoad", () => toast("웹에서는 저장하는 즉시 서버에 반영돼요."))))),
       secBox("서버 정보 및 관리", h("div", { class: "envinfo" }, h("span", {}, "Supabase 프로젝트 URL"), h("span", {}, "https://***********.supabase.co ", h("button", { class: "pcbtn sm", type: "button", onclick: async () => { try { await navigator.clipboard.writeText(VH_URL); work("Supabase 프로젝트 URL 복사"); toast("복사했어요."); } catch { toast("복사하지 못했어요."); } } }, "복사")),
@@ -1645,7 +1645,7 @@ TABS.settings = {
     drawLog(); setTimeout(check, 0);
     /* ---- 하단 확인/취소 ---- */
     const approval = approvalPanel(); approval.className = "envapproval"; approval.hidden = false;
-    server.insertBefore(approval, server.children[1] || null);
+    server.append(approval);
     const panels = { basic, server, ledger }, tabsRow = h("div", { class: "envtabs" });
     const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; };
     showSub();
