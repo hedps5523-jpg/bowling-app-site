@@ -8,7 +8,8 @@
    ===================================================================== */
 (function () {
   const TB = { input: null, wasOn: null };
-  const TB_ON = () => window.innerWidth >= 900 && document.documentElement.getAttribute("data-dev") === "desktop";
+  // PC·노트북(마우스) 또는 터치 태블릿·폴드 가로 화면(폭 900px 이상, 가로가 더 긴 화면)
+  const TB_ON = () => window.innerWidth >= 900 && (document.documentElement.getAttribute("data-dev") === "desktop" || window.innerWidth > window.innerHeight);
   const PHONE = () => !TB_ON(); // 휴대폰·일반 태블릿 세로(좁은 화면): 모바일 볼링클럽 세로화면 배치
   const MODE_KEY = () => (TB_ON() ? "tb" : "ph");
   const TB_KEYS = ["games", "ledger", "fees", "quarter", "album", "members", "lockers"];
