@@ -106,7 +106,7 @@ const Conn = {
       this.mode = "mobile";
       this.me = { name: p.requested_member_name || p.login_id, loginId: p.login_id, role: p.role, isAdmin: p.role === "admin", canRead: p.role === "admin" || p.approved === true, canWrite: p.role === "admin" || (p.approved === true && p.can_write === true), source: "mobile" };
       try { const r = await this.rest("rpc/bowlingclub_my_profile", { method: "POST", body: "{}" }); const q = r.ok && Array.isArray(r.d) && r.d[0]; if (q) { m.profile = q; this.saveMobile(m); this.me = { ...this.me, role: q.role, isAdmin: q.role === "admin", canRead: q.role === "admin" || q.approved === true, canWrite: q.role === "admin" || (q.approved === true && q.can_write === true) }; } } catch (e) { if (e.message === "login") return { need: "login", reason: "expired" }; }
-      if (!this.me.isAdmin) { this.me = null; this.mode = null; return { need: "login", reason: "not_admin" }; } // 클럽관리는 관리자만
+      // 클럽관리: 홈페이지 운영진·관리자(연결·승인된 클럽 계정) 또는 클럽 계정에서 승인된 회원만 들어올 수 있어요 (입력·수정은 입력 권한이 있을 때만)
       return this.me.canRead ? { ok: true } : { need: "login", reason: "not_approved" };
     }
     if (this.siteToken() && !VIEWONLY) {
@@ -1876,7 +1876,7 @@ function loginView(reason) {
   $("pchead").hidden = true; $("appName").textContent = "클럽관리";
   view.textContent = "";
   const msg = h("div", { class: "msg" + (reason ? " info" : "") }, reason === "site_expired" ? "홈페이지 인증이 만료되었어요. 아래 \"홈페이지 관리자·운영진 인증하기\"로 다시 인증해 주세요." : reason === "site_error" ? "홈페이지 연결을 확인하지 못했어요. 잠시 후 다시 열거나 아래에서 다시 인증해 주세요." : reason === "site_member" ? "홈페이지 관리자·운영진만 홈페이지 계정으로 들어올 수 있어요. 모바일 볼링클럽 계정으로 로그인해 주세요."
-    : reason === "not_admin" ? "클럽관리는 관리자 계정만 들어올 수 있어요. 조회만 하시려면 하단의 \"기록 조회\"를 이용해 주세요." : reason === "not_approved" ? "아직 승인되지 않은 모바일 계정이에요. 관리자 승인 후 이용할 수 있어요." : reason === "expired" ? "로그인이 만료되었어요. 다시 로그인해 주세요." : "");
+    : reason === "not_admin" ? "클럽관리는 운영진 또는 승인된 클럽 계정만 들어올 수 있어요. 조회만 하시려면 하단의 \"기록 조회\"를 이용해 주세요." : reason === "not_approved" ? "아직 승인되지 않은 모바일 계정이에요. 관리자 승인 후 이용할 수 있어요." : reason === "expired" ? "로그인이 만료되었어요. 다시 로그인해 주세요." : "");
   const go2 = h("button", { class: "btn", type: "button" }, "로그인");
   const f = credForm(() => go2.click());
   go2.onclick = async () => {
