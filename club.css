@@ -787,3 +787,8 @@ body.phmode .phqt>b{font-size:20px}body.phmode .phqt{padding:4px 8px 6px}
 body.phmode .phqt.center>b{font-size:18px}
 body.phmode .phqcap{margin:2px 0 4px}
 body.phmode .phpickit{font-size:15px}
+
+/* 월별 접힘/펼침 (분기에버·순위표 상세내역) */
+.tbmh.tgl{cursor:pointer;user-select:none;padding:4px 6px;border-radius:6px;align-items:center}.tbmh.tgl:hover{background:#EAF1FB}
+.tbmh .chv{font-style:normal;display:inline-block;width:16px;color:#1A5BA8}
+.tbmini.rk td{font-size:12px!important;height:26px}
