@@ -158,6 +158,7 @@
   const spacer = () => h("span", { style: "flex:1" });
   const empty = (msg) => h("div", { class: "tbtable" }, h("div", { class: "tbempty" }, msg));
   /* 결과표: 머리글 고정, 행 클릭 = 선택/불러오기, 길게 누르기·오른쪽 클릭 = 삭제/취소 */
+  let KEEP_SCROLL = false; // 표에서 행을 눌러 다시 그릴 때 스크롤 위치 유지
   function table({ headers, rows, weights, aligns = [], selectedRow = -1, cellColor, cellBg, custom, onClick, onLong, cls = "" }) {
     if (!rows.length) return null;
     const sum = weights.reduce((a, b) => a + b, 0);
@@ -174,7 +175,7 @@
         if (!own) td.title = String(v ?? "");
         tr.append(td);
       });
-      if (onClick) tr.onclick = () => onClick(i);
+      if (onClick) tr.onclick = () => { KEEP_SCROLL = true; onClick(i); };
       if (onLong) {
         tr.oncontextmenu = (e) => { e.preventDefault(); onLong(i); };
         let tm; tr.onpointerdown = (e) => { if (e.pointerType === "mouse") return; tm = setTimeout(() => onLong(i), 650); };
@@ -196,7 +197,16 @@
       const i = kids.findIndex((k) => k.classList && k.classList.contains("tbcard"));
       if (i >= 0) { sub.append(...kids[i].childNodes); kids.splice(i, 1); }
     }
-    const r = h("div", { class: "tbroot" }, ...kids); view.textContent = ""; view.append(r); fit(); return r;
+    const keep = KEEP_SCROLL; KEEP_SCROLL = false;
+    const tops = keep ? [...view.querySelectorAll(".tbtable, .tbright, .tbdetail")].map((e) => e.scrollTop) : null;
+    const r = h("div", { class: "tbroot" }, ...kids); view.textContent = ""; view.append(r); fit();
+    if (tops) {
+      const put = () => { [...r.querySelectorAll(".tbtable, .tbright, .tbdetail")].forEach((e, i) => { if (tops[i] != null) e.scrollTop = tops[i]; });
+        r.querySelectorAll(".tbtable").forEach((t) => { const sel = t.querySelector("tr.sel"); if (!sel) return; const a = t.getBoundingClientRect(), b = sel.getBoundingClientRect(), hd = t.querySelector("thead") ? t.querySelector("thead").offsetHeight : 0;
+          if (b.bottom > a.bottom) t.scrollTop += b.bottom - a.bottom + 4; else if (b.top < a.top + hd) t.scrollTop -= a.top + hd - b.top + 4; }); };
+      put(); requestAnimationFrame(put);
+    }
+    return r;
   }
   function fit() {
     const r = view.querySelector(":scope > .tbroot"); if (!r) return;
