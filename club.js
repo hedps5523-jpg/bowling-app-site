@@ -1833,5 +1833,35 @@ async function boot() {
   if (TITLES[k]) current = k;
   render();
 }
+/* 다른 기기(폰·태블릿·PC)에서 서버에 새 자료가 저장되면 자동으로 반영:
+   화면이 다시 보일 때·창이 포커스를 받을 때·인터넷이 다시 연결될 때, 그리고 보고 있는 동안 3분마다 확인해요. */
+const AutoSync = {
+  busy: false, last: 0,
+  idle() {
+    if (!$("modal").hidden) return false;                       // 대화상자가 열려 있으면 미룸
+    const a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && view.contains(a)) return false; // 입력 중이면 미룸
+    return true;
+  },
+  async check(force) {
+    if (this.busy || document.hidden || !Conn.me || !S.dataVersion) return;
+    if (!force && Date.now() - this.last < 30000) return;       // 너무 자주 확인하지 않게 30초 간격
+    this.busy = true; this.last = Date.now();
+    try {
+      const v0 = S.dataVersion;
+      const snap = await Conn.snapshot();
+      if (snap.dataVersion === v0) return;
+      for (let i = 0; i < 20 && !this.idle(); i++) await new Promise((r) => setTimeout(r, 1500)); // 입력이 끝날 때까지 잠깐 기다림
+      if (!this.idle()) return;                                  // 계속 입력 중이면 다음 확인 때 반영
+      Svc._seeded = new Set(); Svc._weeks = {}; buildSnapshot(snap); SnapCache.save(snap);
+      render();
+      toast("서버의 새 자료로 갱신했어요.");
+    } catch (e) { /* 네트워크 오류는 조용히 무시 */ }
+    finally { this.busy = false; }
+  },
+};
+document.addEventListener("visibilitychange", () => { if (!document.hidden) AutoSync.check(false); });
+window.addEventListener("focus", () => AutoSync.check(false));
+window.addEventListener("online", () => AutoSync.check(true));
+setInterval(() => AutoSync.check(false), 180000);
 $("logoutBtn").onclick = logout;
 boot();
