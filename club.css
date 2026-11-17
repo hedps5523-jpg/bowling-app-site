@@ -851,3 +851,15 @@ td.r200{color:#B00020!important;font-weight:800}
 .tbah{height:calc(30px*var(--fit))}.tbar{height:calc(28px*var(--fit))}
 .tbcs{gap:calc(8px*var(--fit));margin-top:calc(6px*var(--fit))}
 .alrow{padding:calc(10px*var(--fit)) 14px}
+
+/* 폴드8 메인 가로 등 중간 폭(≈760~1240px) 가로 화면: 우측 상세 박스를 좁혀 왼쪽 표 문구가 잘리지 않게 */
+@media (orientation:landscape) and (min-width:760px) and (max-width:1240px){
+  body.tbon .tbright{flex:none!important;width:clamp(200px,20vw,236px)}
+  body.tbon .tbright:has(.tbreport){width:clamp(250px,25vw,290px)}
+  body.tbon .tbtable table{font-size:12px}
+  body.tbon .tbtable td.l,body.tbon .tbtable td.r{padding:0 5px}
+  body.tbon .tbtable .tbdot{font-size:16px}
+  body.tbon .tbcard{flex-wrap:wrap;overflow:visible;padding:5px 10px;gap:4px 8px;min-height:0}
+  body.tbon .tbin.note{flex:1 1 140px!important}
+  body.tbon .tbinfo{padding-left:12px;padding-right:12px}
+}
