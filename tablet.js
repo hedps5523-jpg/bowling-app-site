@@ -1285,7 +1285,15 @@
     for (const k of ["games", "ledger", "fees", "quarter", "album"]) nav.append(h("button", { class: "tbbtn" + (current === k ? " sel" : ""), type: "button", onclick: () => go(k) }, TAB_LABEL[k]));
     const oldRf = $("hdrRefresh"); if (oldRf) oldRf.remove();
     if (!VIEWONLY && me) {
-      const rf = h("button", { type: "button", class: "pcbtn hdrrefresh", id: "hdrRefresh", title: "홈페이지·서버의 변경 내용 갱신", "aria-label": "새로고침", onclick: async () => { rf.disabled = true; rf.classList.add("spin"); try { await reload("최신 자료로 갱신했어요."); render(); } catch (e) { toast(e.message); } finally { rf.disabled = false; rf.classList.remove("spin"); } } }, "↻");
+      const rf = h("button", { type: "button", class: "pcbtn hdrrefresh", id: "hdrRefresh", title: "홈페이지·서버의 변경 내용 갱신", "aria-label": "새로고침", onclick: async () => { rf.disabled = true; rf.classList.add("spin"); try {
+          await reload(); // 서버 자료(홈페이지 승인·규칙 포함)를 먼저 다시 받아 오류가 없는지 확인
+          // 화면 파일(스크립트·스타일)과 서비스 워커를 최신으로 받아 전체 적용
+          const urls = [...document.querySelectorAll("script[src],link[rel=stylesheet]")].map((n) => n.src || n.href).concat(["/common.js", "/style.css", "/manifest.webmanifest"]);
+          await Promise.all([...new Set(urls)].map((u) => fetch(u, { cache: "reload" }).catch(() => 0)));
+          try { if (window.caches) (await caches.keys()).forEach((k) => caches.delete(k)); } catch {}
+          try { const reg = navigator.serviceWorker && (await navigator.serviceWorker.getRegistration()); if (reg) await reg.update(); } catch {}
+          toast("최신 내용으로 갱신하는 중이에요…"); setTimeout(() => location.reload(), 350);
+        } catch (e) { toast(e.message); rf.disabled = false; rf.classList.remove("spin"); } } }, "↻");
       $("authStatus").before(rf);
     }
     $("authStatus").textContent = me ? `${me.isAdmin ? "관리자" : VIEWONLY ? "조회" : "회원"} · ${mgr}` : "";
