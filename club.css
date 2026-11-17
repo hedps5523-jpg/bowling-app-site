@@ -792,3 +792,6 @@ body.phmode .phpickit{font-size:15px}
 .tbmh.tgl{cursor:pointer;user-select:none;padding:4px 6px;border-radius:6px;align-items:center}.tbmh.tgl:hover{background:#EAF1FB}
 .tbmh .chv{font-style:normal;display:inline-block;width:16px;color:#1A5BA8}
 .tbmini.rk td{font-size:12px!important;height:26px}
+.phst tr.qtap{cursor:pointer}.phst tr.qtap td{text-decoration:underline;text-decoration-color:#C9D6EA;text-underline-offset:3px}.phst tr.qtap:active td{background:#D5E3F7!important}
+.rkpop{max-height:68vh;overflow-y:auto;-webkit-overflow-scrolling:touch;min-width:min(86vw,520px)}
+.rkpop .tbmh{margin:8px 0 3px}.rkpop .tbmini.rk td{height:28px}
