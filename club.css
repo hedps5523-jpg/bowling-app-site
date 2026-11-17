@@ -806,11 +806,14 @@ body.phmode .phpickit{font-size:15px}
 .rkpop .tbmini.rk td{height:auto!important;padding:0 1px!important;font-size:12.5px;line-height:1.1}
 .pcmodal.rkm *{scrollbar-width:none}.pcmodal.rkm *::-webkit-scrollbar{display:none}
 .rkpop td.r200{color:#B00020!important;font-weight:800}
-.pcmodal.rkm.rk1 .pcdlg{height:auto!important}
-.pcmodal.rkm.rk1 .pcdlg-b{flex:none}
-.pcmodal.rkm.rk1 .rkpop{height:auto}.pcmodal.rkm.rk1 .rkmo{flex:none}
-.pcmodal.rkm.rk1 .tbmini.rk{flex:none;height:auto}
-.pcmodal.rkm.rk1 .tbmini.rk td{height:34px!important;font-size:13.5px}
-.pcmodal.rkm.rk1 .tbmh{height:30px;font-size:15px}
+.pcmodal.rkm.rk1 .pcdlg{height:min(80vh,80dvh,640px)!important}
+.pcmodal.rkm.rk1 .pcdlg-h{font-size:17px!important;padding:10px 14px!important}
+.pcmodal.rkm.rk1 .pcdlg-b{padding:8px 8px!important}
+.pcmodal.rkm.rk1 .tbmh{height:40px;font-size:19px;margin:0 2px 4px!important}
+.pcmodal.rkm.rk1 .tbmini.rk td{font-size:clamp(12px,3.55vw,17px)!important;font-weight:600;letter-spacing:-.3px}
+.pcmodal.rkm.rk1 .tbmini.rk tr.hd td{font-size:clamp(11px,3.2vw,15px)!important;font-weight:700}
+.pcmodal.rkm.rk1 .tbmini.rk tr.tot td{font-weight:700}
+.pcmodal.rkm.rk1 .tbmini.rk td.r200{font-weight:900}
+.pcmodal.rkm.rk1 .rkmo{flex:1 1 0}
 @keyframes rkL{from{transform:translateX(40px);opacity:.2}to{transform:none;opacity:1}}@keyframes rkR{from{transform:translateX(-40px);opacity:.2}to{transform:none;opacity:1}}
 .rkpop.slL{animation:rkL .18s ease-out}.rkpop.slR{animation:rkR .18s ease-out}
