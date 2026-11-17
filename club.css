@@ -687,3 +687,24 @@ body.phmode .phfixed .phlbar .phpillbtn{height:34px}body.phmode .phfixed .phlbar
 .phpicklist{position:fixed;background:#fff;border:1px solid #BCCDE5;border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.22);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:0}
 .phpickit{display:block;width:100%;margin:0;border:0;border-bottom:1px solid #EEF2F8;background:#fff;color:#12285A;font:inherit;font-size:16px;font-weight:600;text-align:center;cursor:pointer;border-radius:0}
 .phpickit.on{background:#E3ECFA;color:#1A5BA8}
+
+/* 환경설정 기본 DATA: 3열 (기본값 20% · 주차별 30% · 분기 에버 50%) */
+@media (orientation:landscape){
+  body.pc .envroot>.envbasic:not([hidden]){display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr) minmax(0,5fr);grid-template-rows:auto minmax(0,1fr);gap:4px 8px;overflow:hidden}
+  body.pc .envbasic>.pcform{grid-column:1/-1;grid-row:1}
+  body.pc .envbasic>.envband{grid-column:1;grid-row:2;display:flex;flex-direction:column;gap:6px;margin:0;min-height:0;overflow-y:auto;align-content:normal}
+  body.pc .envbasic>.envband>.envsec{flex:none}
+  body.pc .envbasic>.envband>:nth-child(3){grid-column:auto}
+  body.pc .envbasic>.envdata{display:contents}
+  body.pc .envbasic>.envdata>.envsec:nth-child(1){grid-column:2;grid-row:2}
+  body.pc .envbasic>.envdata>.envsec:nth-child(2){grid-column:3;grid-row:2}
+  body.pc .envbasic .envother{grid-template-columns:1fr;grid-template-rows:none;grid-auto-flow:row}
+  body.pc .envbasic>.pcnote{display:none}
+}
+@media (orientation:landscape){
+  body.pc .envbasic>.envband{gap:3px}
+  body.pc .envbasic>.envband .pcin{height:20px !important;font-size:12px !important}
+  body.pc .envbasic>.envband .envlist,body.pc .envbasic>.envband .envother{gap:2px 6px !important}
+  body.pc .envbasic>.envband .envsec-h{font-size:13px !important;padding:0 8px !important}
+  body.pc .envbasic>.envband .envsec-b{padding:1px 6px 3px}
+}
