@@ -914,3 +914,8 @@ td.r200{color:#B00020!important;font-weight:800}
   body.tbon .tbcard:has(.tbchk) .tbf:has(.tbin:not(.date)){flex:1 1 90px;min-width:90px}
   body.tbon .tbcard:has(.tbchk) .tbbtn{white-space:nowrap;padding:0 8px}
 }
+/* 가로 화면(태블릿 12.4·8인치, 폴드 메인): 분기에버 월 팝업 줄 간격을 조금 넓게 (글자는 그대로) */
+@media (orientation:landscape) and (min-width:700px){
+  .pcmodal.rkm.rk1 .tbmini.rk td{height:34px!important;padding:6px 1px!important}
+  .pcmodal.rkm.rk1 .tbmh{height:38px!important;margin:2px 2px 4px!important}
+}
