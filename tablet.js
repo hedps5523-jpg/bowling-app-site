@@ -1340,7 +1340,21 @@
     document.body.classList.toggle("phmode", phone);
     $("logoutBtn").style.display = "";
     const old = $("tbpill"); if (old) old.remove();
-    if (!TB.started) { TB.started = true; if (!location.hash.replace("#", "")) current = "games"; }
+    if (!TB.started) {
+      TB.started = true; if (!location.hash.replace("#", "")) current = "games";
+      /* 홈페이지에서 지정한 시작화면(?start=...)으로 열기 */
+      try {
+        const sp = new URLSearchParams(location.search).get("start");
+        if (sp && VIEWONLY) {
+          const R = { personal: "개인기록", meeting: "모임기록", ranking: "순위표", quarter: "분기에버" }[sp];
+          if (R) {
+            current = "games"; GS.report = R; GS.linked = null;
+            if (sp === "personal") { const nm = String((Conn.me && (Conn.me.siteName || Conn.me.name)) || "").trim(), m = activeMembers().find((x) => x.name.trim() === nm); if (m) GS.linked = String(m.memberId); }
+          }
+          history.replaceState(null, "", location.pathname + "#games");
+        }
+      } catch {}
+    }
     if (!TB_KEYS.includes(current) && current !== "settings") current = "games";
     const nav = $("pcnav"); nav.textContent = "";
     $("pcsub").textContent = "";
@@ -1353,18 +1367,18 @@
       const secSel = h("select", { class: "phsec", "aria-label": "구역 선택" }, list.map(([k, t]) => h("option", { value: k }, t)));
       secSel.value = list.some(([k]) => k === current) ? current : "games";
       secSel.onchange = () => go(secSel.value);
-      nav.append(h("b", { class: "phclub" }, mgr || "클럽관리"), secSel);
+      nav.append(secSel);
       const tools = h("span", { class: "phtools", id: "tbpill" });
-      tools.append(h("button", { type: "button", class: "phmenu pcbtn file", title: "메뉴", onclick: (e) => {
+      if (inputMode()) tools.append(h("button", { type: "button", class: "phmenu pcbtn file", title: "메뉴", onclick: (e) => {
         if (inputMode()) return openFileMenu(e.currentTarget);
         const m = $("fileMenu"); if (!m.hidden) { m.hidden = true; return; }
         m.textContent = ""; const it = (t, href) => h("button", { type: "button", onclick: () => { m.hidden = true; location.href = href; } }, t);
         m.append(it("🎳 클럽관리", "/club"), it("🔐 관리", "/admin"), it("🏠 홈으로", "/"));
         const r = e.currentTarget.getBoundingClientRect(); m.style.left = Math.max(8, r.right - 170) + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
-      } }, "☰"));
+      } }, "FILE"));
       $("authStatus").before(tools);
       $("authStatus").textContent = "";
-      $("appName").textContent = mgr || (VIEWONLY ? "기록 조회" : "클럽관리");
+      $("appName").textContent = VIEWONLY ? "기록 조회" : (TITLES[current] || "클럽관리"); // 가로 화면·홈과 같은 상단 제목
       $("pchead").hidden = false;
       return;
     }

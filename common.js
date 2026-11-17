@@ -94,3 +94,50 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", set);
   window.addEventListener("orientationchange", set);
 })();
+
+/* ---------- 시작화면 설정 (홈페이지를 열 때 처음 보여줄 화면) ---------- */
+const START_OPTS = [["home", "🏠 홈", "처음 화면 (기본)"], ["personal", "👤 개인기록", "로그인한 회원 본인의 기록"], ["meeting", "📅 모임기록", "가장 최근 모임의 기록"], ["ranking", "🏆 순위표", "올해 순위"], ["quarter", "📈 분기에버", "현재 분기 에버"]];
+const START_KEY = "startPage";
+const getStart = () => { try { const v = localStorage.getItem(START_KEY); return START_OPTS.some((o) => o[0] === v) ? v : "home"; } catch { return "home"; } };
+function setStart(v) { try { v === "home" ? localStorage.removeItem(START_KEY) : localStorage.setItem(START_KEY, v); } catch {} }
+function openStartPicker() {
+  const old = document.getElementById("startPick"); if (old) old.remove();
+  const ov = document.createElement("div"); ov.id = "startPick";
+  ov.style.cssText = "position:fixed;inset:0;z-index:200;background:rgba(20,28,48,.45);display:flex;align-items:center;justify-content:center;padding:16px";
+  const box = document.createElement("div");
+  box.style.cssText = "background:#fff;border-radius:16px;width:min(380px,100%);box-shadow:0 12px 30px rgba(0,0,0,.25);overflow:hidden;font-family:inherit";
+  const hd = document.createElement("div"); hd.textContent = "시작화면 설정"; hd.style.cssText = "padding:14px 16px;font-weight:800;font-size:17px;background:#EEF3FB;color:#12285A";
+  const sub = document.createElement("div"); sub.textContent = "홈페이지를 처음 열 때 보여줄 화면을 골라 주세요."; sub.style.cssText = "padding:10px 16px 2px;font-size:13px;color:#6B7A90";
+  box.append(hd, sub);
+  const close = () => ov.remove();
+  const cur = getStart();
+  for (const [k, t, d] of START_OPTS) {
+    const b = document.createElement("button"); b.type = "button";
+    b.style.cssText = "display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:" + (k === cur ? "#E3ECFA" : "#fff") + ";border:0;border-bottom:1px solid #EEF2F8;padding:12px 16px;font:inherit;color:#12285A;cursor:pointer";
+    const l = document.createElement("div"); const b1 = document.createElement("b"); b1.textContent = t; const s1 = document.createElement("small"); s1.textContent = d; s1.style.cssText = "display:block;color:#6B7A90;font-weight:400;margin-top:2px";
+    l.append(b1, s1); const ck = document.createElement("span"); ck.textContent = k === cur ? "✓" : ""; ck.style.cssText = "margin-left:auto;color:#1A5BA8;font-weight:800;font-size:18px";
+    b.append(l, ck);
+    b.onclick = () => { setStart(k); close(); appNote(k === "home" ? "시작화면을 홈으로 설정했어요." : `시작화면을 ${t.replace(/^\S+\s/, "")}(으)로 설정했어요.`); };
+    box.append(b);
+  }
+  const x = document.createElement("button"); x.type = "button"; x.textContent = "닫기"; x.style.cssText = "display:block;margin:10px 16px 14px auto;border:1px solid #BCCDE5;background:#E8EFFA;color:#12285A;border-radius:10px;padding:8px 18px;font:inherit;font-weight:700;cursor:pointer";
+  x.onclick = close; box.append(x); ov.append(box); ov.onclick = (e) => { if (e.target === ov) close(); };
+  document.body.append(ov);
+}
+document.addEventListener("DOMContentLoaded", () => {
+  // 메뉴에 「시작화면 설정」 항목 추가
+  const dd = document.getElementById("dd");
+  if (dd && !dd.querySelector(".startit")) {
+    const a = document.createElement("a"); a.className = "it startit"; a.href = "#";
+    const sp = document.createElement("span"); sp.textContent = "🏁"; const d = document.createElement("div"), b = document.createElement("b"), sm = document.createElement("small"); b.textContent = "시작화면 설정"; sm.textContent = "앱을 열 때 처음 보일 화면 선택"; d.append(b, sm); a.append(sp, d);
+    a.addEventListener("click", (e) => { e.preventDefault(); const dim = document.getElementById("dim"), bg = document.getElementById("burger"); dd.hidden = true; if (dim) dim.hidden = true; if (bg) { bg.textContent = "☰"; bg.setAttribute("aria-expanded", "false"); } openStartPicker(); });
+    dd.append(a);
+  }
+  // 새로 열었을 때(이 탭에서 처음) 홈이면 설정한 시작화면으로 이동
+  let done = false; try { done = sessionStorage.getItem("startDone") === "1"; sessionStorage.setItem("startDone", "1"); } catch {}
+  const p = location.pathname.replace(/\.html$/, ""), home = p === "/" || p === "/index" || p === "/home";
+  if (home && !done && (!location.hash || location.hash === "#/") && getStart() !== "home") {
+    let tok = null; try { tok = localStorage.getItem("authToken"); } catch {}
+    if (tok) location.replace("/records?start=" + getStart());
+  }
+});

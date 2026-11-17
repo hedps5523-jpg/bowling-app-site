@@ -362,14 +362,13 @@ body.phmode .tbin.note{flex:none!important;height:38px!important}
 body.phmode .tbcard>label.tbf>.tbchk{height:38px;width:22px}
 
 /* ===== 세로 화면: 모바일 볼링클럽 앱 화면 (네이비 상단바 · 입력모드 카드) ===== */
-body.phmode .appbar .topbar{display:none}
-body.phmode .appbar .fix{background:#1B2D4F;margin:0 -12px;padding:0 12px;border:0}
-body.phmode .pchead{min-height:62px;padding:6px 0}
+body.phmode .appbar .fix{background:var(--bg);margin:0;padding:0 0 4px;border:0;max-height:none;overflow:visible}
+body.phmode .pchead{min-height:50px;padding:4px 0}
 body.phmode .pcnav{display:flex;align-items:center;gap:8px;overflow:visible}
 .phclub{color:#fff;font-size:19px;font-weight:800;white-space:nowrap;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
-body.phmode .phsec{flex:0 1 170px;max-width:170px;height:46px;border-radius:23px;border:0;text-align:center;text-align-last:center;font-size:16px}
-body.phmode .phmodebtn,body.phmode .phmenu{width:44px;height:44px;border:0;border-radius:22px;background:transparent;color:#fff;font-size:22px;padding:0}
-body.phmode .phmodebtn.in{background:transparent}
+body.phmode .phsec{flex:1 1 auto;max-width:none;height:42px;border-radius:21px;border:1px solid #BCCDE5;background:#fff;color:#12285A;text-align:center;text-align-last:center;font-size:16px}
+body.phmode .phmodebtn,body.phmode .phmenu{height:42px;border:1px solid #BCCDE5;border-radius:21px;background:#E8EFFA;color:#12285A;font-size:14px;font-weight:700;padding:0 14px;width:auto}
+body.phmode .phmodebtn.in{background:#1A5BA8;border-color:#1A5BA8;color:#fff}
 .phroot{gap:0;padding-top:8px}
 .phcard{background:#fff;border:1px solid #D7E0EC;border-radius:16px;padding:12px;margin-bottom:8px;display:flex;flex-direction:column;gap:8px}
 .phct{font-size:17px;font-weight:800;color:#12285A}.phct.big{font-size:22px}.phct.sm{font-size:16px}
