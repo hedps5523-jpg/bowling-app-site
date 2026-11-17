@@ -873,3 +873,5 @@ td.r200{color:#B00020!important;font-weight:800}
   body.tbon .tbcard:has(.tbin.amt) .tbf{gap:4px}.tbcard:has(.tbin.amt) .tblab{margin-left:2px}
   body.tbon .tbcard:has(.tbin.amt) .tbbtn{white-space:nowrap;padding:0 10px}
 }
+.envsec-ht{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.envsec-ht .pcbtn{margin:0;padding:3px 12px;height:auto;line-height:1.3;font-size:13px}

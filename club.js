@@ -1556,6 +1556,7 @@ function approvalPanel() {
 const ST = { sub: "basic", logs: [], sel: null };
 const stLog = (t) => { ST.logs.unshift([new Date().toLocaleTimeString("ko-KR", { hour12: false }), t]); };
 const secBox = (title, ...kids) => h("section", { class: "envsec" }, h("div", { class: "envsec-h" }, title), h("div", { class: "envsec-b" }, kids));
+const secBoxTool = (title, tool, ...kids) => h("section", { class: "envsec" }, h("div", { class: "envsec-h envsec-ht" }, h("span", {}, title), tool), h("div", { class: "envsec-b" }, kids));
 const numList = (title, fields) => secBox(title, h("div", { class: "envlist" }, fields.map((f, i) => h("div", { class: "envitem" }, h("span", {}, String(i + 1)), f))));
 TABS.settings = {
   render() {
@@ -1582,7 +1583,7 @@ TABS.settings = {
     const nameRow = h("div", { class: "envname" }, h("label", {}, "관리 명칭"), h("div", { class: "envnamein" }, nameF)); // 수입/지출 탭 줄 오른쪽 끝에 표시
     const basic = h("div", { class: "envpanel envbasic" }, 
       h("div", { class: "envband" }, numList("모임", mFields), numList("등급", gFields), other),
-      h("div", { class: "envdata" }, secBox("주차별", weekT), secBox("분기 에버", h("div", { style: "text-align:right;margin-bottom:6px" }, editQ), qT)),
+      h("div", { class: "envdata" }, secBox("주차별", weekT), secBoxTool("분기 에버", editQ, qT)),
       h("p", { class: "pcnote" }, "관리 명칭·모임구분·등급·회비·락카 기본값·수입/지출 목록은 서버 공용입니다."));
     /* ---- 수입/지출 ---- */
     const E = { rows: { 수입: [], 지출: [] }, type: "수입", sel: -1 };
