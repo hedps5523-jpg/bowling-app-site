@@ -1139,7 +1139,7 @@
   const scoreLine = (g, refs) => { const raw = sc(g), last = raw.map((v) => v > 0).lastIndexOf(true); const out = []; raw.slice(0, Math.max(0, last + 1)).forEach((v, i) => { if (i) out.push(" / "); const hi = refs && refs.has(g.recordId * 10 + i + 1); out.push(h("span", { class: hi ? "hi" : v >= 200 ? "red" : "" }, v > 0 ? String(v) : "   ")); }); return out; };
   function phqGames() {
     const games = tbGames(), stat = statGames(), groups = weekGroups(games), mm = byId(), roles = roleMap(games);
-    const reports = ["개인기록", "모임기록", "누적기록", "분기에버", "순위표"];
+    const reports = ["개인기록", "모임기록", "누적기록", "순위표", "분기에버"];
     if (!reports.includes(GS.report)) GS.report = "개인기록";
     const rep = GS.report;
     const y0 = ynum(today()), qOpts = [[`${pad2((y0 - 1) % 100)}_4분기`, y0 - 1, 4], ...[1, 2, 3, 4].map((q) => [`${q}분기`, y0, q])];
