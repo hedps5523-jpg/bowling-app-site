@@ -389,8 +389,13 @@ window.addEventListener("beforeunload", (e) => { if (Pend.ops.length) { e.preven
 /* ===== 동시 작업 알림: 같이 로그인해 작업 중인 관리자·운영진 이름을 보여 줘서 입력이 겹치지 않게 해요 ===== */
 const Presence = {
   others: [], last: 0, seen: new Set(), timer: null,
-  on() { return Conn.mode === "site" && canWrite() && !VIEWONLY && !!Conn.siteToken(); },
+  on() { return canWrite() && !VIEWONLY && (Conn.mode === "mobile" || (Conn.mode === "site" && !!Conn.siteToken())); },
   async call(action, extra) {
+    if (Conn.mode === "mobile") { // 클럽 계정으로 직접 로그인한 경우: 모바일 볼링클럽 앱과 같은 서버 함수를 그대로 사용
+      if (action === "leave") { const r = await Conn.rest("rpc/bowlingclub_presence_leave", { method: "POST", body: "{}", keepalive: true }); return r.ok ? { ok: true } : null; }
+      const r = await Conn.rest("rpc/bowlingclub_presence_heartbeat", { method: "POST", body: JSON.stringify({ p_section: TITLES[current] || "" }) });
+      return r.ok && Array.isArray(r.d) ? { ok: true, others: r.d.map((x) => ({ name: x.out_name, section: x.out_section, busy: false })) } : null;
+    }
     const r = await fetch(VH_FN("site-club-presence"), { method: "POST", headers: { "Content-Type": "application/json", apikey: VH_KEY }, body: JSON.stringify({ token: Conn.siteToken(), action, section: TITLES[current] || "", busy: Pend.ops.length > 0, ...extra }), keepalive: action === "leave" });
     return r.ok ? r.json().catch(() => null) : null;
   },
