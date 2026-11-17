@@ -798,7 +798,7 @@
   let PH_KEEP = false; // 펼침/접힘 때는 스크롤 위치를 그대로 유지
   function phRootF(n, ...kids) {
     const oldSc = PH_KEEP ? view.querySelector(".phscroll") : null, keepTop = oldSc ? oldSc.scrollTop : 0; PH_KEEP = false;
-    const ks = kids.filter(Boolean), foot = ks.filter((k, i) => i >= n && k.classList && /\b(phsticky|phsettle|phdet)\b/.test(k.className)), sc = h("div", { class: "phscroll" }, ...ks.slice(n).filter((k) => !foot.includes(k)));
+    const ks = kids.filter(Boolean), foot = ks.filter((k, i) => i >= n && k.classList && /\b(phsticky|phsettle|phdet|phfeestat)\b/.test(k.className)), sc = h("div", { class: "phscroll" }, ...ks.slice(n).filter((k) => !foot.includes(k)));
     const r = h("div", { class: "tbroot phroot phfixroot" }, h("div", { class: "phfixed" }, ...ks.slice(0, n)), sc, ...foot.map((f) => { f.classList.add("phfoot"); return f; }));
     view.textContent = ""; view.append(r);
     const size = () => { const top = r.getBoundingClientRect().top, bn = document.querySelector(".bnav"), bh = bn && !bn.hidden ? bn.offsetHeight : 0; r.style.setProperty("--phh", Math.max(240, window.innerHeight - top - bh - 4) + "px"); };
@@ -909,9 +909,9 @@
       list.append(item);
     });
     const qs = psel(qOpts.map((o) => [o[0], o[0]]), GS.linked, (v) => { GS.linked = v; phQuarter(); }, "big");
-    phRootF(2, h("div", { class: "phqbar" }, qs, pbtn("조회", phQuarter, "ghost sm")),
+    phRootF(2, h("div", { class: "phqbar" }, qs, pbtn("조회", phQuarter, "ghost sm"), pbtn("저장", saveQ, "pri sm")),
       h("div", { class: "phqcap" }, h("b", {}, `전회원 · 조정 ${open ? "입력 가능" : `${mnum(from)}/${dnum(from)}부터`}`), h("span", {}, `${months[0]}~${months[2]}월`)),
-      list, h("div", { class: "phsticky" }, pbtn("저장", saveQ, "pri")));
+      list);
     async function saveQ() {
       if (!canIn()) return;
       if (!QA.isOpen(dates, y, q)) return toast(`조정에버는 ${mnum(from)}월 ${dnum(from)}일부터 입력할 수 있습니다.`);
@@ -962,7 +962,7 @@
       h("div", { class: "phfeerow" }, h("label", { class: "phchk" }, pre, "선납"), h("label", { class: "phlab" }, h("small", {}, "시작 월"), sSel), h("label", { class: "phlab" }, h("small", {}, "종료 월"), eSel)),
       h("div", { class: "phrow2" }, h("label", { class: "phout" }, h("small", {}, "납부일"), dIn), nIn), calc,
       h("div", { class: "phbtns three" }, pbtn("납부취소", cancelRange, "ghost"), pbtn("수정", modifyFee, "ghost"), pbtn("납부 등록", savePay, "pri"))),
-      h("section", { class: "phcard" }, h("b", { class: "phct sm" }, `완납: ${paid}개월 / 미납: ${miss}개월`), h("div", { class: "phprog" }, h("i", { style: `width:${pct}%` })), h("div", { class: "phtiles" }, tiles)));
+      h("section", { class: "phcard phfeestat" }, h("b", { class: "phct sm" }, `완납: ${paid}개월 / 미납: ${miss}개월`), h("div", { class: "phprog" }, h("i", { style: `width:${pct}%` })), h("div", { class: "phtiles" }, tiles)));
     async function apply(memberId, desired, msg) { const ops = feeOps(memberId, year, desired); if (!ops.length) return toast(msg); await save(ops, msg); }
     async function savePay() {
       if (!canIn() || !m) return;

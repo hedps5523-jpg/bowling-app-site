@@ -741,3 +741,15 @@ body.phmode .phfixed .phlbar .phpillbtn{height:34px}body.phmode .phfixed .phlbar
   .envserver>.envapproval .envapb{flex:1;min-height:0}
   .envserver .envapproval .aplist{flex:1;min-height:0;max-height:none}
 }
+
+/* 세로: 상세 박스는 스크롤바 없이 모두 보이게, 회비 현황 박스는 하단 고정 */
+.phfixroot>.phdet,.phfixroot>.phsettle{max-height:none;overflow:visible}
+.phfixroot>.phdet{padding:6px 12px}
+.phfixroot>.phdet .top{line-height:1.1}.phfixroot>.phdet .big{font-size:20px}
+.phfixroot>.phdet .sec{font-size:14px;margin:4px 0 2px;padding-top:3px}
+.phfixroot>.phdet .who{font-size:14px;padding-bottom:2px}
+.phfixroot>.phdet .phkv{font-size:12.5px;gap:1px 10px}.phfixroot>.phdet .memo{font-size:12.5px}
+.phfixroot>.phfeestat{flex:none;margin:6px 0 0;padding:8px 10px;gap:6px}
+.phfeestat .phtiles{grid-template-columns:repeat(4,1fr);gap:6px}
+.phfeestat .phtile{height:48px;font-size:12px;border-radius:10px}
+.phqbar .phbtn.sm{height:36px;padding:0 12px;flex:none}
