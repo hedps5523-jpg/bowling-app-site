@@ -785,12 +785,16 @@
   const psel = (opts, value, onchange, cls = "") => { const s = sel(opts, value, onchange, "phfs " + cls); return s; };
   const pbtn = (t, onclick, cls = "") => h("button", { type: "button", class: "phbtn " + cls, onclick }, t);
   /* 앞의 n개는 고정, 나머지는 아래에서만 스크롤 (세로 입력모드) */
+  let PH_KEEP = false; // 펼침/접힘 때는 스크롤 위치를 그대로 유지
   function phRootF(n, ...kids) {
+    const oldSc = PH_KEEP ? view.querySelector(".phscroll") : null, keepTop = oldSc ? oldSc.scrollTop : 0; PH_KEEP = false;
     const ks = kids.filter(Boolean), foot = ks.filter((k, i) => i >= n && k.classList && /\b(phsticky|phsettle|phdet)\b/.test(k.className)), sc = h("div", { class: "phscroll" }, ...ks.slice(n).filter((k) => !foot.includes(k)));
     const r = h("div", { class: "tbroot phroot phfixroot" }, h("div", { class: "phfixed" }, ...ks.slice(0, n)), sc, ...foot.map((f) => { f.classList.add("phfoot"); return f; }));
     view.textContent = ""; view.append(r);
     const size = () => { const top = r.getBoundingClientRect().top, bn = document.querySelector(".bnav"), bh = bn && !bn.hidden ? bn.offsetHeight : 0; r.style.setProperty("--phh", Math.max(240, window.innerHeight - top - bh - 4) + "px"); };
-    size(); requestAnimationFrame(size); window.onresize = size; return r;
+    size(); window.onresize = size;
+    const restore = () => { size(); if (!oldSc) return; sc.scrollTop = keepTop; const o = sc.querySelector(".open"); if (o) { const a = sc.getBoundingClientRect(), b = o.getBoundingClientRect(); if (b.bottom > a.bottom) sc.scrollTop += Math.min(b.bottom - a.bottom + 8, b.top - a.top - 4); else if (b.top < a.top) sc.scrollTop -= a.top - b.top + 4; } };
+    restore(); requestAnimationFrame(restore); return r;
   }
   /* 회원명 선택: 6명까지 보이고 위·아래로 끌어서 이동하는 목록 */
   function ppick(opts, value, onchange, cls = "") {
@@ -881,7 +885,7 @@
       inp.disabled = !open; inp.oninput = () => { inp.value = inp.value.replace(/\D/g, "").slice(0, 3); GS.draft[k] = inp.value; };
       const isOpen = QP.open.has(r.m.memberId);
       const item = h("div", { class: "phqitem" + (isOpen ? " open" : "") },
-        h("div", { class: "phqhead", onclick: (e) => { if (e.target === inp) return; isOpen ? QP.open.delete(r.m.memberId) : QP.open.add(r.m.memberId); phQuarter(); } },
+        h("div", { class: "phqhead", onclick: (e) => { if (e.target === inp) return; isOpen ? QP.open.delete(r.m.memberId) : QP.open.add(r.m.memberId); PH_KEEP = true; phQuarter(); } },
           h("b", { class: "nm" }, `${r.m.name}(${r.base || "-"})`), h("span", { class: "lb" }, "에버"), inp,
           h("span", { class: "acc" }, h("small", {}, "총 누적에버"), h("b", {}, r.recs.some((g) => cnt(g) > 0) ? r.avg.toFixed(1) : "-")), h("i", { class: "chev" }, isOpen ? "︿" : "﹀")));
       if (isOpen) {
@@ -1006,7 +1010,7 @@
   const refreshBtn = () => h("button", { type: "button", class: "phref", title: "새로고침", onclick: async () => { try { await reload("서버 최신 자료를 불러왔어요."); render(); } catch (e) { toast(e.message); } } }, "↻");
   const pTitle = (t, sub, right) => h("div", { class: "phqt" }, h("b", {}, t), sub ? h("div", { class: "sub" }, h("span", {}, sub), right ? h("span", {}, right) : null) : null);
   const devCls = (d) => (d == null ? "" : d >= 0 ? "pos" : "neg");
-  const toggleOpen = (k) => { QS.open.has(k) ? QS.open.delete(k) : QS.open.add(k); RENDER[current](); };
+  const toggleOpen = (k) => { QS.open.has(k) ? QS.open.delete(k) : QS.open.add(k); PH_KEEP = true; RENDER[current](); };
   const ROLE_TXT = { HIGH: "최고하이", EVER: "에버하이", ALL: "올카" };
   const kv = (pairs) => h("div", { class: "phkv" }, pairs.map(([k, v]) => [h("span", {}, k), h("b", {}, v ?? "-")]).flat());
   const yy = (d) => (d ? d.slice(2) : "-");
