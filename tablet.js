@@ -243,7 +243,7 @@
     const idxM = (g) => ynum(g.gameDate) * 12 + mnum(g.gameDate) - 1, idxQ = (g) => ynum(g.gameDate) * 4 + Math.floor((mnum(g.gameDate) - 1) / 3);
     const ix = onlyMo ? idxM : idxQ, ids = all.map(ix);
     let cur = onlyMo ? y * 12 + onlyMo - 1 : y * 4 + q - 1;
-    const lo = Math.min(cur, ...ids), hi = Math.max(cur, ...ids);
+    const qs = Math.floor(cur / 3) * 3, lo = onlyMo ? qs : Math.min(cur, ...ids), hi = onlyMo ? qs + 2 : Math.max(cur, ...ids); // 월 팝업은 선택한 분기 안에서만
     const trr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: i >= 1 && i <= 4 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
     const dev = (rs, c) => { const bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return bw > 0 ? sgn1(recAvg(rs) - bw) : "-"; };
     const line = (lbl, rs) => {
