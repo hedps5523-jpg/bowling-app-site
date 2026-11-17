@@ -141,3 +141,4 @@ document.addEventListener("DOMContentLoaded", () => {
     if (tok) location.replace("/records?start=" + getStart());
   }
 });
+
