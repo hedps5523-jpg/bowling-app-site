@@ -812,3 +812,5 @@ body.phmode .phpickit{font-size:15px}
 .pcmodal.rkm.rk1 .tbmini.rk{flex:none;height:auto}
 .pcmodal.rkm.rk1 .tbmini.rk td{height:34px!important;font-size:13.5px}
 .pcmodal.rkm.rk1 .tbmh{height:30px;font-size:15px}
+@keyframes rkL{from{transform:translateX(40px);opacity:.2}to{transform:none;opacity:1}}@keyframes rkR{from{transform:translateX(-40px);opacity:.2}to{transform:none;opacity:1}}
+.rkpop.slL{animation:rkL .18s ease-out}.rkpop.slR{animation:rkR .18s ease-out}

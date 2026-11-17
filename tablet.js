@@ -238,8 +238,12 @@
   }
 
   /* 선수 한 명의 분기 상세 팝업: 월별로 1~4주(1G~4G·Total·Avg·편차)를 펼쳐 보여요 (가로 화면 순위표 상세와 같은 구성) */
-  function rankQuarterPopup(m, y, q, recsAll, mm, onlyMo) {
-    const months = onlyMo ? [onlyMo] : [q * 3 - 2, q * 3 - 1, q * 3], body = h("div", { class: "rkpop" });
+  function rankQuarterPopup(m, y, q, _recs, mm, onlyMo) {
+    const all = statGames().filter((g) => g.memberId === m.memberId && g.gameDate), body = h("div", { class: "rkpop" });
+    const idxM = (g) => ynum(g.gameDate) * 12 + mnum(g.gameDate) - 1, idxQ = (g) => ynum(g.gameDate) * 4 + Math.floor((mnum(g.gameDate) - 1) / 3);
+    const ix = onlyMo ? idxM : idxQ, ids = all.map(ix);
+    let cur = onlyMo ? y * 12 + onlyMo - 1 : y * 4 + q - 1;
+    const lo = Math.min(cur, ...ids), hi = Math.max(cur, ...ids);
     const trr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: i >= 1 && i <= 4 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
     const dev = (rs, c) => { const bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return bw > 0 ? sgn1(recAvg(rs) - bw) : "-"; };
     const line = (lbl, rs) => {
@@ -252,14 +256,31 @@
       const per = [0, 1, 2, 3].map((i) => { const v = rs.map((g) => sc(g)[i]).filter((x) => x > 0); return v.length ? v.reduce((a, x) => a + x, 0) / v.length : 0; });
       return [lbl, ...per.map((v) => (v > 0 ? fmt1(v) : "-")), fmt1(per.reduce((a, x) => a + x, 0)), fmt1(recAvg(rs)), dev(rs, c)];
     };
-    months.forEach((mo) => {
-      const recs = recsAll.filter((g) => ynum(g.gameDate) === y && mnum(g.gameDate) === mo), wc = recs.some((g) => Math.floor((dnum(g.gameDate) - 1) / 7) >= 4) ? 5 : 4;
-      body.append(h("div", { class: "rkmo" }, h("div", { class: "tbmh" }, h("b", {}, `${mo}월`), h("b", { class: "blue" }, "에버 : " + (recs.some((g) => cnt(g) > 0) ? fmt1(recAvg(recs)) : "-"))),
-        h("table", { class: "tbmini rk" }, h("tbody", {}, trr(["구분", "1G", "2G", "3G", "4G", "Total", "Avg", "편차"], "hd"),
-          ...Array.from({ length: wc }, (_, w) => trr(line(`${w + 1}주`, recs.filter((g) => Math.floor((dnum(g.gameDate) - 1) / 7) === w)), w % 2 ? "alt" : "")), trr(lineAvg("Total", recs), "tot")))));
-    });
+    const draw = (dir) => {
+      const yy = onlyMo ? Math.floor(cur / 12) : Math.floor(cur / 4), pp = onlyMo ? (cur % 12) + 1 : (cur % 4) + 1;
+      const months = onlyMo ? [pp] : [pp * 3 - 2, pp * 3 - 1, pp * 3];
+      $("modalTitle").textContent = onlyMo ? `${m.name} · ${yy}년 ${pp}월` : `${m.name} · ${yy}년 ${pp}분기`;
+      body.textContent = "";
+      months.forEach((mo) => {
+        const recs = all.filter((g) => ynum(g.gameDate) === yy && mnum(g.gameDate) === mo), wc = recs.some((g) => Math.floor((dnum(g.gameDate) - 1) / 7) >= 4) ? 5 : 4;
+        body.append(h("div", { class: "rkmo" }, h("div", { class: "tbmh" }, h("b", {}, `${mo}월`), h("b", { class: "blue" }, "에버 : " + (recs.some((g) => cnt(g) > 0) ? fmt1(recAvg(recs)) : "-"))),
+          h("table", { class: "tbmini rk" }, h("tbody", {}, trr(["구분", "1G", "2G", "3G", "4G", "Total", "Avg", "편차"], "hd"),
+            ...Array.from({ length: wc }, (_, w) => trr(line(`${w + 1}주`, recs.filter((g) => Math.floor((dnum(g.gameDate) - 1) / 7) === w)), w % 2 ? "alt" : "")), trr(lineAvg("Total", recs), "tot")))));
+      });
+      if (dir) { body.classList.remove("slL", "slR"); void body.offsetWidth; body.classList.add(dir > 0 ? "slL" : "slR"); }
+    };
+    draw(0);
+    /* 좌·우로 밀면 이전/다음 (분기에버: 월, 순위표: 분기) */
+    let sx = 0, sy = 0;
+    body.addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+    body.addEventListener("touchend", (e) => {
+      const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      const nx = cur + (dx < 0 ? 1 : -1); if (nx < lo || nx > hi) return;
+      cur = nx; draw(dx < 0 ? 1 : -1);
+    }, { passive: true });
     const md = $("modal"); md.classList.add("rkm"); md.classList.toggle("rk1", !!onlyMo);
-    const pr = modal(onlyMo ? `${m.name} · ${y}년 ${onlyMo}월` : `${m.name} · ${y}년 ${q}분기`, body, [["닫기", "close"]]);
+    const pr = modal($("modalTitle").textContent, body, [["닫기", "close"]]);
     return pr.then((v) => { md.classList.remove("rkm", "rk1"); return v; });
   }
   const MOPEN = new Set(); // 펼친 월 (접힘이 기본)
