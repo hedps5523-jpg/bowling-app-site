@@ -919,3 +919,8 @@ td.r200{color:#B00020!important;font-weight:800}
   .pcmodal.rkm.rk1 .tbmini.rk td{height:34px!important;padding:6px 1px!important}
   .pcmodal.rkm.rk1 .tbmh{height:38px!important;margin:2px 2px 4px!important}
 }
+/* 폰 세로 화면(폭 700px 미만)에도 넓은 줄 간격 적용 */
+@media (max-width:699px){
+  .pcmodal.rkm.rk1 .tbmini.rk td{height:32px!important;padding:5px 1px!important}
+  .pcmodal.rkm.rk1 .tbmh{height:36px!important;margin:2px 2px 4px!important}
+}
