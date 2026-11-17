@@ -375,7 +375,9 @@ async function uploadPending() {
   const n = Pend.ops.length;
   if (!n) return toast("서버에 올릴 입력·수정 내용이 없어요.");
   if (n > 500) return toast("한 번에 500건까지 올릴 수 있어요. (현재 " + n + "건)", 4200);
-  if (!(await confirmBox(`입력·수정한 ${n}건을 서버에 올릴까요?`))) return;
+  await Presence.ping(true);
+  const who = Presence.others.length ? `\n\n※ ${Presence.others.map((o) => o.name + "님").join(", ")}도 지금 작업 중이에요.` : "";
+  if (!(await confirmBox(`입력·수정한 ${n}건을 서버에 올릴까요?` + who))) return;
   try { await Conn.upload(Pend.payloadOps()); }
   catch (e) { toast(/다른 기기/.test(e.message) ? "다른 기기에서 먼저 바뀐 자료가 있어 올리지 못했어요.\n서버 원본 동기화로 최신 자료를 받은 뒤 다시 입력해 주세요. (대기 입력은 그대로 있어요)" : e.message, 6000); return; }
   Pend.drop();
@@ -383,6 +385,44 @@ async function uploadPending() {
   catch (e) { toast(`${n}건을 올렸어요. 화면 갱신은 서버 원본 동기화로 해 주세요.`, 4200); }
 }
 window.addEventListener("beforeunload", (e) => { if (Pend.ops.length) { e.preventDefault(); e.returnValue = ""; } });
+
+/* ===== 동시 작업 알림: 같이 로그인해 작업 중인 관리자·운영진 이름을 보여 줘서 입력이 겹치지 않게 해요 ===== */
+const Presence = {
+  others: [], last: 0, seen: new Set(), timer: null,
+  on() { return Conn.mode === "site" && canWrite() && !VIEWONLY && !!Conn.siteToken(); },
+  async call(action, extra) {
+    const r = await fetch(VH_FN("site-club-presence"), { method: "POST", headers: { "Content-Type": "application/json", apikey: VH_KEY }, body: JSON.stringify({ token: Conn.siteToken(), action, section: TITLES[current] || "", busy: Pend.ops.length > 0, ...extra }), keepalive: action === "leave" });
+    return r.ok ? r.json().catch(() => null) : null;
+  },
+  async ping(force) {
+    if (!this.on() || document.hidden) return;
+    if (!force && Date.now() - this.last < 8000) return;
+    this.last = Date.now();
+    try {
+      const d = await this.call("ping");
+      if (!d) return;
+      this.others = Array.isArray(d.others) ? d.others : [];
+      for (const o of this.others) if (!this.seen.has(o.name)) { this.seen.add(o.name); toast(`${o.name}님도 지금 클럽관리에서 작업 중이에요. 겹치지 않게 확인해 주세요.`, 4200); }
+      const now = new Set(this.others.map((o) => o.name)); for (const n of [...this.seen]) if (!now.has(n)) this.seen.delete(n);
+      this.draw();
+    } catch {}
+  },
+  text() {
+    if (!this.others.length) return "";
+    return this.others.slice(0, 3).map((o) => `${o.name}님은 ${o.section || "클럽관리"}${o.busy ? " 입력 중(UpLoad 전)" : " 작업 중"}`).join(" · ") + (this.others.length > 3 ? ` 외 ${this.others.length - 3}명` : "");
+  },
+  draw() {
+    let b = $("presbar");
+    if (!b) { b = h("div", { id: "presbar", class: "presbar", hidden: true }); document.body.append(b); }
+    const t = this.text(); b.hidden = !t; b.textContent = t ? "👥 " + t + " — 같은 자료를 함께 고치지 않게 해 주세요." : "";
+  },
+  start() {
+    if (this.timer || !this.on()) return;
+    this.ping(true); this.timer = setInterval(() => this.ping(true), 30000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) this.ping(true); });
+    window.addEventListener("pagehide", () => { if (this.on()) this.call("leave"); });
+  },
+};
 
 async function reload(msg, opt) {
   const keep = !!(opt && opt.keep);
@@ -447,6 +487,7 @@ function openFileMenu(btn) {
 document.addEventListener("click", (e) => { const m = $("fileMenu"); if (m && !m.hidden && !m.contains(e.target) && !e.target.closest(".pcbtn.file")) m.hidden = true; });
 function go(k) { if (k === "settings" && current !== "settings") { ST.back = current; ST.sub = "basic"; } current = k; try { history.replaceState(null, "", "#" + k); } catch {} render(); }
 function render() {
+  Presence.start(); Presence.ping(false);
   drawHeader();
   view.textContent = "";
   const t = TABS[current];

@@ -945,3 +945,5 @@ body.phmode .topbar .phtbar .phmenu{padding:0 8px}
 
 .pendbar{position:fixed;right:12px;bottom:14px;z-index:80;border:0;border-radius:99px;background:#e8590c;color:#fff;font:800 14px/1 inherit;padding:11px 16px;box-shadow:0 3px 12px rgba(0,0,0,.28);cursor:pointer}
 .pendbar[hidden]{display:none}
+.presbar{position:fixed;left:50%;transform:translateX(-50%);top:8px;z-index:85;max-width:min(92vw,720px);background:#fff3bf;color:#5c4400;border:1px solid #f0c63c;border-radius:12px;padding:8px 14px;font:700 13px/1.4 inherit;box-shadow:0 3px 12px rgba(0,0,0,.2);pointer-events:none}
+.presbar[hidden]{display:none}
