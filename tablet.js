@@ -1330,7 +1330,7 @@
   const PC = {}; TB_KEYS.forEach((k) => { PC[k] = TABS[k]; TABS[k] = { render() { TB.wasOn = MODE_KEY(); RENDER[k](); } }; });
   const pcHeader = drawHeader;
   /* 세로 화면 구역 목록 (모바일 볼링클럽: 입력모드 / 조회모드 선택목록) */
-  const PH_INPUT = [["members", "회원관리"], ["games", "점수관리"], ["quarter", "분기에버"], ["ledger", "장부관리"], ["fees", "회비관리"], ["lockers", "락카 사용현황"]];
+  const PH_INPUT = [["members", "회원관리"], ["games", "점수관리"], ["quarter", "분기에버"], ["ledger", "장부관리"], ["fees", "회비관리"], ["lockers", "락카 사용현황"], ["settings", "환경설정"]];
   const PH_QUERY = [["members", "회원"], ["games", "게임기록"], ["ledger", "장부"], ["fees", "회비"], ["lockers", "락카"]];
   const phList = () => (inputMode() ? PH_INPUT : PH_QUERY);
   drawHeader = function () {

@@ -940,3 +940,5 @@ body.phmode .topbar .tb-left .lg{width:32px;height:32px}
 body.phmode .topbar{gap:4px}
 body.phmode .topbar .burger{width:40px}
 body.phmode .topbar .phtbar .phmenu{padding:0 8px}
+/* 세로 화면 환경설정: 탭 줄 고정 (기본DATA·서버관리) */
+.envroot.envstick>.envtop{position:sticky;top:var(--abh,60px);z-index:20;background:var(--bg,#F2F6FB);padding:6px 0!important;border-bottom:1px solid #DCE6F3;margin:0!important;flex-wrap:wrap}
