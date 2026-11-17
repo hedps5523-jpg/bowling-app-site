@@ -903,3 +903,14 @@ td.r200{color:#B00020!important;font-weight:800}
   body.tbon .tbcard:has(.tbin.num) .tbin.note{min-width:64px}
   body.tbon .tbcard:has(.tbin.num) .tbbtn{padding:0 7px}
 }
+/* 회비관리 입력줄(중간 폭 가로): 한 줄 배치 */
+@media (orientation:landscape) and (min-width:760px) and (max-width:1240px){
+  body.tbon .tbcard:has(.tbchk){flex-wrap:nowrap;overflow:hidden;gap:3px 5px;padding:5px 8px}
+  body.tbon .tbcard:has(.tbchk) .tbf{gap:3px;flex:none}
+  body.tbon .tbcard:has(.tbchk) .tblab{margin-left:1px;font-size:12px;white-space:nowrap}
+  body.tbon .tbcard:has(.tbchk) .tbsel{flex:none;width:76px!important;max-width:76px;min-width:0;padding:0 3px!important;font-size:13px}
+  body.tbon .tbcard:has(.tbchk) .tbin.date{width:112px!important;padding:0 3px!important;font-size:13px}
+  body.tbon .tbcard:has(.tbchk) .tbin:not(.date){flex:1 1 60px;width:auto!important;min-width:56px}
+  body.tbon .tbcard:has(.tbchk) .tbf:has(.tbin:not(.date)){flex:1 1 90px;min-width:90px}
+  body.tbon .tbcard:has(.tbchk) .tbbtn{white-space:nowrap;padding:0 8px}
+}
