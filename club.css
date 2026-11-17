@@ -863,3 +863,13 @@ td.r200{color:#B00020!important;font-weight:800}
   body.tbon .tbin.note{flex:1 1 140px!important}
   body.tbon .tbinfo{padding-left:12px;padding-right:12px}
 }
+/* 장부 입력줄(중간 폭 가로): 일자·구분·금액 칸을 줄여 한 줄에 표시 */
+@media (orientation:landscape) and (min-width:760px) and (max-width:1240px){
+  body.tbon .tbcard:has(.tbin.amt){flex-wrap:nowrap;overflow:hidden}
+  body.tbon .tbcard:has(.tbin.amt) .tbin.date{width:116px!important;padding:0 4px!important;font-size:13px}
+  body.tbon .tbcard:has(.tbin.amt) .tbsel{max-width:96px;padding:0 4px!important;font-size:13px}
+  body.tbon .tbcard:has(.tbin.amt) .tbin.amt{width:84px!important}
+  body.tbon .tbcard:has(.tbin.amt) .tbin.note{flex:1 1 90px!important;min-width:70px}
+  body.tbon .tbcard:has(.tbin.amt) .tbf{gap:4px}.tbcard:has(.tbin.amt) .tblab{margin-left:2px}
+  body.tbon .tbcard:has(.tbin.amt) .tbbtn{white-space:nowrap;padding:0 10px}
+}
