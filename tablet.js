@@ -238,9 +238,9 @@
   }
 
   /* 선수 한 명의 분기 상세 팝업: 월별로 1~4주(1G~4G·Total·Avg·편차)를 펼쳐 보여요 (가로 화면 순위표 상세와 같은 구성) */
-  function rankQuarterPopup(m, y, q, recsAll, mm) {
-    const months = [q * 3 - 2, q * 3 - 1, q * 3], body = h("div", { class: "rkpop" });
-    const trr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v) => h("td", {}, v)));
+  function rankQuarterPopup(m, y, q, recsAll, mm, onlyMo) {
+    const months = onlyMo ? [onlyMo] : [q * 3 - 2, q * 3 - 1, q * 3], body = h("div", { class: "rkpop" });
+    const trr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: i >= 1 && i <= 4 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
     const dev = (rs, c) => { const bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return bw > 0 ? sgn1(recAvg(rs) - bw) : "-"; };
     const line = (lbl, rs) => {
       const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "-", "-", "-", "-", "-", "-", "-"];
@@ -258,9 +258,9 @@
         h("table", { class: "tbmini rk" }, h("tbody", {}, trr(["구분", "1G", "2G", "3G", "4G", "Total", "Avg", "편차"], "hd"),
           ...Array.from({ length: wc }, (_, w) => trr(line(`${w + 1}주`, recs.filter((g) => Math.floor((dnum(g.gameDate) - 1) / 7) === w)), w % 2 ? "alt" : "")), trr(lineAvg("Total", recs), "tot")))));
     });
-    const md = $("modal"); md.classList.add("rkm");
-    const pr = modal(`${m.name} · ${y}년 ${q}분기`, body, [["닫기", "close"]]);
-    return pr.then((v) => { md.classList.remove("rkm"); return v; });
+    const md = $("modal"); md.classList.add("rkm"); md.classList.toggle("rk1", !!onlyMo);
+    const pr = modal(onlyMo ? `${m.name} · ${y}년 ${onlyMo}월` : `${m.name} · ${y}년 ${q}분기`, body, [["닫기", "close"]]);
+    return pr.then((v) => { md.classList.remove("rkm", "rk1"); return v; });
   }
   const MOPEN = new Set(); // 펼친 월 (접힘이 기본)
   const toggleM = (k) => { MOPEN.has(k) ? MOPEN.delete(k) : MOPEN.add(k); KEEP_SCROLL = true; RENDER[current](); };
@@ -1143,7 +1143,7 @@
           const row = (lbl, rs) => { const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "—", "—", "—", "—", null]; const av = recAvg(rs), bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return [lbl, String(c), av.toFixed(1), String(Math.max(...rs.map(smax))), bw > 0 ? sgn1(av - bw) : "—", bw > 0 ? av - bw : null]; };
           body.push(card("q" + r.m.memberId, [h("b", { class: "nm" }, `${r.m.name}(${r.base || "-"})`), h("span", { class: "lb" }, "에버"), h("span", { class: "pill" }, String(r.base || "-")), h("span", { class: "acc" }, h("small", {}, "총 누적에버"), h("b", {}, r.recs.some((g) => cnt(g) > 0) ? r.avg.toFixed(1) : "-"))],
             () => h("div", { class: "phrd" }, h("table", { class: "phst" }, h("tbody", {}, h("tr", { class: "hd" }, ["구분", "게임수", "총에버", "최고게임", "편차"].map((x) => h("td", {}, x))),
-              ...[...months.map((mo) => row(`${mo}월`, r.recs.filter((g) => mnum(g.gameDate) === mo))), row("Total", r.recs)].map((v) => h("tr", { class: v[0] === "Total" ? "tot" : "" }, v.slice(0, 4).map((x) => h("td", {}, x)), h("td", { class: devCls(v[5]) }, v[4]))))))));
+              ...[...months.map((mo) => row(`${mo}월`, r.recs.filter((g) => mnum(g.gameDate) === mo))), row("Total", r.recs)].map((v) => h("tr", v[0] === "Total" || v[1] === "—" ? { class: v[0] === "Total" ? "tot" : "" } : { class: "qtap", onclick: (e) => { e.stopPropagation(); rankQuarterPopup(r.m, y, q, r.recs, mm, parseInt(v[0])); } }, v.slice(0, 4).map((x) => h("td", {}, x)), h("td", { class: devCls(v[5]) }, v[4]))))))));
         });
     } else {
       const P = { 전분기: [1, 12], "1분기": [1, 3], "2분기": [4, 6], "3분기": [7, 9], "4분기": [10, 12], 상반기: [1, 6], 하반기: [7, 12] }[QS.period];

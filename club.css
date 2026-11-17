@@ -805,3 +805,10 @@ body.phmode .phpickit{font-size:15px}
 .rkpop .tbmini.rk{width:100%;flex:1;table-layout:fixed;height:100%}
 .rkpop .tbmini.rk td{height:auto!important;padding:0 1px!important;font-size:12.5px;line-height:1.1}
 .pcmodal.rkm *{scrollbar-width:none}.pcmodal.rkm *::-webkit-scrollbar{display:none}
+.rkpop td.r200{color:#B00020!important;font-weight:800}
+.pcmodal.rkm.rk1 .pcdlg{height:auto!important}
+.pcmodal.rkm.rk1 .pcdlg-b{flex:none}
+.pcmodal.rkm.rk1 .rkpop{height:auto}.pcmodal.rkm.rk1 .rkmo{flex:none}
+.pcmodal.rkm.rk1 .tbmini.rk{flex:none;height:auto}
+.pcmodal.rkm.rk1 .tbmini.rk td{height:34px!important;font-size:13.5px}
+.pcmodal.rkm.rk1 .tbmh{height:30px;font-size:15px}
