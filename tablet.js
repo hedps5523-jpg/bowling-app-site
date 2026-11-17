@@ -1283,6 +1283,11 @@
     }
     nav.append(h("button", { class: "tbbtn file pcbtn", type: "button", onclick: (e) => openFileMenu(e.currentTarget) }, "FILE"));
     for (const k of ["games", "ledger", "fees", "quarter", "album"]) nav.append(h("button", { class: "tbbtn" + (current === k ? " sel" : ""), type: "button", onclick: () => go(k) }, TAB_LABEL[k]));
+    const oldRf = $("hdrRefresh"); if (oldRf) oldRf.remove();
+    if (!VIEWONLY && me) {
+      const rf = h("button", { type: "button", class: "pcbtn hdrrefresh", id: "hdrRefresh", title: "홈페이지·서버의 변경 내용 갱신", "aria-label": "새로고침", onclick: async () => { rf.disabled = true; rf.classList.add("spin"); try { await reload("최신 자료로 갱신했어요."); render(); } catch (e) { toast(e.message); } finally { rf.disabled = false; rf.classList.remove("spin"); } } }, "↻");
+      $("authStatus").before(rf);
+    }
     $("authStatus").textContent = me ? `${me.isAdmin ? "관리자" : VIEWONLY ? "조회" : "회원"} · ${mgr}` : "";
     $("authStatus").title = me ? `${me.siteName || me.name || ""} · 서버 v${S.dataVersion}` : "";
     $("logoutBtn").textContent = VIEWONLY ? "홈으로" : "로그아웃";

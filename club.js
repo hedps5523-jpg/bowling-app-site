@@ -1640,13 +1640,14 @@ TABS.settings = {
       secBox("동기화 관리", h("div", { class: "envbtnrow" }, bigBtn("↻  서버 원본 동기화", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); work("서버 원본 동기화"); render(); } catch (e) { toast(e.message); } }), bigBtn("↥  UpLoad", () => toast("웹에서는 저장하는 즉시 서버에 반영돼요."))))),
       secBox("서버 정보 및 관리", h("div", { class: "envinfo" }, h("span", {}, "Supabase 프로젝트 URL"), h("span", {}, "https://***********.supabase.co ", h("button", { class: "pcbtn sm", type: "button", onclick: async () => { try { await navigator.clipboard.writeText(VH_URL); work("Supabase 프로젝트 URL 복사"); toast("복사했어요."); } catch { toast("복사하지 못했어요."); } } }, "복사")),
         h("span", {}, "프로젝트 상태"), h("span", {}, statusV, " ", checkBtn), h("span", {}, "마지막 재시작 시간"), h("span", {}, "-"), h("span", {}, "앱 버전"), h("span", {}, "웹 클럽관리")),
-        h("p", { class: "pcnote" }, "✓ 서버 상태를 확인하여 PC/모바일이 최신 자료로 동작합니다.", h("br"), "✓ 프로젝트 URL은 보안상 일부만 표시됩니다.", h("br"), "※ 승인관리·서버 재실행은 모바일 볼링클럽/서버 관리 화면에서 처리해요.")),
+        h("p", { class: "pcnote" }, "✓ 서버 상태를 확인하여 PC/모바일이 최신 자료로 동작합니다.", h("br"), "✓ 프로젝트 URL은 보안상 일부만 표시됩니다.", h("br"), "※ 서버 재실행은 모바일 볼링클럽/서버 관리 화면에서 처리해요.")),
       secBox("최근 작업", h("div", { class: "pctable-wrap", style: "max-height:180px" }, h("table", { class: "pct", style: "min-width:0" }, h("thead", {}, h("tr", {}, h("th", { style: "width:110px" }, "시간"), h("th", {}, "작업 내용"))), logBody))));
     drawLog(); setTimeout(check, 0);
     /* ---- 하단 확인/취소 ---- */
-    const approval = approvalPanel();
-    const panels = { basic, server, ledger, approval }, tabsRow = h("div", { class: "envtabs" });
-    const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"], ["approval", "승인관리"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; };
+    const approval = approvalPanel(); approval.className = "envapproval"; approval.hidden = false;
+    server.insertBefore(approval, server.children[1] || null);
+    const panels = { basic, server, ledger }, tabsRow = h("div", { class: "envtabs" });
+    const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; };
     showSub();
     const okBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", disabled: ro }, "확인"), cancelBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", onclick: () => go(ST.back || "games") }, "취소");
     okBtn.onclick = async () => {
@@ -1671,7 +1672,7 @@ TABS.settings = {
         if (await save(ops, `환경설정이 저장되었습니다. (서버 공용 변경 ${ops.length}건)`)) { work(`환경설정 저장 ${ops.length}건`); go(ST.back || "games"); } else okBtn.disabled = false;
       } catch (e) { toast("환경설정을 저장하지 못했습니다.\n" + e.message, 4200); }
     };
-    const root = h("section", { class: "pcbox envroot" }, h("div", { class: "pcform envtop", style: "justify-content:space-between" }, tabsRow, roBadge()), basic, server, ledger, approval,
+    const root = h("section", { class: "pcbox envroot" }, h("div", { class: "pcform envtop", style: "justify-content:space-between" }, tabsRow, roBadge()), basic, server, ledger,
       h("div", { class: "envfoot", style: "text-align:center;margin-top:6px" }, okBtn, " ", cancelBtn));
     view.append(root);
     showSub();

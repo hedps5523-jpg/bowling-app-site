@@ -708,3 +708,8 @@ body.phmode .phfixed .phlbar .phpillbtn{height:34px}body.phmode .phfixed .phlbar
   body.pc .envbasic>.envband .envsec-h{font-size:13px !important;padding:0 8px !important}
   body.pc .envbasic>.envband .envsec-b{padding:1px 6px 3px}
 }
+.hdrrefresh{padding:3px 8px;font-size:16px;line-height:1;margin-right:6px}
+.hdrrefresh.spin{animation:hdrspin .8s linear infinite}@keyframes hdrspin{to{transform:rotate(360deg)}}
+.envscroll>.envapproval{flex:none;display:block;margin:0 0 8px;padding:0}
+.envscroll>.envapproval .envapb{flex:none;min-height:0}
+.envscroll>.envapproval .aplist{min-height:120px;max-height:260px}
