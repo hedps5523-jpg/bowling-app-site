@@ -942,3 +942,6 @@ body.phmode .topbar .burger{width:40px}
 body.phmode .topbar .phtbar .phmenu{padding:0 8px}
 /* 세로 화면 환경설정: 탭 줄 고정 (기본DATA·서버관리) */
 .envroot.envstick>.envtop{position:sticky;top:var(--abh,60px);z-index:20;background:var(--bg,#F2F6FB);padding:6px 0!important;border-bottom:1px solid #DCE6F3;margin:0!important;flex-wrap:wrap}
+
+.pendbar{position:fixed;right:12px;bottom:14px;z-index:80;border:0;border-radius:99px;background:#e8590c;color:#fff;font:800 14px/1 inherit;padding:11px 16px;box-shadow:0 3px 12px rgba(0,0,0,.28);cursor:pointer}
+.pendbar[hidden]{display:none}

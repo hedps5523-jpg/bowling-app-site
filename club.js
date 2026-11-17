@@ -301,11 +301,101 @@ const SnapCache = {
   async save(snap) { const d = await this.db(); if (!d) return; try { d.transaction("snap", "readwrite").objectStore("snap").put({ snap, at: Date.now() }, this.key()); } catch {} },
   async clear() { const d = await this.db(); if (!d) return; try { d.transaction("snap", "readwrite").objectStore("snap").clear(); } catch {} },
 };
-async function reload(msg) {
-  const snap = await Conn.snapshot();
+/* =====================================================================
+   2-1) UpLoad 대기: 입력·수정은 먼저 이 기기(대기 목록)에만 반영하고, UpLoad 를 눌러야 서버에 한꺼번에 저장해요.
+   ===================================================================== */
+const PK = { members: "member_id", games: "record_id", ledger_entries: "ledger_id", lockers: "locker_id" };
+const natKey = (e, p) => e === "fee_payments" ? `${p.member_id}|${p.fee_year}|${p.fee_month}` : e === "quarter_base_averages" ? `${p.member_id}|${p.year}|${p.quarter}` : e === "app_settings" ? String(p.setting_key) : null;
+const opKey = (o) => o.entity + "|" + (natKey(o.entity, o.payload) ?? String(o.action === "insert" ? o._tmp : o.payload[PK[o.entity]]));
+const Pend = {
+  base: null, ops: [], ver: null, dropped: false,
+  lsKey() { return "clubPend|" + SnapCache.key(); },
+  persist() { try { if (this.ops.length) localStorage.setItem(this.lsKey(), JSON.stringify({ ver: this.ver, ops: this.ops })); else localStorage.removeItem(this.lsKey()); } catch {} },
+  restore() {
+    try {
+      const d = JSON.parse(localStorage.getItem(this.lsKey()) || "null");
+      if (d && Array.isArray(d.ops) && d.ops.length && this.base && d.ver === this.base.dataVersion) { this.ops = d.ops; this.ver = d.ver; }
+      else if (d) localStorage.removeItem(this.lsKey());
+    } catch {}
+  },
+  drop() { this.ops = []; this.ver = null; this.persist(); },
+  nextId(q, entity) {
+    const col = PK[entity]; let m = 0;
+    for (const r of (this.base.tables[entity] || [])) m = Math.max(m, int(r[col]));
+    for (const x of q) if (x.entity === entity && x._tmp) m = Math.max(m, x._tmp);
+    return m + 1;
+  },
+  add(list) {
+    const q = this.ops.map((o) => ({ ...o }));
+    const tmpM = new Set(q.filter((o) => o.entity === "members" && o._tmp).map((o) => o._tmp));
+    for (const o0 of list) {
+      const o = { ...o0, payload: { ...o0.payload } }, col = PK[o.entity];
+      if (o.entity !== "members" && tmpM.has(int(o.payload.member_id))) throw new Error("방금 등록한 회원은 UpLoad 후에 기록·회비·락카를 입력할 수 있어요. 먼저 UpLoad를 눌러 주세요.");
+      if (col && o.action === "insert") { o._tmp = this.nextId(q, o.entity); o.payload[col] = 0; }
+      const key = opKey(o), i = q.findIndex((x) => opKey(x) === key);
+      if (i < 0) { q.push(o); continue; }
+      const ex = q[i];
+      if (ex.action === "insert") {
+        if (o.action === "delete") q.splice(i, 1);
+        else q[i] = { ...ex, payload: col ? { ...o.payload, [col]: 0 } : o.payload };
+      } else if (ex.action === "update") {
+        q[i] = o.action === "delete" ? { ...o, expected_row_version: ex.expected_row_version } : { ...ex, payload: o.payload };
+      } else if (o.action === "insert") q[i] = { ...o, action: "update", expected_row_version: ex.expected_row_version };
+    }
+    this.ops = q; this.ver = this.base.dataVersion; this.persist();
+  },
+  work() {
+    const t = {};
+    for (const k of Object.keys(this.base.tables)) t[k] = (this.base.tables[k] || []).map((r) => ({ ...r }));
+    let seq = 1e9;
+    for (const o of this.ops) {
+      const rows = t[o.entity] || (t[o.entity] = []), col = PK[o.entity], p = o.payload;
+      const id = col ? String(o.action === "insert" ? o._tmp : p[col]) : null, nk = natKey(o.entity, p);
+      const hit = (r) => col ? String(r[col]) === id : natKey(o.entity, r) === nk;
+      if (o.action === "insert") { const r = { ...p }; if (col) r[col] = o._tmp; else if (o.entity === "fee_payments") r.payment_id = seq++; rows.push(r); }
+      else if (o.action === "update") { const i = rows.findIndex(hit); if (i >= 0) rows[i] = { ...rows[i], ...p }; }
+      else if (o.action === "delete") t[o.entity] = rows.filter((r) => !hit(r));
+    }
+    return t;
+  },
+  payloadOps() { return this.ops.map(({ _tmp, ...o }) => o); },
+};
+function rebuildWork() {
   Svc._seeded = new Set(); Svc._weeks = {};
-  buildSnapshot(snap);
+  buildSnapshot({ dataVersion: Pend.base.dataVersion, tables: Pend.ops.length ? Pend.work() : Pend.base.tables });
+  pendBar();
+}
+function pendBar() {
+  let b = $("pendbar");
+  if (!b) { b = h("button", { id: "pendbar", type: "button", class: "pendbar", hidden: true, onclick: () => uploadPending() }); document.body.append(b); }
+  const n = Pend.ops.length; b.hidden = !n; b.textContent = `↥ UpLoad 대기 ${n}건`;
+}
+async function uploadPending() {
+  if (!canWrite()) return toast("조회 전용 계정은 올릴 수 없어요.");
+  const n = Pend.ops.length;
+  if (!n) return toast("서버에 올릴 입력·수정 내용이 없어요.");
+  if (n > 500) return toast("한 번에 500건까지 올릴 수 있어요. (현재 " + n + "건)", 4200);
+  if (!(await confirmBox(`입력·수정한 ${n}건을 서버에 올릴까요?`))) return;
+  try { await Conn.upload(Pend.payloadOps()); }
+  catch (e) { toast(/다른 기기/.test(e.message) ? "다른 기기에서 먼저 바뀐 자료가 있어 올리지 못했어요.\n서버 원본 동기화로 최신 자료를 받은 뒤 다시 입력해 주세요. (대기 입력은 그대로 있어요)" : e.message, 6000); return; }
+  Pend.drop();
+  try { await reload(null, { keep: true }); render(); toast(`${n}건을 서버에 업로드했어요.`); }
+  catch (e) { toast(`${n}건을 올렸어요. 화면 갱신은 서버 원본 동기화로 해 주세요.`, 4200); }
+}
+window.addEventListener("beforeunload", (e) => { if (Pend.ops.length) { e.preventDefault(); e.returnValue = ""; } });
+
+async function reload(msg, opt) {
+  const keep = !!(opt && opt.keep);
+  if (Pend.ops.length && !keep) {
+    if (!(await confirmBox(`UpLoad하지 않은 입력·수정이 ${Pend.ops.length}건 있어요.\n서버 자료로 바꾸면 이 내용은 사라져요. 계속할까요?`))) throw new Error("취소했어요. 대기 중인 입력은 그대로예요.");
+    Pend.drop();
+  }
+  const snap = await Conn.snapshot();
   SnapCache.save(snap);
+  Pend.base = snap;
+  if (keep && !Pend.ops.length) Pend.restore();
+  if (Pend.ops.length && Pend.ver !== snap.dataVersion) { Pend.drop(); Pend.dropped = true; toast("서버 자료가 바뀌어 UpLoad 대기 입력을 취소했어요. 다시 입력해 주세요.", 5000); }
+  rebuildWork();
   if (msg) toast(msg);
 }
 
@@ -347,7 +437,7 @@ function openFileMenu(btn) {
   const view1 = VIEWONLY;
   const ph = document.body.classList.contains("phmode");
   m.append(...(ph ? [] : [item("회원관리", () => go("members"))]), ...(view1 ? [] : [...(ph ? [] : [item("락카 사용현황", () => go("lockers"))]), item("연락처(뷰)", contactView)]), ...(ph ? [] : [h("hr")]),
-    item("환경설정", () => go("settings")), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
+    item("환경설정", () => go("settings")), ...(view1 ? [] : [item(`UpLoad (대기 ${Pend.ops.length}건)`, uploadPending)]), item("서버 원본 동기화 (새로고침)", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); render(); } catch (e) { toast(e.message); } }), h("hr"),
     ...(Conn.mode === "site" ? [item("클럽 계정 연결 해제", unlinkClub)] : []),
     item(view1 ? "홈으로" : "로그아웃", logout));
   const r = btn.getBoundingClientRect(); m.style.left = r.left + "px"; m.style.top = r.bottom + 2 + "px"; m.style.maxWidth = (innerWidth - 16) + "px"; m.hidden = false;
@@ -438,8 +528,8 @@ function memberPayload(m) {
   return { member_id: m.memberId || 0, name: m.name, phone: m.phone, grade: m.grade, gender: m.gender || null, join_date: m.joinDate || "", current_base_average: m.currentBaseAverage, locker_number: "", fee_exempt: m.feeExempt, fee_start_month: m.feeStartMonth, fee_start_year: m.feeStartYear, executive_three_month_exempt: m.executiveThreeMonthExempt, withdrawal_date: m.withdrawalDate || "", rejoin_date: m.rejoinDate || "", rejoin_fee_start_month: m.rejoinFeeStartMonth, rejoin_fee_start_year: m.rejoinFeeStartYear };
 }
 async function save(ops, okMsg) {
-  try { await Conn.upload(ops); await reload(); render(); toast(okMsg); return true; }
-  catch (e) { if (/다른 기기/.test(e.message)) { try { await reload(); render(); } catch {} } toast(e.message, 4200); return false; }
+  try { Pend.add(ops); rebuildWork(); render(); toast(String(okMsg || "").replace(/\.$/, "") + " · UpLoad 대기 " + Pend.ops.length + "건"); return true; }
+  catch (e) { toast(e.message, 4200); return false; }
 }
 
 TABS.members = {
@@ -1649,7 +1739,7 @@ TABS.settings = {
     };
     const server = h("div", { class: "envpanel envscroll envserver" }, h("div", { class: "envtwo" },
       secBox("자료 관리", h("div", { class: "envbtnrow" }, bigBtn("↥  자료 백업", backup), bigBtn("↧  자료 복원", () => toast("자료 복원·초기화는 PC 프로그램에서 사용해요."), true), bigBtn("⚙  초기화", () => toast("자료 복원·초기화는 PC 프로그램에서 사용해요."), true))),
-      secBox("동기화 관리", h("div", { class: "envbtnrow" }, bigBtn("↻  서버 원본 동기화", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); work("서버 원본 동기화"); render(); } catch (e) { toast(e.message); } }), bigBtn("↥  UpLoad", () => toast("웹에서는 저장하는 즉시 서버에 반영돼요."))))),
+      secBox("동기화 관리", h("div", { class: "envbtnrow" }, bigBtn("↻  서버 원본 동기화", async () => { try { await reload("서버 최신 자료를 다시 불러왔어요."); work("서버 원본 동기화"); render(); } catch (e) { toast(e.message); } }), bigBtn("↥  UpLoad", uploadPending)))),
       secBox("서버 정보 및 관리", h("div", { class: "envinfo" }, h("span", {}, "Supabase 프로젝트 URL"), h("span", {}, "https://***********.supabase.co ", h("button", { class: "pcbtn sm", type: "button", onclick: async () => { try { await navigator.clipboard.writeText(VH_URL); work("Supabase 프로젝트 URL 복사"); toast("복사했어요."); } catch { toast("복사하지 못했어요."); } } }, "복사")),
         h("span", {}, "프로젝트 상태"), h("span", {}, statusV, " ", checkBtn), h("span", {}, "마지막 재시작 시간"), h("span", {}, "-"), h("span", {}, "앱 버전"), h("span", {}, "웹 클럽관리")),
         h("p", { class: "pcnote" }, "✓ 서버 상태를 확인하여 PC/모바일이 최신 자료로 동작합니다.", h("br"), "✓ 프로젝트 URL은 보안상 일부만 표시됩니다.", h("br"), "※ 서버 재실행은 모바일 볼링클럽/서버 관리 화면에서 처리해요.")),
@@ -1808,6 +1898,8 @@ async function unlinkClub() {
 }
 async function logout() {
   if (VIEWONLY) { location.href = "/"; return; }
+  if (Pend.ops.length && !(await confirmBox(`UpLoad하지 않은 입력·수정이 ${Pend.ops.length}건 있어요.\n나가면 대기 중인 입력은 서버에 저장되지 않아요. 계속할까요?`))) return;
+  Pend.drop();
   if (Conn.mode === "site") { if (!(await confirmBox("홈페이지 계정으로 들어와 있어요.\n클럽관리에서만 나가고, 모바일 계정으로 로그인 화면을 열까요?"))) return; }
   await SnapCache.clear(); await Conn.logout(); sessionStorage.setItem("clubSkipSite", "1"); loginView();
 }
@@ -1822,14 +1914,14 @@ async function boot() {
   const cached = await SnapCache.load();
   if (cached) {
     // 저장본으로 먼저 화면을 보여 주고, 서버 최신 자료는 뒤에서 받아요
-    try { Svc._seeded = new Set(); Svc._weeks = {}; buildSnapshot(cached); } catch { SnapCache.clear(); location.reload(); return; }
+    try { Pend.base = cached; Pend.restore(); rebuildWork(); } catch { SnapCache.clear(); location.reload(); return; }
     if (TITLES[k]) current = k;
     render();
     const v0 = S.dataVersion;
-    reload().then(() => { if (S.dataVersion !== v0) render(); }).catch((e) => { if (e.message === "login") loginView("expired"); });
+    reload(null, { keep: true }).then(() => { if (S.dataVersion !== v0 || Pend.dropped) render(); }).catch((e) => { if (e.message === "login") loginView("expired"); });
     return;
   }
-  try { await reload(); } catch (e) { if (e.message === "login") return loginView("expired"); view.textContent = ""; view.append(h("section", { class: "card" }, "자료를 불러오지 못했어요: " + e.message)); return; }
+  try { await reload(null, { keep: true }); } catch (e) { if (e.message === "login") return loginView("expired"); view.textContent = ""; view.append(h("section", { class: "card" }, "자료를 불러오지 못했어요: " + e.message)); return; }
   if (TITLES[k]) current = k;
   render();
 }
@@ -1843,7 +1935,7 @@ const AutoSync = {
     return true;
   },
   async check(force) {
-    if (this.busy || document.hidden || !Conn.me || !S.dataVersion) return;
+    if (this.busy || document.hidden || !Conn.me || !S.dataVersion || Pend.ops.length) return; // UpLoad 대기 중에는 덮어쓰지 않아요
     if (!force && Date.now() - this.last < 30000) return;       // 너무 자주 확인하지 않게 30초 간격
     this.busy = true; this.last = Date.now();
     try {
@@ -1851,8 +1943,8 @@ const AutoSync = {
       const snap = await Conn.snapshot();
       if (snap.dataVersion === v0) return;
       for (let i = 0; i < 20 && !this.idle(); i++) await new Promise((r) => setTimeout(r, 1500)); // 입력이 끝날 때까지 잠깐 기다림
-      if (!this.idle()) return;                                  // 계속 입력 중이면 다음 확인 때 반영
-      Svc._seeded = new Set(); Svc._weeks = {}; buildSnapshot(snap); SnapCache.save(snap);
+      if (!this.idle() || Pend.ops.length) return;               // 계속 입력 중이면 다음 확인 때 반영
+      Pend.base = snap; rebuildWork(); SnapCache.save(snap);
       render();
       toast("서버의 새 자료로 갱신했어요.");
     } catch (e) { /* 네트워크 오류는 조용히 무시 */ }
