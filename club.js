@@ -1648,8 +1648,8 @@ TABS.settings = {
     /* ---- 하단 확인/취소 ---- */
     const approval = approvalPanel(); approval.className = "envapproval"; approval.hidden = false;
     server.append(approval);
-    /* 좁은 세로 화면: 기본DATA·서버관리는 탭 줄까지 고정(스크롤해도 안 움직임), 수입/지출은 기존 방식 */
-    const stick = () => { const r = document.querySelector(".envroot"); if (!r) return; const ab = document.querySelector(".appbar"); r.style.setProperty("--abh", (ab ? ab.offsetHeight : 0) + "px"); r.classList.toggle("envstick", ST.sub !== "ledger" && narrowPortrait()); };
+    /* 좁은 세로 화면: 기본DATA·서버관리·수입/지출 모두 탭 줄까지 고정(스크롤해도 안 움직임) */
+    const stick = () => { const r = document.querySelector(".envroot"); if (!r) return; const ab = document.querySelector(".appbar"); r.style.setProperty("--abh", (ab ? ab.offsetHeight : 0) + "px"); r.classList.toggle("envstick", narrowPortrait()); };
     window.addEventListener("resize", stick);
     const panels = { basic, server, ledger }, tabsRow = h("div", { class: "envtabs" });
     const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; nameRow.hidden = ST.sub !== "basic"; stick(); };
