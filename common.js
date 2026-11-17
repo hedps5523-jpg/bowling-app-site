@@ -64,7 +64,7 @@ function initAppItems(dd, close) {
 }
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 
-/* ---------- 하단 메뉴 (모든 화면) : 회원 · 내 앱 · 홈 · 강의 · 공지·투표 ---------- */
+/* ---------- 하단 메뉴 (모든 화면) : 회원 · 내 앱 · 홈 · 기록 조회 · 공지·투표 ---------- */
 const BNAV = [["members", "/#/members", "👥", "회원"], ["myapps", "/myapps", "📲", "내 앱"], ["home", "/#/", "🏠", "홈"], ["records", "/records", "📊", "기록 조회"], ["notices", "/#/notices", "📣", "공지·투표"]];
 function setBnav(active) {
   let nav = document.getElementById("bnav");

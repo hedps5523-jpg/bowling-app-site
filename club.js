@@ -292,10 +292,20 @@ const Svc = {
   effectiveBaseAverage(m, ref = todayStr()) { return m ? this.quarterBaseAverage(m, yearOf(ref), this.quarterFromDate(ref)) : 0; },
 };
 
+/* 서버 자료 로컬 보관(IndexedDB): 처음 읽은 자료를 기기에 저장해 두고, 다음부터는 저장본으로 먼저 화면을 보여 준 뒤
+   서버에서 최신 자료를 받아 달라진 때만 다시 그려요. (로그아웃·연결 해제 시 삭제) */
+const SnapCache = {
+  key() { const m = Conn.me || {}; return `${Conn.mode || ""}|${VIEWONLY ? "v" : "c"}|${m.loginId || m.siteName || m.name || ""}`; },
+  db() { return new Promise((res) => { try { const q = indexedDB.open("clubSnap", 1); q.onupgradeneeded = () => q.result.createObjectStore("snap"); q.onsuccess = () => res(q.result); q.onerror = () => res(null); } catch { res(null); } }); },
+  async load() { const d = await this.db(); if (!d) return null; return new Promise((res) => { try { const r = d.transaction("snap").objectStore("snap").get(this.key()); r.onsuccess = () => res(r.result && r.result.snap && r.result.snap.tables ? r.result.snap : null); r.onerror = () => res(null); } catch { res(null); } }); },
+  async save(snap) { const d = await this.db(); if (!d) return; try { d.transaction("snap", "readwrite").objectStore("snap").put({ snap, at: Date.now() }, this.key()); } catch {} },
+  async clear() { const d = await this.db(); if (!d) return; try { d.transaction("snap", "readwrite").objectStore("snap").clear(); } catch {} },
+};
 async function reload(msg) {
   const snap = await Conn.snapshot();
   Svc._seeded = new Set(); Svc._weeks = {};
   buildSnapshot(snap);
+  SnapCache.save(snap);
   if (msg) toast(msg);
 }
 
@@ -1794,12 +1804,12 @@ function linkView(st) {
 }
 async function unlinkClub() {
   if (!(await confirmBox("이 홈페이지 계정과 클럽 계정의 연결을 해제할까요?\n해제하면 다시 클럽 비밀번호로 연결해야 해요."))) return;
-  try { await Conn.unlinkClub(); await Conn.logout(); sessionStorage.removeItem("clubSkipSite"); await boot(); } catch (e) { toast(e.message); }
+  try { await Conn.unlinkClub(); await SnapCache.clear(); await Conn.logout(); sessionStorage.removeItem("clubSkipSite"); await boot(); } catch (e) { toast(e.message); }
 }
 async function logout() {
   if (VIEWONLY) { location.href = "/"; return; }
   if (Conn.mode === "site") { if (!(await confirmBox("홈페이지 계정으로 들어와 있어요.\n클럽관리에서만 나가고, 모바일 계정으로 로그인 화면을 열까요?"))) return; }
-  await Conn.logout(); sessionStorage.setItem("clubSkipSite", "1"); loginView();
+  await SnapCache.clear(); await Conn.logout(); sessionStorage.setItem("clubSkipSite", "1"); loginView();
 }
 async function boot() {
   view.textContent = ""; view.append(h("section", { class: "card" }, h("p", { class: "tag" }, "서버 자료를 불러오는 중…")));
@@ -1808,8 +1818,19 @@ async function boot() {
   else st = await Conn.start();
   if (st.need === "link") return linkView(st);
   if (st.need) return loginView(st.reason);
+  const k = location.hash.replace("#", "");
+  const cached = await SnapCache.load();
+  if (cached) {
+    // 저장본으로 먼저 화면을 보여 주고, 서버 최신 자료는 뒤에서 받아요
+    try { Svc._seeded = new Set(); Svc._weeks = {}; buildSnapshot(cached); } catch { SnapCache.clear(); location.reload(); return; }
+    if (TITLES[k]) current = k;
+    render();
+    const v0 = S.dataVersion;
+    reload().then(() => { if (S.dataVersion !== v0) render(); }).catch((e) => { if (e.message === "login") loginView("expired"); });
+    return;
+  }
   try { await reload(); } catch (e) { if (e.message === "login") return loginView("expired"); view.textContent = ""; view.append(h("section", { class: "card" }, "자료를 불러오지 못했어요: " + e.message)); return; }
-  const k = location.hash.replace("#", ""); if (TITLES[k]) current = k;
+  if (TITLES[k]) current = k;
   render();
 }
 $("logoutBtn").onclick = logout;
