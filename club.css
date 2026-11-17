@@ -875,3 +875,31 @@ td.r200{color:#B00020!important;font-weight:800}
 }
 .envsec-ht{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .envsec-ht .pcbtn{margin:0;padding:3px 12px;height:auto;line-height:1.3;font-size:13px}
+/* 게임기록 입력줄(중간 폭 가로): 한 줄 배치 */
+@media (orientation:landscape) and (min-width:760px) and (max-width:1240px){
+  body.tbon .tbcard:has(.tbin.num){flex-wrap:nowrap;overflow:hidden;gap:4px 5px}
+  body.tbon .tbcard:has(.tbin.num) .tbf{gap:3px;flex:none}
+  body.tbon .tbcard:has(.tbin.num) .tblab{margin-left:1px;font-size:12px;white-space:nowrap}
+  body.tbon .tbcard:has(.tbin.num) .tbsel{max-width:92px;padding:0 3px!important;font-size:13px;text-overflow:ellipsis}
+  body.tbon .tbcard:has(.tbin.num) .tbin.num{width:42px!important;padding:0 2px!important;font-size:13px}
+  body.tbon .tbcard:has(.tbin.num) .tbf.full,body.tbon .tbcard:has(.tbin.num) .tbin.note{flex:1 1 60px!important;min-width:50px}
+  body.tbon .tbcard:has(.tbin.num) .tbbtn{white-space:nowrap;padding:0 9px}
+}
+@media (orientation:landscape) and (min-width:760px) and (max-width:1240px){
+  body.tbon .tbcard:has(.tbin.num) .tbsel{flex:none;min-width:70px;width:auto}
+  body.tbon .tbcard:has(.tbin.num) .tbin.num{flex:none}
+}
+@media (orientation:landscape) and (min-width:760px) and (max-width:1240px){
+  body.tbon .tbcard:has(.tbin.num) .tbf>.tbsel{width:80px!important;min-width:0;max-width:80px}
+}
+@media (orientation:landscape) and (min-width:760px) and (max-width:1240px){
+  body.tbon .tbcard:has(.tbin.num) .tbf.full:has(.tbsel){flex:none!important;min-width:0}
+  body.tbon .tbcard:has(.tbin.num) .tbf.full>.tbsel{width:84px!important;max-width:84px}
+}
+@media (orientation:landscape) and (min-width:760px) and (max-width:1240px){
+  body.tbon .tbcard:has(.tbin.num){gap:3px 4px;padding:5px 8px}
+  body.tbon .tbcard:has(.tbin.num) .tbf>.tbsel,body.tbon .tbcard:has(.tbin.num) .tbf.full>.tbsel{width:74px!important;max-width:74px}
+  body.tbon .tbcard:has(.tbin.num) .tbin.num{width:38px!important}
+  body.tbon .tbcard:has(.tbin.num) .tbin.note{min-width:64px}
+  body.tbon .tbcard:has(.tbin.num) .tbbtn{padding:0 7px}
+}
