@@ -8,8 +8,8 @@
    ===================================================================== */
 (function () {
   const TB = { input: null, wasOn: null };
-  // PC·노트북(마우스) 또는 터치 태블릿·폴드 가로 화면(폭 900px 이상, 가로가 더 긴 화면)
-  const TB_ON = () => window.innerWidth >= 900 && (document.documentElement.getAttribute("data-dev") === "desktop" || window.innerWidth > window.innerHeight);
+  // PC·노트북(마우스, 폭 900px 이상) 또는 터치 태블릿·폴드 가로 화면(가로가 더 길고 폭 700px·높이 600px 이상)
+  const TB_ON = () => { const w = window.innerWidth, h = window.innerHeight; return (w >= 900 && document.documentElement.getAttribute("data-dev") === "desktop") || (w > h && w >= 700 && h >= 600); };
   const PHONE = () => !TB_ON(); // 휴대폰·일반 태블릿 세로(좁은 화면): 모바일 볼링클럽 세로화면 배치
   const MODE_KEY = () => (TB_ON() ? "tb" : "ph");
   const TB_KEYS = ["games", "ledger", "fees", "quarter", "album", "members", "lockers"];
@@ -485,7 +485,7 @@
     const detail = h("div", { class: "tbdetail" }, h("b", { class: "tbdh" }, who ? `${who.name} · 상세내역` : "회원을 선택하세요"));
     months.forEach((mo) => {
       const recs = stat.filter((g) => g.memberId === GS.qMember && ynum(g.gameDate) === y && mnum(g.gameDate) === mo);
-      const k = `q${y}-${mo}`, isOpen = MOPEN.has(k);
+      const k = `q${y}-${mo}`, isOpen = !MOPEN.has(k); // 분기에버는 펼침이 기본
       detail.append(h("div", { class: "tbmh tgl", onclick: () => toggleM(k) }, h("b", {}, h("i", { class: "chv" }, isOpen ? "▾" : "▸"), `${mo}월`), h("b", { class: "blue" }, "에버 : " + (recs.some((g) => cnt(g) > 0) ? fmt1(recAvg(recs)) : "-"))));
       const wc = recs.some((g) => Math.floor((dnum(g.gameDate) - 1) / 7) >= 4) ? 5 : 4;
       const tr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v) => h("td", {}, v)));
