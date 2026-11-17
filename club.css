@@ -825,3 +825,6 @@ body.phmode .phpickit{font-size:15px}
 .pcmodal.rkm.rk1 .tbmini.rk{flex:none!important;height:auto!important}
 .pcmodal.rkm.rk1 .tbmini.rk td{height:auto!important;padding:3px 1px!important;line-height:1.15!important}
 .pcmodal.rkm.rk1 .tbmh{height:32px!important;margin:0 2px 2px!important}
+td.r200{color:#B00020!important;font-weight:800}
+.tbdh u.tbtap{cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:#1f5fbf}
+@media (min-width:700px){.pcmodal.rkm .pcdlg{width:min(98vw,600px)!important}.pcmodal.rkm .rkpop{user-select:none}}

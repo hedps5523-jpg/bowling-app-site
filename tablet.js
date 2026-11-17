@@ -279,6 +279,13 @@
       const nx = cur + (dx < 0 ? 1 : -1); if (nx < lo || nx > hi) return;
       cur = nx; draw(dx < 0 ? 1 : -1);
     }, { passive: true });
+    let mx = null;
+    body.addEventListener("mousedown", (e) => { mx = [e.clientX, e.clientY]; });
+    body.addEventListener("mouseup", (e) => {
+      if (!mx) return; const dx = e.clientX - mx[0], dy = e.clientY - mx[1]; mx = null;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      const nx = cur + (dx < 0 ? 1 : -1); if (nx < lo || nx > hi) return; cur = nx; draw(dx < 0 ? 1 : -1);
+    });
     const md = $("modal"); md.classList.add("rkm"); md.classList.toggle("rk1", !!onlyMo);
     const pr = modal($("modalTitle").textContent, body, [["닫기", "close"]]);
     return pr.then((v) => { md.classList.remove("rkm", "rk1"); return v; });
@@ -413,7 +420,7 @@
       const wm = mm.get(GS.rankMember);
       const rdet = h("div", { class: "tbdetail" }, h("b", { class: "tbdh" }, wm ? `${wm.name} · ${year}년 상세내역` : "회원을 선택하세요"));
       const mine = stat.filter((g) => g.memberId === GS.rankMember && ynum(g.gameDate) === year);
-      const trr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v) => h("td", {}, v)));
+      const trr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: i >= 1 && i <= 4 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
       const line = (lbl, rs) => {
         const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "-", "-", "-", "-", "-", "-", "-"];
         const per = [0, 1, 2, 3].map((i) => rs.reduce((a, g) => a + (sc(g)[i] > 0 ? sc(g)[i] : 0), 0));
@@ -535,7 +542,7 @@
       const bw = recs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c;
       return [lbl, String(c), fmt1(avg), String(best), bw > 0 ? sgn1(avg - bw) : "-"];
     };
-    const detail = h("div", { class: "tbdetail" }, h("b", { class: "tbdh" }, who ? `${who.name} · 상세내역` : "회원을 선택하세요"));
+    const detail = h("div", { class: "tbdetail" }, h("b", { class: "tbdh" }, who ? [`${who.name} · `, h("u", { class: "tbtap", title: "눌러서 월별 팝업 보기", onclick: () => { const withRec = months.filter((mo) => stat.some((g) => g.memberId === who.memberId && ynum(g.gameDate) === y && mnum(g.gameDate) === mo)); rankQuarterPopup(who, y, q, null, mm, withRec.length ? withRec[withRec.length - 1] : months[0]); } }, "상세내역 ▸")] : "회원을 선택하세요"));
     months.forEach((mo) => {
       const recs = stat.filter((g) => g.memberId === GS.qMember && ynum(g.gameDate) === y && mnum(g.gameDate) === mo);
       const k = `q${y}-${mo}`, isOpen = !MOPEN.has(k); // 분기에버는 펼침이 기본
