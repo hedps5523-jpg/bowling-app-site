@@ -900,7 +900,7 @@
     view.textContent = ""; view.append(r);
     const size = () => { const top = r.getBoundingClientRect().top, bn = document.querySelector(".bnav"), bh = bn && !bn.hidden ? bn.offsetHeight : 0; r.style.setProperty("--phh", Math.max(240, window.innerHeight - top - bh - 4) + "px"); };
     size(); window.onresize = size;
-    const restore = () => { size(); if (!oldSc) return; sc.scrollTop = keepTop; const o = sc.querySelector(".open"); if (o) { const a = sc.getBoundingClientRect(), b = o.getBoundingClientRect(); if (b.bottom > a.bottom) sc.scrollTop += Math.min(b.bottom - a.bottom + 8, b.top - a.top - 4); else if (b.top < a.top) sc.scrollTop -= a.top - b.top + 4; } };
+    const restore = () => { size(); if (!oldSc) return; sc.scrollTop = keepTop; const o = sc.querySelector(".open, .phfi.sel, .phlk.sel"); if (o) { const a = sc.getBoundingClientRect(), b = o.getBoundingClientRect(); if (b.bottom > a.bottom) sc.scrollTop += Math.min(b.bottom - a.bottom + 8, b.top - a.top - 4); else if (b.top < a.top) sc.scrollTop -= a.top - b.top + 4; } };
     restore(); requestAnimationFrame(restore); return r;
   }
   /* 회원명 선택: 6명까지 보이고 위·아래로 끌어서 이동하는 목록 */
@@ -1241,7 +1241,7 @@
     });
     if (!rows.some((r) => r.m.memberId === QS.fsel)) QS.fsel = rows.length ? rows[0].m.memberId : 0;
     const r = rows.find((x) => x.m.memberId === QS.fsel);
-    const items = rows.map((x) => h("div", { class: "phfi" + (x.m.memberId === QS.fsel ? " sel" : ""), onclick: () => { QS.fsel = x.m.memberId; phqFees(); } }, h("b", {}, x.m.name), h("span", { class: "st " + ST[x.status] }, (x.status === "미납" ? "! " : "✓ ") + x.status), h("b", { class: "amt" }, won(x.total) + "원")));
+    const items = rows.map((x) => h("div", { class: "phfi" + (x.m.memberId === QS.fsel ? " sel" : ""), onclick: () => { QS.fsel = x.m.memberId; PH_KEEP = true; phqFees(); } }, h("b", {}, x.m.name), h("span", { class: "st " + ST[x.status] }, (x.status === "미납" ? "! " : "✓ ") + x.status), h("b", { class: "amt" }, won(x.total) + "원")));
     let det = null;
     if (r) {
       const cp = r.by.get(tm), lastPaid = r.pays.reduce((a, p) => (p.paidDate > a ? p.paidDate : a), "");
@@ -1259,7 +1259,7 @@
     const ms = activeMembers().map((m) => ({ m, l: lockerOf(m.memberId) })).filter((x) => x.l).sort((a, b) => String(a.l.locker_number).localeCompare(String(b.l.locker_number), "ko", { numeric: true }));
     if (!ms.some((x) => x.m.memberId === QS.ksel)) QS.ksel = ms.length ? ms[0].m.memberId : 0;
     const s0 = ms.find((x) => x.m.memberId === QS.ksel);
-    const tiles = ms.map((x) => h("div", { class: "phlk" + (x.m.memberId === QS.ksel ? " sel" : ""), onclick: () => { QS.ksel = x.m.memberId; phqLockers(); } }, h("b", {}, String(x.l.locker_number)), h("span", { class: "use" }, "● 사용중"), h("span", {}, x.m.name)));
+    const tiles = ms.map((x) => h("div", { class: "phlk" + (x.m.memberId === QS.ksel ? " sel" : ""), onclick: () => { QS.ksel = x.m.memberId; PH_KEEP = true; phqLockers(); } }, h("b", {}, String(x.l.locker_number)), h("span", { class: "use" }, "● 사용중"), h("span", {}, x.m.name)));
     const det = s0 ? h("section", { class: "phdet white" }, h("div", { class: "top" }, h("b", { class: "big" }, String(s0.l.locker_number)), h("span", { class: "dot ok" }, "● 사용중")), h("div", { class: "who" }, s0.m.name),
       h("b", { class: "sec" }, "회원 정보"), kv([["회원명", s0.m.name], ["회원구분", s0.m.grade || "-"], ["연락처", s0.m.phone || "-"], ["성별", s0.m.gender === "MALE" ? "남자" : s0.m.gender === "FEMALE" ? "여자" : "-"], ["가입일", yy(s0.m.joinDate)], ["", ""]]),
       h("b", { class: "sec" }, "락카 정보"), kv([["락카번호", String(s0.l.locker_number)], ["상태", "사용중"], ["보증금", won(int(s0.l.deposit) || dDep) + "원"], ["1년사용료", won(int(s0.l.yearly_fee) || dFee) + "원"], ["계약일", s0.l.contract_date || st.key_locker_contract_date || "-"], ["만료일", s0.l.expiry_date || st.key_locker_expiry_date || "-"], ["비고", s0.l.note || "-"], ["", ""]])) : null;
