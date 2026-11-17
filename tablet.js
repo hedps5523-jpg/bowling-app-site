@@ -1367,7 +1367,6 @@
       const secSel = h("select", { class: "phsec", "aria-label": "구역 선택" }, list.map(([k, t]) => h("option", { value: k }, t)));
       secSel.value = list.some(([k]) => k === current) ? current : "games";
       secSel.onchange = () => go(secSel.value);
-      nav.append(secSel);
       const tools = h("span", { class: "phtools", id: "tbpill" });
       if (inputMode()) tools.append(h("button", { type: "button", class: "phmenu pcbtn file", title: "메뉴", onclick: (e) => {
         if (inputMode()) return openFileMenu(e.currentTarget);
@@ -1376,10 +1375,13 @@
         m.append(it("🎳 클럽관리", "/club"), it("🔐 관리", "/admin"), it("🏠 홈으로", "/"));
         const r = e.currentTarget.getBoundingClientRect(); m.style.left = Math.max(8, r.right - 170) + "px"; m.style.top = r.bottom + 2 + "px"; m.hidden = false;
       } }, "FILE"));
-      $("authStatus").before(tools);
       $("authStatus").textContent = "";
-      $("appName").textContent = VIEWONLY ? "기록 조회" : (TITLES[current] || "클럽관리"); // 가로 화면·홈과 같은 상단 제목
-      $("pchead").hidden = false;
+      /* 상단 제목: 가운데 문구는 고정, 바로 옆 드롭메뉴로 구역 선택 (기존 드롭메뉴 줄은 없앰) */
+      const an = $("appName"); an.textContent = ""; an.classList.add("phtitle");
+      an.append(h("span", { class: "phtt" }, VIEWONLY ? "기록 조회" : "클럽관리"), secSel);
+      const oldT = document.querySelector(".appbar .topbar > .phtools"); if (oldT) oldT.remove();
+      if (tools.childNodes.length) { tools.classList.add("phtbar"); $("burger").before(tools); }
+      $("pchead").hidden = true;
       return;
     }
     if (VIEWONLY) {

@@ -923,3 +923,20 @@ td.r200{color:#B00020!important;font-weight:800}
   .pcmodal.rkm.rk1 .tbmini.rk td{height:32px!important;padding:5px 1px!important}
   .pcmodal.rkm.rk1 .tbmh{height:36px!important;margin:2px 2px 4px!important}
 }
+
+/* 세로 화면 상단 제목: 고정 문구 + 바로 옆 구역 선택 드롭메뉴 */
+body.phmode .pchead[hidden]{display:none}
+body.phmode .appbar .fix{padding:0}
+.topbar .tb-title.phtitle{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0}
+.phtitle .phtt{font-size:18px;font-weight:800;white-space:nowrap}
+body.phmode .topbar .phsec{flex:0 1 auto;width:auto;max-width:132px;min-width:0;height:36px;border-radius:18px;font-size:14px;padding:0 22px 0 10px;text-align:left;text-align-last:left}
+body.phmode .topbar .tb-left{min-width:0}
+body.phmode .topbar .burger{margin-left:6px}
+.topbar .phtbar{display:inline-flex;margin-left:4px}
+body.phmode .topbar .phtbar .phmenu{height:36px;padding:0 10px;font-size:13px}
+body.phmode .topbar .phsec{flex:1 1 auto;max-width:150px;padding:0 16px 0 8px;font-size:13.5px;text-overflow:clip}
+.phtitle .phtt{font-size:17px}
+body.phmode .topbar .tb-left .lg{width:32px;height:32px}
+body.phmode .topbar{gap:4px}
+body.phmode .topbar .burger{width:40px}
+body.phmode .topbar .phtbar .phmenu{padding:0 8px}
