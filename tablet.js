@@ -216,7 +216,18 @@
     const nav = $("bnav"), navTop = nav && !nav.hidden && getComputedStyle(nav).display !== "none" ? nav.getBoundingClientRect().top : window.innerHeight;
     r.style.height = Math.max(360, navTop - r.getBoundingClientRect().top - 6) + "px";
     document.documentElement.classList.add("fitpage");
+    squeeze(r);
   }
+  /* 오른쪽 상세 박스(회비·장부·회원) / 앨범 목록이 넘치면 줄 간격·글자를 기기 높이에 맞춰 줄여 스크롤 없이 한 화면에 */
+  function squeeze(r) {
+    const boxes = [...r.querySelectorAll(".tbright, .alscroll")].filter((b) => b.querySelector(".tbinfo, .tbreport, .alrow") || b.classList.contains("alscroll"));
+    boxes.forEach((b) => {
+      const over = () => b.scrollHeight > b.clientHeight + 1 || [...b.querySelectorAll(".tbcs")].some((e) => e.scrollHeight > e.clientHeight + 1);
+      let f = 1; b.style.setProperty("--fit", 1);
+      while (over() && f > 0.45) { f = Math.round((f - 0.04) * 100) / 100; b.style.setProperty("--fit", f); }
+    });
+  }
+  window.tbSqueeze = () => { const r = view.querySelector(":scope > .tbroot"); if (r) squeeze(r); };
   window.addEventListener("resize", () => { if (TB.wasOn != null && TB.wasOn !== MODE_KEY() && typeof render === "function" && $("pchead") && !$("pchead").hidden) render(); else fit(); });
 
   /* =====================================================================
@@ -290,6 +301,7 @@
     const pr = modal($("modalTitle").textContent, body, [["닫기", "close"]]);
     return pr.then((v) => { md.classList.remove("rkm", "rk1"); return v; });
   }
+  const SMALLQ = () => { const w = window.innerWidth, h2 = window.innerHeight; return w > h2 && (Math.max(w, h2) <= 1100 || h2 <= 650); };
   const MOPEN = new Set(); // 펼친 월 (접힘이 기본)
   const toggleM = (k) => { MOPEN.has(k) ? MOPEN.delete(k) : MOPEN.add(k); KEEP_SCROLL = true; RENDER[current](); };
   function renderGames(quarterOnly) {
@@ -545,7 +557,7 @@
     const detail = h("div", { class: "tbdetail" }, h("b", { class: "tbdh" }, who ? [`${who.name} · `, h("u", { class: "tbtap", title: "눌러서 월별 팝업 보기", onclick: () => { const withRec = months.filter((mo) => stat.some((g) => g.memberId === who.memberId && ynum(g.gameDate) === y && mnum(g.gameDate) === mo)); rankQuarterPopup(who, y, q, null, mm, withRec.length ? withRec[withRec.length - 1] : months[0]); } }, "상세내역 ▸")] : "회원을 선택하세요"));
     months.forEach((mo) => {
       const recs = stat.filter((g) => g.memberId === GS.qMember && ynum(g.gameDate) === y && mnum(g.gameDate) === mo);
-      const k = `q${y}-${mo}`, isOpen = !MOPEN.has(k); // 분기에버는 펼침이 기본
+      const k = `q${y}-${mo}`, isOpen = SMALLQ() ? MOPEN.has(k) : !MOPEN.has(k); // 분기에버: 큰 화면은 펼침, 8인치 이하 가로 화면은 접힘이 기본
       detail.append(h("div", { class: "tbmh tgl", onclick: () => toggleM(k) }, h("b", {}, h("i", { class: "chv" }, isOpen ? "▾" : "▸"), `${mo}월`), h("b", { class: "blue" }, "에버 : " + (recs.some((g) => cnt(g) > 0) ? fmt1(recAvg(recs)) : "-"))));
       const wc = recs.some((g) => Math.floor((dnum(g.gameDate) - 1) / 7) >= 4) ? 5 : 4;
       const tr = (vals, cls) => h("tr", { class: cls || "" }, vals.map((v) => h("td", {}, v)));

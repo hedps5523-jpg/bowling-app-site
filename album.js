@@ -553,6 +553,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     view.textContent = ""; view.append(root);
     const nav = $("bnav"), navTop = nav && !nav.hidden && getComputedStyle(nav).display !== "none" ? nav.getBoundingClientRect().top : window.innerHeight;
     window.scrollTo(0, 0); root.style.height = Math.max(420, navTop - root.getBoundingClientRect().top - 6) + "px"; document.documentElement.classList.add("fitpage");
+    if (window.tbSqueeze) window.tbSqueeze(); // 목록이 잘리지 않게 줄 간격 자동 조절
   }
   window.ClubAlbum = { render: draw };
   TABS.album = { render: draw };

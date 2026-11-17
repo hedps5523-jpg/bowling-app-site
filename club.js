@@ -1579,7 +1579,8 @@ TABS.settings = {
     const dq = () => Math.max(1, Math.floor(new Date().getMonth() / 3) + 1 - 1);
     qT.querySelectorAll("tbody tr").forEach((tr, i) => tr.addEventListener("dblclick", (e) => { const td = e.target.closest("td"); if (!td) return; const c = [...tr.children].indexOf(td); if (c >= 2 && c <= 5) { ST.sel = qrows[i].m; editBasicQuarter(qrows[i].m, c - 1); } }));
     const editQ = h("button", { class: "pcbtn", type: "button", onclick: () => editBasicQuarter(ST.sel, dq()) }, "전분기 에버 수정");
-    const basic = h("div", { class: "envpanel envbasic" }, h("div", { class: "pcform", style: "margin:2px 0 4px" }, h("label", { style: "font-size:16px" }, "관리 명칭"), h("div", { style: "flex:1;min-width:220px;max-width:420px" }, nameF)),
+    const nameRow = h("div", { class: "envname" }, h("label", {}, "관리 명칭"), h("div", { class: "envnamein" }, nameF)); // 수입/지출 탭 줄 오른쪽 끝에 표시
+    const basic = h("div", { class: "envpanel envbasic" }, 
       h("div", { class: "envband" }, numList("모임", mFields), numList("등급", gFields), other),
       h("div", { class: "envdata" }, secBox("주차별", weekT), secBox("분기 에버", h("div", { style: "text-align:right;margin-bottom:6px" }, editQ), qT)),
       h("p", { class: "pcnote" }, "관리 명칭·모임구분·등급·회비·락카 기본값·수입/지출 목록은 서버 공용입니다."));
@@ -1647,7 +1648,7 @@ TABS.settings = {
     const approval = approvalPanel(); approval.className = "envapproval"; approval.hidden = false;
     server.append(approval);
     const panels = { basic, server, ledger }, tabsRow = h("div", { class: "envtabs" });
-    const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; };
+    const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; nameRow.hidden = ST.sub !== "basic"; };
     showSub();
     const okBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", disabled: ro }, "확인"), cancelBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", onclick: () => go(ST.back || "games") }, "취소");
     okBtn.onclick = async () => {
@@ -1672,7 +1673,7 @@ TABS.settings = {
         if (await save(ops, `환경설정이 저장되었습니다. (서버 공용 변경 ${ops.length}건)`)) { work(`환경설정 저장 ${ops.length}건`); go(ST.back || "games"); } else okBtn.disabled = false;
       } catch (e) { toast("환경설정을 저장하지 못했습니다.\n" + e.message, 4200); }
     };
-    const root = h("section", { class: "pcbox envroot" }, h("div", { class: "pcform envtop", style: "justify-content:space-between" }, tabsRow, roBadge()), basic, server, ledger,
+    const root = h("section", { class: "pcbox envroot" }, h("div", { class: "pcform envtop", style: "justify-content:space-between" }, tabsRow, nameRow, roBadge()), basic, server, ledger,
       h("div", { class: "envfoot", style: "text-align:center;margin-top:6px" }, okBtn, " ", cancelBtn));
     view.append(root);
     showSub();

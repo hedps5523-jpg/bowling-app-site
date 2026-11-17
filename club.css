@@ -828,3 +828,26 @@ body.phmode .phpickit{font-size:15px}
 td.r200{color:#B00020!important;font-weight:800}
 .tbdh u.tbtap{cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:#1f5fbf}
 @media (min-width:700px){.pcmodal.rkm .pcdlg{width:min(98vw,600px)!important}.pcmodal.rkm .rkpop{user-select:none}}
+
+/* 환경설정: 관리 명칭을 탭 줄 오른쪽 끝으로, 기본 DATA 열 비율 조정(주차별 축소·분기 에버 확장) */
+.envname{display:flex;align-items:center;gap:8px;margin-left:auto}.envname[hidden]{display:none}
+.envname label{font-size:14px;font-weight:700;white-space:nowrap;margin:0}.envnamein{width:clamp(180px,26vw,320px)}
+.envname input{height:30px}
+@media (orientation:landscape){
+  body.pc .envroot>.envbasic:not([hidden]){grid-template-columns:minmax(0,2fr) minmax(0,2fr) minmax(0,6fr);grid-template-rows:minmax(0,1fr)}
+  body.pc .envbasic>.envband,body.pc .envbasic>.envdata>.envsec:nth-child(1),body.pc .envbasic>.envdata>.envsec:nth-child(2){grid-row:1}
+  body.pc .envbasic>.envdata table.pct th,body.pc .envbasic>.envdata table.pct td{white-space:nowrap;padding-left:4px;padding-right:4px}
+  body.pc .envbasic>.envdata>.envsec:nth-child(2) table.pct{width:100%;table-layout:auto;font-size:12.5px}
+}
+
+/* 한 화면 맞춤(--fit: 1 → 0.45) */
+.tbright,.alscroll{--fit:1}
+.tbinfo{padding:calc(16px*var(--fit)) calc(16px*max(var(--fit),.7))}
+.tbinfo>b{margin-bottom:calc(6px*var(--fit));font-size:calc(16px*max(var(--fit),.8))}
+.tbline{height:calc(34px*var(--fit));font-size:calc(14px*max(var(--fit),.82))}
+.tbreport,.tbchart{padding:calc(8px*var(--fit)) 10px calc(10px*var(--fit))}
+.tbrl{height:calc(32px*var(--fit));font-size:calc(12.5px*max(var(--fit),.85))}.tbrl b{font-size:calc(14px*max(var(--fit),.85))}
+.tbg2{margin:calc(5px*var(--fit)) 0}
+.tbah{height:calc(30px*var(--fit))}.tbar{height:calc(28px*var(--fit))}
+.tbcs{gap:calc(8px*var(--fit));margin-top:calc(6px*var(--fit))}
+.alrow{padding:calc(10px*var(--fit)) 14px}
