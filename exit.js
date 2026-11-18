@@ -1,13 +1,17 @@
 /* ---------- 종료 (☰ 메뉴): 작업을 마무리하고 창 닫기 ---------- */
 function exitApp() {
-  const ok = window.confirm("작업을 마무리하고 종료할까요?");
+  let pend = 0; try { if (typeof Pend !== "undefined") pend = Pend.ops.length; } catch {}
+  const ok = window.confirm(pend ? `UpLoad하지 않은 입력·수정이 ${pend}건 있어요.\n종료하면 서버에 저장되지 않아요. 그래도 종료할까요?` : "작업을 마무리하고 종료할까요?");
   if (!ok) return;
+  if (pend) { try { Pend.drop(); } catch {} }
   try { if (document.fullscreenElement) document.exitFullscreen(); } catch {}
   try { sessionStorage.removeItem("startDone"); } catch {}
   try { if (typeof window.onExitApp === "function") window.onExitApp(); } catch {}
   try { window.close(); } catch {}
-  // 브라우저가 창 닫기를 막는 경우: 종료 안내 화면을 보여 줘요
+  // 브라우저가 창 닫기를 막는 경우: 일반 탭은 홈 화면으로, 설치한 앱에서 닫히지 않으면 종료 안내 화면을 보여 줘요
   setTimeout(() => {
+    const standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+    if (!standalone) { location.replace("/"); return; }
     const ov = document.createElement("div");
     ov.style.cssText = "position:fixed;inset:0;z-index:999;background:#12285A;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;font-family:inherit";
     const t = document.createElement("div"); t.textContent = "종료되었어요"; t.style.cssText = "font-size:24px;font-weight:800";
