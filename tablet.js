@@ -228,7 +228,15 @@
     });
   }
   window.tbSqueeze = () => { const r = view.querySelector(":scope > .tbroot"); if (r) squeeze(r); };
-  window.addEventListener("resize", () => { if (TB.wasOn != null && TB.wasOn !== MODE_KEY() && typeof render === "function" && $("pchead") && !$("pchead").hidden) render(); else fit(); });
+  // 세로↔가로 전환(폴드 펼침·회전) 시 화면 구성을 바로 다시 그려요 (어느 메뉴에 있든)
+  let lastMode = MODE_KEY();
+  const modeSwap = () => {
+    const m = MODE_KEY();
+    if (m !== lastMode) { lastMode = m; if (typeof render === "function" && Conn.me && TABS[current]) { render(); return; } }
+    fit();
+  };
+  window.addEventListener("resize", modeSwap);
+  window.addEventListener("orientationchange", () => { setTimeout(modeSwap, 200); setTimeout(modeSwap, 700); });
 
   /* =====================================================================
      게임기록 / 분기에버 (LargeGameFragment)
