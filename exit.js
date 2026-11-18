@@ -11,7 +11,9 @@ function exitApp() {
   // 브라우저가 창 닫기를 막는 경우: 일반 탭은 홈 화면으로, 설치한 앱에서 닫히지 않으면 종료 안내 화면을 보여 줘요
   setTimeout(() => {
     const standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
-    if (!standalone) { location.replace("/"); return; }
+    const p = location.pathname.replace(/\/+$/, "").replace(/\.html$/, "");
+    const atHome = p === "" || p === "/index" || p === "/records"; // 홈·기록 조회에서는 홈으로 가도 종료처럼 안 보여서 종료 안내 화면을 보여 줘요
+    if (!standalone && !atHome) { location.replace("/"); return; }
     const ov = document.createElement("div");
     ov.style.cssText = "position:fixed;inset:0;z-index:999;background:#12285A;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;font-family:inherit";
     const t = document.createElement("div"); t.textContent = "종료되었어요"; t.style.cssText = "font-size:24px;font-weight:800";
