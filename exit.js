@@ -14,10 +14,12 @@ function exitApp() {
     const p = location.pathname.replace(/\/+$/, "").replace(/\.html$/, "");
     const atHome = p === "" || p === "/index" || p === "/records"; // 홈·기록 조회에서는 홈으로 가도 종료처럼 안 보여서 종료 안내 화면을 보여 줘요
     if (!standalone && !atHome) { location.replace("/"); return; }
+    // 설치한 앱: 웹페이지가 창을 직접 닫지 못하는 기기가 있어요. 열었던 화면 기록을 처음으로 되돌려 두면 뒤로 가기 한 번으로 앱이 닫혀요.
+    if (standalone) { try { if (history.length > 1) history.go(-(history.length - 1)); } catch {} }
     const ov = document.createElement("div");
     ov.style.cssText = "position:fixed;inset:0;z-index:999;background:#12285A;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;font-family:inherit";
     const t = document.createElement("div"); t.textContent = "종료되었어요"; t.style.cssText = "font-size:24px;font-weight:800";
-    const s = document.createElement("div"); s.textContent = "작업이 모두 마무리되었어요. 이 창(앱)을 닫아 주세요."; s.style.cssText = "font-size:15px;opacity:.85;line-height:1.5";
+    const s = document.createElement("div"); s.textContent = standalone ? "작업이 모두 마무리되었어요.\n기기의 뒤로 가기를 한 번 더 누르면 앱이 닫혀요.\n(또는 최근 앱 화면에서 이 앱을 밀어서 닫아 주세요)" : "작업이 모두 마무리되었어요. 이 창(앱)을 닫아 주세요."; s.style.cssText = "font-size:15px;opacity:.85;line-height:1.6;white-space:pre-line";
     const b = document.createElement("button"); b.type = "button"; b.textContent = "다시 시작"; b.style.cssText = "margin-top:10px;border:0;border-radius:12px;padding:12px 26px;font:inherit;font-weight:700;background:#fff;color:#12285A;cursor:pointer";
     b.onclick = () => { location.href = "/"; };
     ov.append(t, s, b); document.body.append(ov);
