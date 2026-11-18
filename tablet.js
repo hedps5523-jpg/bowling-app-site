@@ -334,12 +334,13 @@
       tSel.disabled = !!GS.lockedType;
       const ims = inputMembersFor(games);
       if (!ims.some((m) => m.memberId === GS.member)) GS.member = ims.length ? ims[0].memberId : null;
-      const mSel = sel(ims.length ? ims.map((m) => [m.memberId, m.name]) : [["", "등록 가능한 회원 없음"]], GS.member, (v) => { GS.member = +v; });
+      const mSel = sel(ims.length ? ims.map((m) => [m.memberId, m.name]) : [["", "등록 가능한 회원 없음"]], GS.member, (v) => { GS.member = +v; setTimeout(() => { const f = view.querySelector(".tbin.num"); if (f) f.focus(); }, 0); }); // 회원 선택 → 1G 입력칸으로
       mSel.disabled = !ims.length; mSel.id = "tbMember"; mSel.classList.add("wide");
       const scoreIn = GS.scores.map((v, i) => h("input", { class: "tbin num", inputmode: "numeric", maxlength: "3", value: v }));
       const noteIn = h("input", { class: "tbin note", value: GS.note });
       // 3자리를 입력하면 다음 칸(1G→2G→3G→4G→비고)으로 자동 이동
-      scoreIn.forEach((e, i) => { e.oninput = () => { e.value = e.value.replace(/\D/g, "").slice(0, 3); GS.scores[i] = e.value; if (e.value.length === 3) (scoreIn[i + 1] || noteIn).focus(); }; e.onkeydown = (ev) => { if (ev.key === "Enter") saveInput(GS.editing > 0); }; });
+      // 점수는 1~300점만: 3자리가 300을 넘으면 막고, 3자리가 되면 다음 칸으로 이동(2자리는 탭키·터치로 직접 이동)
+      scoreIn.forEach((e, i) => { e.onfocus = () => { try { e.select(); } catch {} }; e.oninput = () => { let v = e.value.replace(/\D/g, "").slice(0, 3); if (v.length === 3 && +v > 300) { toast(`${i + 1}G 점수는 1~300점까지만 입력할 수 있어요.`); v = v.slice(0, 2); } e.value = v; GS.scores[i] = v; if (v.length === 3) (scoreIn[i + 1] || noteIn).focus(); }; e.onkeydown = (ev) => { if (ev.key === "Enter") saveInput(GS.editing > 0); }; });
       noteIn.oninput = () => GS.note = noteIn.value; noteIn.onkeydown = (ev) => { if (ev.key === "Enter") saveInput(GS.editing > 0); };
       const add = btn("등록", () => saveInput(false), "pri"), edit = btn("수정", () => saveInput(true));
       add.disabled = GS.editing > 0; edit.disabled = !(GS.editing > 0);
@@ -485,14 +486,14 @@
       if (!canIn()) return;
       const m = mm.get(GS.member); if (!m) return toast("등록 가능한 회원이 없습니다.");
       const s = [];
-      for (let i = 0; i < 4; i++) { const t = String(GS.scores[i] || "").trim(); const v = t ? (/^\d+$/.test(t) ? +t : null) : 0; if (v == null) return toast(`${i + 1}G 점수를 숫자로 입력하세요.`); if (v < 0 || v > 300) return toast(`${i + 1}G 점수는 0~300 사이여야 합니다.`); s.push(v); }
+      for (let i = 0; i < 4; i++) { const t = String(GS.scores[i] || "").trim(); const v = t ? (/^\d+$/.test(t) ? +t : null) : 0; if (v == null) return toast(`${i + 1}G 점수를 숫자로 입력하세요.`); if (t && (v < 1 || v > 300)) return toast(`${i + 1}G 점수는 1~300점까지만 등록할 수 있어요.`); s.push(v); }
       if (update && !(GS.editing > 0)) return toast("표에서 수정할 기록을 선택하세요.");
       const rec = { recordId: update ? GS.editing : 0, memberId: m.memberId, gameDate: GS.date, s1: s[0], s2: s[1], s3: s[2], s4: s[3], note: String(GS.note || "").trim(), meetingType: GS.type || "정모" };
       const ok = await save([op("games", update ? "update" : "insert", gamePayload(rec), update ? S.rv.games[GS.editing] : undefined)], update ? "게임 기록이 수정되었습니다." : "게임 기록이 저장되었습니다.");
       if (!ok) return;
       GS.lockedWeek = weekLabel(GS.date); GS.lockedType = rec.meetingType;
       clearInput(); applyMeetingTypeRule(GS.lockedWeek); draw();
-      setTimeout(() => { const ms = $("tbMember"); if (ms) ms.focus(); }, 30); // 저장 후 다음 회원 입력
+      setTimeout(() => { const f = view.querySelector(".tbin.num"); if (f) f.focus(); }, 30); // 등록·수정 후 1G 입력칸으로
     }
     async function bulkChange() {
       if (!canIn()) return;
