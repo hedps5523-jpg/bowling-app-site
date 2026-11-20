@@ -350,17 +350,17 @@
 
     // 2행: 보고서 종류 / 연결 필드 / 조회
     let queryCard = null;
-    const reports = quarterOnly ? ["분기에버"] : (PHONE() || VIEWONLY) && !inMode ? ["개인기록", "모임기록", "누적기록", "순위표", "분기에버"] : ["개인기록", "모임기록", "누적기록", "순위표"];
+    const reports = quarterOnly ? ["분기에버"] : (PHONE() || VIEWONLY) && !inMode ? ["개인기록", "모임기록", "최근 기록", "순위표", "분기에버"] : ["개인기록", "모임기록", "최근 기록", "순위표"];
     if (!reports.includes(GS.report)) GS.report = reports[0];
     const report = quarterOnly ? "분기에버" : GS.report;
     let linkedOpts = [], linkedLabel = "";
     const qOpts = (() => { const y = ynum(today()); return [[`${pad2((y - 1) % 100)}_4분기`, y - 1, 4], ...[1, 2, 3, 4].map((q) => [`${q}분기`, y, q])]; })();
     if (report === "개인기록") { linkedLabel = "회원명"; linkedOpts = activeMembers().map((m) => [String(m.memberId), m.name]); }
     else if (report === "모임기록") { linkedLabel = "주차"; linkedOpts = groups.slice().reverse().map((g) => [g.key, g.label]); }
-    else if (report === "누적기록") { linkedLabel = "기간"; linkedOpts = ["최근 2주", "최근 3주", "최근 4주", "최근 5주"].map((x) => [x, x]); }
+    else if (report === "최근 기록") { linkedLabel = "기간"; linkedOpts = ["최근 2주", "최근 3주", "최근 4주", "최근 5주"].map((x) => [x, x]); }
     else if (report === "순위표") { linkedLabel = "기준"; linkedOpts = [...new Set([...games.map((g) => ynum(g.gameDate)), ynum(today())])].sort((a, b) => b - a).map((y) => [String(y), `${y}년`]); }
     else { linkedLabel = "분기"; linkedOpts = qOpts.map((o) => [o[0], o[0]]); }
-    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "누적기록" ? "최근 4주" : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
+    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? "최근 4주" : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
     if (!inMode || quarterOnly) {
       const rSel = quarterOnly ? null : sel(reports, report, (v) => { GS.report = v; GS.linked = null; draw(); });
       const lSel = sel(linkedOpts, GS.linked, (v) => { GS.linked = v; draw(); });
@@ -400,7 +400,7 @@
         rows: list.map((g) => [nameWithAvg(mm.get(g.memberId), g.gameDate), "", "", "", "", fmt1(gavg(g)), deviation(gavg(g), qBase(mm.get(g.memberId), g.gameDate)), noteOf(g, roles)]),
         weights: [256, 118, 118, 118, 118, 140, 152, 236],
         cellBg: (r) => ROW_BG[(roles.get(list[r].recordId) || {}).role], custom: (r, c) => (c >= 1 && c <= 4 ? scoreCell(list[r], c, refs, roles) : null) }) || empty("조회된 자료가 없습니다.");
-    } else if (report === "누적기록") {
+    } else if (report === "최근 기록") {
       const n = +(GS.linked.match(/\d+/) || [4])[0], gs = groups.slice(-Math.max(1, n));
       const year = gs.length ? ynum(gs[gs.length - 1].dates[gs[gs.length - 1].dates.length - 1]) : ynum(today());
       title = `모임 누적 현황 · ${year}년 기준 · ${GS.linked}`;
@@ -1148,16 +1148,16 @@
   const scoreLine = (g, refs) => { const raw = sc(g), last = raw.map((v) => v > 0).lastIndexOf(true); const out = []; raw.slice(0, Math.max(0, last + 1)).forEach((v, i) => { if (i) out.push(" / "); const hi = refs && refs.has(g.recordId * 10 + i + 1); out.push(h("span", { class: hi ? "hi" : v >= 200 ? "red" : "" }, v > 0 ? String(v) : "   ")); }); return out; };
   function phqGames() {
     const games = tbGames(), stat = statGames(), groups = weekGroups(games), mm = byId(), roles = roleMap(games);
-    const reports = ["개인기록", "모임기록", "누적기록", "순위표", "분기에버"];
+    const reports = ["개인기록", "모임기록", "최근 기록", "순위표", "분기에버"];
     if (!reports.includes(GS.report)) GS.report = "개인기록";
     const rep = GS.report;
     const y0 = ynum(today()), qOpts = [[`${pad2((y0 - 1) % 100)}_4분기`, y0 - 1, 4], ...[1, 2, 3, 4].map((q) => [`${q}분기`, y0, q])];
     let lopts = [];
     if (rep === "개인기록") lopts = activeMembers().slice().sort((a, b) => ko.compare(a.name, b.name)).map((m) => [String(m.memberId), m.name]);
     else if (rep === "모임기록") lopts = groups.slice().reverse().map((g) => [g.key, g.label]);
-    else if (rep === "누적기록") lopts = ["최근2주", "최근3주", "최근4주", "최근5주"].map((x) => [x, x]);
+    else if (rep === "최근 기록") lopts = ["최근2주", "최근3주", "최근4주", "최근5주"].map((x) => [x, x]);
     else if (rep === "분기에버") lopts = qOpts.map((o) => [o[0], o[0]]);
-    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "누적기록" ? "최근4주" : rep === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4)][0] : (lopts[0] || [""])[0];
+    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? "최근4주" : rep === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4)][0] : (lopts[0] || [""])[0];
     const repSel = fsel(reports, rep, (v) => { GS.report = v; GS.linked = null; QS.open.clear(); phqGames(); });
     const bar = rep === "순위표"
       ? fbar(repSel, fsel(["전회원", "남자", "여자"], QS.rk, (v) => { QS.rk = v; phqGames(); }), fsel(["전분기", "1분기", "2분기", "3분기", "4분기", "상반기", "하반기"], QS.period, (v) => { QS.period = v; phqGames(); }), refreshBtn())
@@ -1174,7 +1174,7 @@
       const g0 = groups.find((g) => g.key === GS.linked), list = games.filter((g) => g0 && g0.dates.includes(g.gameDate)).sort((a, b) => gavg(b) - gavg(a));
       body.push(pTitle("모임 기록", g0 ? `${g0.label} / ${[...new Set(list.map(gtype))].join("·")}` : ""));
       list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : ""), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role]) : null], scoreDetail(g), r ? "r-" + r.role.toLowerCase() : "")); });
-    } else if (rep === "누적기록") {
+    } else if (rep === "최근 기록") {
       const n = +(String(GS.linked).match(/\d+/) || [4])[0], gs = groups.slice(-n), year = gs.length ? ynum(gs[gs.length - 1].dates[0]) : y0;
       body.push(pTitle("누적 기록"));
       const yg = new Map(); stat.filter((g) => ynum(g.gameDate) === year).forEach((g) => { if (!yg.has(g.memberId)) yg.set(g.memberId, []); yg.get(g.memberId).push(g); });
