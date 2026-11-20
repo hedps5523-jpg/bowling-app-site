@@ -160,6 +160,21 @@
   const empty = (msg) => h("div", { class: "tbtable" }, h("div", { class: "tbempty" }, msg));
   /* 결과표: 머리글 고정, 행 클릭 = 선택/불러오기, 길게 누르기·오른쪽 클릭 = 삭제/취소 */
   let KEEP_SCROLL = false; // 표에서 행을 눌러 다시 그릴 때 스크롤 위치 유지
+  // 5줄이 보이는 드롭메뉴 (칸을 누르면 아래로 열리고, 자리가 모자라면 위로 열려요)
+  function openDrop(btn, opts, cur, pick) {
+    const old = document.getElementById("tbdd"); if (old) { old.remove(); if (old._for === btn) return; }
+    const box = h("div", { id: "tbdd", class: "tbddlist" }), r = btn.getBoundingClientRect(), H = 178;
+    box._for = btn;
+    opts.forEach(([v, t]) => box.append(h("div", { class: "tbddit" + (v === cur ? " on" : ""), onclick: () => { close(); pick(v); } }, t)));
+    box.style.width = Math.max(r.width, 120) + "px"; box.style.left = Math.min(r.left, window.innerWidth - Math.max(r.width, 120) - 6) + "px";
+    box.style.top = (window.innerHeight - r.bottom >= H + 6 ? r.bottom + 2 : Math.max(6, r.top - H - 2)) + "px";
+    document.body.append(box);
+    const on = box.querySelector(".on"); if (on) box.scrollTop = Math.max(0, on.offsetTop - on.offsetHeight * 2);
+    function close() { box.remove(); document.removeEventListener("pointerdown", away, true); window.removeEventListener("resize", close); document.removeEventListener("keydown", esc); }
+    const away = (e) => { if (!box.contains(e.target) && e.target !== btn) close(); };
+    const esc = (e) => { if (e.key === "Escape") close(); };
+    document.addEventListener("pointerdown", away, true); window.addEventListener("resize", close); document.addEventListener("keydown", esc);
+  }
   function table({ headers, rows, weights, aligns = [], selectedRow = -1, cellColor, cellBg, custom, onClick, onLong, cls = "" }) {
     if (!rows.length) return null;
     const sum = weights.reduce((a, b) => a + b, 0);
@@ -363,13 +378,9 @@
     if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "4주") ? "4주" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
     if (!inMode || quarterOnly) {
       const rSel = quarterOnly ? null : sel(reports, report, (v) => { GS.report = v; GS.linked = null; draw(); });
-      // 최근 기록: 기간을 5줄 목록(전체·1주~n주)으로 보여 주고 위·아래로 드래그해서 고른다
-      const lSel = report === "최근 기록" && !quarterOnly ? (() => {
-        const s2 = h("select", { class: "tbsel tblist", size: "5" }, linkedOpts.map(([v, t]) => h("option", { value: v }, t)));
-        s2.value = GS.linked; s2.onchange = () => { GS.linked = s2.value; draw(); };
-        requestAnimationFrame(() => { const o = s2.options[s2.selectedIndex]; if (o) s2.scrollTop = Math.max(0, o.offsetTop - o.offsetHeight * 2); });
-        return s2;
-      })() : sel(linkedOpts, GS.linked, (v) => { GS.linked = v; draw(); });
+      // 최근 기록: 기간 칸을 누르면 5줄 목록(전체·1주~n주)이 열리고, 위·아래로 드래그해서 고른다
+      const lSel = report === "최근 기록" && !quarterOnly ? h("button", { type: "button", class: "tbsel tbddbtn", onclick: (ev) => { ev.stopPropagation(); openDrop(ev.currentTarget, linkedOpts, GS.linked, (v) => { GS.linked = v; draw(); }); } }, `${GS.linked}`)
+        : sel(linkedOpts, GS.linked, (v) => { GS.linked = v; draw(); });
       const sortSel = report === "순위표" ? sel(["평균점수", "최고점수", "게임수"], GS.sort, (v) => { GS.sort = v; draw(); }) : null;
       const qEdit = quarterOnly && inputMode();
       queryCard = card(rSel, lab(linkedLabel), lSel, sortSel ? lab("정렬") : null, sortSel, btn("조회", draw, "pri"),

@@ -949,11 +949,12 @@ body.phmode .topbar .phtbar .phmenu{padding:0 8px}
 .presbar[hidden]{display:none}
 
 /* 최근 기록: 기간 목록(5줄) · 회원 기록(C) */
-.tbsel.tblist{height:148px!important;width:130px!important;min-width:130px;padding:2px!important;overflow-y:auto;border:2px solid #BCCDE5!important;border-radius:8px!important;font-weight:700;font-size:15px;-webkit-overflow-scrolling:touch;margin:4px 0!important}
-.tbf:has(.tblist){align-items:center}
-.tbsel.tblist option{height:28px;line-height:20px;padding:4px 12px;border-bottom:1px solid #EEF2F8;box-sizing:border-box}
 .tbrecent .tbdh{position:sticky;top:-8px;z-index:2;background:#12285A;color:#fff;margin:-8px -8px 6px;padding:8px 12px;font-size:14px;border-radius:7px 7px 0 0}
 .tbrecent .tbrec td{height:40px;font-size:14px!important;font-weight:500}
 .tbrecent .tbrec tr.hd td{position:sticky;top:26px;z-index:1;font-weight:700;font-size:13px!important}
 .tbrecent .tbrec td.r200{color:#9B1C1F;font-weight:800}
 .tbrecent .tbrec td:nth-child(8){font-weight:700}
+.tbddbtn{text-align:left;min-width:96px;cursor:pointer;background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' fill='none' stroke='%2312285A' stroke-width='2'/></svg>") no-repeat right 8px center}
+.tbddlist{position:fixed;z-index:200;height:178px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;background:#fff;border:1px solid #BCCDE5;border-radius:8px;box-shadow:0 8px 22px rgba(0,0,0,.25)}
+.tbddit{height:35px;line-height:35px;padding:0 14px;font-size:15px;font-weight:700;color:#12285A;border-bottom:1px solid #EEF2F8;cursor:pointer}
+.tbddit.on{background:#2F5EA8;color:#fff}
