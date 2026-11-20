@@ -1,3 +1,15 @@
+/* ---------- 화면별 표시 방식 ----------
+   기록 조회·클럽관리·관리·내 앱: 터치 기기(태블릿·폰)에서 첫 터치 때 전체화면으로 표시하고, ☰ 메뉴의 종료 항목은 두지 않아요.
+   홈·회원·공지·투표(홈 화면 안): 기기 하단 메뉴가 보이는 일반 앱 화면에 종료 항목을 둬요. */
+const FULL_PATHS = ["/club", "/records", "/admin", "/myapps", "/apps"];
+const IS_FULL_PAGE = FULL_PATHS.includes(location.pathname.replace(/\/+$/, "").replace(/\.html$/, ""));
+if (IS_FULL_PAGE && window.matchMedia && matchMedia("(pointer: coarse)").matches) {
+  const goFull = () => {
+    if (document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+    try { const r = document.documentElement.requestFullscreen({ navigationUI: "hide" }); if (r && r.catch) r.catch(() => {}); } catch {}
+  };
+  document.addEventListener("click", goFull, { once: true, capture: true });
+}
 /* ---------- 종료 (☰ 메뉴): 작업을 마무리하고 창 닫기 ---------- */
 function exitApp() {
   let pend = 0; try { if (typeof Pend !== "undefined") pend = Pend.ops.length; } catch {}
@@ -27,7 +39,7 @@ function exitApp() {
 }
 document.addEventListener("DOMContentLoaded", () => {
   const dd = document.getElementById("dd");
-  if (!dd || dd.querySelector(".exitit")) return;
+  if (!dd || dd.querySelector(".exitit") || IS_FULL_PAGE) return;
   const a = document.createElement("a"); a.className = "it exitit"; a.href = "#";
   const sp = document.createElement("span"); sp.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#D93025" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block;margin:0 auto"><path d="M12 3v8"/><path d="M6.4 6.8a8 8 0 1 0 11.2 0"/></svg>'; const d = document.createElement("div"), b = document.createElement("b"), sm = document.createElement("small"); b.textContent = "종료"; sm.textContent = "모든 작업을 마무리하고 닫기"; d.append(b, sm); a.append(sp, d);
   a.addEventListener("click", (e) => { e.preventDefault(); const dim = document.getElementById("dim"), bg = document.getElementById("burger"); dd.hidden = true; if (dim) dim.hidden = true; if (bg) { bg.textContent = "☰"; bg.setAttribute("aria-expanded", "false"); } exitApp(); });
