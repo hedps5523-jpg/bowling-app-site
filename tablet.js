@@ -8,8 +8,8 @@
    ===================================================================== */
 (function () {
   const TB = { input: null, wasOn: null };
-  // PC·노트북(마우스, 폭 900px 이상) 또는 터치 태블릿·폴드 가로 화면(가로가 더 길고 폭 700px·높이 600px 이상)
-  const TB_ON = () => { const w = window.innerWidth, h = window.innerHeight; return (w >= 900 && document.documentElement.getAttribute("data-dev") === "desktop") || (w > h && w >= 700 && h >= 600); };
+  // PC·노트북(마우스, 폭 900px 이상) 또는 터치 태블릿·폴드 가로 화면(가로가 더 길고 폭 700px·높이 480px 이상 — 앱 모드에서 상태바·내비게이션바만큼 줄어든 높이 포함)
+  const TB_ON = () => { const w = window.innerWidth, h = window.innerHeight; return (w >= 900 && document.documentElement.getAttribute("data-dev") === "desktop") || (w > h && w >= 700 && h >= 480); };
   const PHONE = () => !TB_ON(); // 휴대폰·일반 태블릿 세로(좁은 화면): 모바일 볼링클럽 세로화면 배치
   const MODE_KEY = () => (TB_ON() ? "tb" : "ph");
   const TB_KEYS = ["games", "ledger", "fees", "quarter", "album", "members", "lockers"];
