@@ -52,6 +52,17 @@
   const tot = (g) => sc(g).filter((v) => v > 0).reduce((a, b) => a + b, 0);
   const gavg = (g) => (cnt(g) ? tot(g) / cnt(g) : 0);
   const smax = (g) => Math.max(...sc(g));
+  /* 최근 기록 기간: 전체 / 최근 n개월 (게임이 있는 월 기준). 해당 월에 속한 주차 기록을 모두 포함 */
+  const monthKey = (d) => ynum(d) * 100 + mnum(d);
+  const recWin = (groups, linked) => {
+    const keys = [...new Set(groups.flatMap((gr) => gr.dates.map(monthKey)))].sort((a, b) => a - b);
+    const nAll = linked === "전체", n = nAll ? keys.length : Math.max(1, +(String(linked).match(/\d+/) || [3])[0]);
+    const use = new Set(nAll ? keys : keys.slice(-n)), inWin = (d) => use.has(monthKey(d));
+    const gs = groups.filter((gr) => gr.dates.some(inWin)), ks = [...use].sort((a, b) => a - b);
+    const mm1 = (k) => `${k % 100}월`;
+    const range = ks.length ? (ks.length === 1 ? mm1(ks[0]) : `${mm1(ks[0])} ~ ${mm1(ks[ks.length - 1])}`) : "";
+    return { nAll, n, gs, inWin, perLabel: nAll ? "전체" : `최근 ${n}개월`, range, count: keys.length, year: ks.length ? Math.floor(ks[ks.length - 1] / 100) : ynum(today()) };
+  };
   const recSum = (list) => { const g = list.reduce((a, x) => a + cnt(x), 0); const hi = list.length ? Math.max(...list.map(smax)) : 0; const ev = list.length ? Math.max(...list.map((x) => recAvg([x]))) : 0; return h("div", { class: "recsum" }, "총 게임 : ", h("em", {}, `${g}G`), h("i", {}, "/"), "최고하이 : ", h("em", {}, `${hi}점`), h("i", {}, "/"), "최고에버 : ", h("em", {}, `${fmt1(ev)}점`)); };
   const recAvg = (list) => { const c = list.reduce((a, g) => a + cnt(g), 0); return c ? list.reduce((a, g) => a + tot(g), 0) / c : 0; };
   const weekLabel = (d) => `${mnum(d)}월${Math.floor((dnum(d) - 1) / 7) + 1}주`;
@@ -373,10 +384,10 @@
     const qOpts = (() => { const y = ynum(today()); return [[`${pad2((y - 1) % 100)}_4분기`, y - 1, 4], ...[1, 2, 3, 4].map((q) => [`${q}분기`, y, q])]; })();
     if (report === "개인기록") { linkedLabel = "회원명"; linkedOpts = activeMembers().map((m) => [String(m.memberId), m.name]); }
     else if (report === "모임기록") { linkedLabel = "주차"; linkedOpts = groups.slice().reverse().map((g) => [g.key, g.label]); }
-    else if (report === "최근 기록") { linkedLabel = "기간"; linkedOpts = [["전체", "전체"], ...Array.from({ length: Math.max(1, groups.length) }, (_, i) => [`${i + 1}주`, `${i + 1}주`])]; }
+    else if (report === "최근 기록") { linkedLabel = "기간"; linkedOpts = [["전체", "전체"], ...Array.from({ length: Math.max(1, recWin(groups, "전체").count) }, (_, i) => [`${i + 1}개월`, `${i + 1}개월`])]; }
     else if (report === "순위표") { linkedLabel = "기준"; linkedOpts = [...new Set([...games.map((g) => ynum(g.gameDate)), ynum(today())])].sort((a, b) => b - a).map((y) => [String(y), `${y}년`]); }
     else { linkedLabel = "분기"; linkedOpts = qOpts.map((o) => [o[0], o[0]]); }
-    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "10주") ? "10주" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
+    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "3개월") ? "3개월" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
     if (!inMode || quarterOnly) {
       const rSel = quarterOnly ? null : sel(reports, report, (v) => { GS.report = v; GS.linked = null; draw(); });
       // 최근 기록: 기간 칸을 누르면 5줄 목록(전체·1주~n주)이 열리고, 위·아래로 드래그해서 고른다
@@ -420,12 +431,7 @@
         cellBg: (r) => ROW_BG[(roles.get(list[r].recordId) || {}).role], custom: (r, c) => (c >= 1 && c <= 4 ? scoreCell(list[r], c, refs, roles) : null) }) || empty("조회된 자료가 없습니다.");
     } else if (report === "최근 기록") {
       // 기간(전체 / 최근 n주): 가장 최근 주차부터 거꾸로 n주
-      const nAll = GS.linked === "전체", n = nAll ? groups.length : Math.max(1, +(String(GS.linked).match(/\d+/) || [4])[0]);
-      const gs = nAll ? groups.slice() : groups.slice(-n);
-      const dateSet = new Set(gs.flatMap((gr) => gr.dates)), inWin = (d) => dateSet.has(d);
-      const year = gs.length ? ynum(gs[gs.length - 1].dates[gs[gs.length - 1].dates.length - 1]) : ynum(today());
-      const perLabel = nAll ? "전체" : `최근 ${n}주`;
-      const range = gs.length ? `${gs[gs.length - 1].label} ~ ${gs[0].label}` : "";
+      const RW = recWin(groups, GS.linked), { gs, inWin, perLabel, range, year } = RW;
       title = `모임 누적 현황 · ${year}년 기준 · ${perLabel}`;
       const yearGames = new Map(), winGames = new Map();
       stat.forEach((g) => {
@@ -1179,9 +1185,9 @@
     let lopts = [];
     if (rep === "개인기록") lopts = activeMembers().slice().sort((a, b) => ko.compare(a.name, b.name)).map((m) => [String(m.memberId), m.name]);
     else if (rep === "모임기록") lopts = groups.slice().reverse().map((g) => [g.key, g.label]);
-    else if (rep === "최근 기록") lopts = [["전체", "전체"], ...Array.from({ length: Math.max(1, groups.length) }, (_, i) => [`${i + 1}주`, `${i + 1}주`])];
+    else if (rep === "최근 기록") lopts = [["전체", "전체"], ...Array.from({ length: Math.max(1, recWin(groups, "전체").count) }, (_, i) => [`${i + 1}개월`, `${i + 1}개월`])];
     else if (rep === "분기에버") lopts = qOpts.map((o) => [o[0], o[0]]);
-    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "10주") ? "10주" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4)][0] : (lopts[0] || [""])[0];
+    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "3개월") ? "3개월" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4)][0] : (lopts[0] || [""])[0];
     const repSel = fsel(reports, rep, (v) => { GS.report = v; GS.linked = null; QS.open.clear(); phqGames(); });
     const bar = rep === "순위표"
       ? fbar(repSel, fsel(["전회원", "남자", "여자"], QS.rk, (v) => { QS.rk = v; phqGames(); }), fsel(["전분기", "1분기", "2분기", "3분기", "4분기", "상반기", "하반기"], QS.period, (v) => { QS.period = v; phqGames(); }), refreshBtn())
@@ -1200,10 +1206,8 @@
       list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : ""), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role]) : null], scoreDetail(g), r ? "r-" + r.role.toLowerCase() : "")); });
     } else if (rep === "최근 기록") {
       // A: 기간(전체·1주~n주 드롭메뉴) / B: 회원 목록(최근에버·최근게임) / C: 회원을 누르면 기록 팝업(상·하 드래그)
-      const nAll = GS.linked === "전체", n = nAll ? groups.length : Math.max(1, +(String(GS.linked).match(/\d+/) || [4])[0]);
-      const gs = nAll ? groups.slice() : groups.slice(-n), dset = new Set(gs.flatMap((gr) => gr.dates)), inWin = (d) => dset.has(d);
-      const year = gs.length ? ynum(gs[gs.length - 1].dates[0]) : y0, perLabel = nAll ? "전체" : `최근 ${n}주`;
-      body.push(pTitle("최근 기록", `${perLabel}${gs.length ? ` (${gs[gs.length - 1].label} ~ ${gs[0].label})` : ""}`));
+      const RW = recWin(groups, GS.linked), { gs, inWin, perLabel, range, year } = RW;
+      body.push(pTitle("최근 기록", `${perLabel}${range ? ` (${range})` : ""}`));
       const yg = new Map(), wg = new Map();
       stat.forEach((g) => {
         if (ynum(g.gameDate) === year) { if (!yg.has(g.memberId)) yg.set(g.memberId, []); yg.get(g.memberId).push(g); }
@@ -1220,7 +1224,7 @@
             : h("div", { class: "phempty" }, "선택한 기간에 기록이 없어요."));
         const md = $("modal"); md.classList.add("rkm", "rc1");
         const mp = modal(`${nameWithAvg(m, yearEndRef(year))}`, pop, [["닫기", "close"]]).then(() => md.classList.remove("rkm", "rc1"));
-        $("modalTitle").append(h("span", { class: "rcper" }, `${perLabel} 기록${gs.length ? ` (${gs[gs.length - 1].label} ~ ${gs[0].label})` : ""}`)); return mp;
+        $("modalTitle").append(h("span", { class: "rcper" }, `${perLabel} 기록${range ? ` (${range})` : ""}`)); return mp;
       };
       const th = (x) => h("td", {}, x);
       body.push(h("div", { class: "phrctab" }, h("table", { class: "tbmini rkb" }, h("thead", {}, h("tr", { class: "hd" }, ["회원명(에버)", "누적에버", "출석", "최근에버", "최근게임"].map(th))),
