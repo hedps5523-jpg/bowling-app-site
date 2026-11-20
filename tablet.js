@@ -1176,7 +1176,7 @@
       list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : ""), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role]) : null], scoreDetail(g), r ? "r-" + r.role.toLowerCase() : "")); });
     } else if (rep === "최근 기록") {
       const n = +(String(GS.linked).match(/\d+/) || [4])[0], gs = groups.slice(-n), year = gs.length ? ynum(gs[gs.length - 1].dates[0]) : y0;
-      body.push(pTitle("누적 기록"));
+      body.push(pTitle("최근 기록"));
       const yg = new Map(); stat.filter((g) => ynum(g.gameDate) === year).forEach((g) => { if (!yg.has(g.memberId)) yg.set(g.memberId, []); yg.get(g.memberId).push(g); });
       const refsBy = gs.map((gr) => { const l = games.filter((g) => gr.dates.includes(g.gameDate)); return meetingHighRefs(l, roleMap(l)); });
       [...yg.entries()].map(([id, l]) => ({ id, l, acc: recAvg(l), wk: l.filter((g) => gs.some((gr) => gr.dates.includes(g.gameDate))) })).sort((a, b) => b.acc - a.acc).forEach((r) => {
