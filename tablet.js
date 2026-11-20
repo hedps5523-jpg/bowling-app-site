@@ -443,10 +443,10 @@
       const cdet = h("div", { class: "tbdetail tbrecent" }, h("b", { class: "tbdh" }, sm ? `${nameWithAvg(sm, yearEndRef(year))} · ${perLabel} 기록${range ? ` (${range})` : ""}` : "회원을 선택하세요"));
       const mine = stat.filter((g) => g.memberId === GS.recMember && inWin(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : b.recordId - a.recordId));
       const wkOf = (d) => { const gr = gs.find((x) => x.dates.includes(d)); return gr ? gr.label : ""; };
-      const tr2 = (vals, cls, score) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: score && i >= 2 && i <= 5 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
+      const tr2 = (vals, cls, score) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: score && i >= 1 && i <= 4 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
       if (!mine.length) cdet.append(h("p", { class: "tag" }, "선택한 기간에 기록이 없어요."));
-      else cdet.append(h("table", { class: "tbmini rk tbrec" }, h("tbody", {}, tr2(["주차", "게임일", "1G", "2G", "3G", "4G", "평균", "에버편차"], "hd"),
-        ...mine.map((g, k) => { const a = recAvg([g]), b = qBase(sm, g.gameDate); return tr2([wkOf(g.gameDate), `${pad2(mnum(g.gameDate))}/${pad2(dnum(g.gameDate))}`, ...sc(g).map((v) => (v > 0 ? String(v) : "")), fmt1(a), deviation(a, b)], k % 2 ? "alt" : "", true); }))));
+      else cdet.append(h("table", { class: "tbmini rk tbrec" }, h("tbody", {}, tr2(["주차", "1G", "2G", "3G", "4G", "평균", "에버편차"], "hd"),
+        ...mine.map((g, k) => { const a = recAvg([g]), b = qBase(sm, g.gameDate); return tr2([wkOf(g.gameDate), ...sc(g).map((v) => (v > 0 ? String(v) : "")), fmt1(a), deviation(a, b)], k % 2 ? "alt" : "", true); }))));
       body = h("div", { class: "tbsplit" }, h("div", { style: "flex:50;min-width:0;display:flex" }, btbl), h("div", { style: "flex:50;min-width:0;display:flex" }, cdet));
     } else if (report === "순위표") {
       const year = +GS.linked || ynum(today());
@@ -1211,9 +1211,9 @@
       const openRec = (r) => {
         const m = mm.get(r.id), mine = stat.filter((g) => g.memberId === r.id && inWin(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : b.recordId - a.recordId));
         const wkOf = (d) => { const gr = gs.find((x) => x.dates.includes(d)); return gr ? gr.label : ""; };
-        const tr2 = (vals, cls, score) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: score && i >= 2 && i <= 5 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
+        const tr2 = (vals, cls, score) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: score && i >= 1 && i <= 4 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
         const pop = h("div", { class: "rcpop" }, h("div", { class: "rcsub" }, `${perLabel} 기록${gs.length ? ` (${gs[gs.length - 1].label} ~ ${gs[0].label})` : ""} · 위·아래로 밀어 보기`),
-          mine.length ? h("div", { class: "rcscroll" }, h("table", { class: "tbmini rk rctab" }, h("tbody", {}, tr2(["주차", "게임일", "1G", "2G", "3G", "4G", "평균", "편차"], "hd"), ...mine.map((g, k) => { const a = recAvg([g]), b = qBase(m, g.gameDate); return tr2([wkOf(g.gameDate), `${pad2(mnum(g.gameDate))}/${pad2(dnum(g.gameDate))}`, ...sc(g).map((v) => (v > 0 ? String(v) : "")), fmt1(a), deviation(a, b)], k % 2 ? "alt" : "", true); }))))
+          mine.length ? h("div", { class: "rcscroll" }, h("table", { class: "tbmini rk rctab" }, h("tbody", {}, tr2(["주차", "1G", "2G", "3G", "4G", "평균", "편차"], "hd"), ...mine.map((g, k) => { const a = recAvg([g]), b = qBase(m, g.gameDate); return tr2([wkOf(g.gameDate), ...sc(g).map((v) => (v > 0 ? String(v) : "")), fmt1(a), deviation(a, b)], k % 2 ? "alt" : "", true); }))))
             : h("div", { class: "phempty" }, "선택한 기간에 기록이 없어요."));
         const md = $("modal"); md.classList.add("rkm", "rc1");
         modal(`${nameWithAvg(m, yearEndRef(year))}`, pop, [["닫기", "close"]]).then(() => md.classList.remove("rkm", "rc1"));
