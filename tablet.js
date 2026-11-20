@@ -376,7 +376,7 @@
     else if (report === "최근 기록") { linkedLabel = "기간"; linkedOpts = [["전체", "전체"], ...Array.from({ length: Math.max(1, groups.length) }, (_, i) => [`${i + 1}주`, `${i + 1}주`])]; }
     else if (report === "순위표") { linkedLabel = "기준"; linkedOpts = [...new Set([...games.map((g) => ynum(g.gameDate)), ynum(today())])].sort((a, b) => b - a).map((y) => [String(y), `${y}년`]); }
     else { linkedLabel = "분기"; linkedOpts = qOpts.map((o) => [o[0], o[0]]); }
-    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "4주") ? "4주" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
+    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "10주") ? "10주" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
     if (!inMode || quarterOnly) {
       const rSel = quarterOnly ? null : sel(reports, report, (v) => { GS.report = v; GS.linked = null; draw(); });
       // 최근 기록: 기간 칸을 누르면 5줄 목록(전체·1주~n주)이 열리고, 위·아래로 드래그해서 고른다
@@ -1180,7 +1180,7 @@
     else if (rep === "모임기록") lopts = groups.slice().reverse().map((g) => [g.key, g.label]);
     else if (rep === "최근 기록") lopts = [["전체", "전체"], ...Array.from({ length: Math.max(1, groups.length) }, (_, i) => [`${i + 1}주`, `${i + 1}주`])];
     else if (rep === "분기에버") lopts = qOpts.map((o) => [o[0], o[0]]);
-    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "4주") ? "4주" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4)][0] : (lopts[0] || [""])[0];
+    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "10주") ? "10주" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4)][0] : (lopts[0] || [""])[0];
     const repSel = fsel(reports, rep, (v) => { GS.report = v; GS.linked = null; QS.open.clear(); phqGames(); });
     const bar = rep === "순위표"
       ? fbar(repSel, fsel(["전회원", "남자", "여자"], QS.rk, (v) => { QS.rk = v; phqGames(); }), fsel(["전분기", "1분기", "2분기", "3분기", "4분기", "상반기", "하반기"], QS.period, (v) => { QS.period = v; phqGames(); }), refreshBtn())
