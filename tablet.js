@@ -357,13 +357,19 @@
     const qOpts = (() => { const y = ynum(today()); return [[`${pad2((y - 1) % 100)}_4분기`, y - 1, 4], ...[1, 2, 3, 4].map((q) => [`${q}분기`, y, q])]; })();
     if (report === "개인기록") { linkedLabel = "회원명"; linkedOpts = activeMembers().map((m) => [String(m.memberId), m.name]); }
     else if (report === "모임기록") { linkedLabel = "주차"; linkedOpts = groups.slice().reverse().map((g) => [g.key, g.label]); }
-    else if (report === "최근 기록") { linkedLabel = "기간"; linkedOpts = ["최근 2주", "최근 3주", "최근 4주", "최근 5주"].map((x) => [x, x]); }
+    else if (report === "최근 기록") { linkedLabel = "기간"; linkedOpts = [["전체", "전체"], ...Array.from({ length: Math.max(1, groups.length) }, (_, i) => [`${i + 1}주`, `${i + 1}주`])]; }
     else if (report === "순위표") { linkedLabel = "기준"; linkedOpts = [...new Set([...games.map((g) => ynum(g.gameDate)), ynum(today())])].sort((a, b) => b - a).map((y) => [String(y), `${y}년`]); }
     else { linkedLabel = "분기"; linkedOpts = qOpts.map((o) => [o[0], o[0]]); }
-    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? "최근 4주" : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
+    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "4주") ? "4주" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
     if (!inMode || quarterOnly) {
       const rSel = quarterOnly ? null : sel(reports, report, (v) => { GS.report = v; GS.linked = null; draw(); });
-      const lSel = sel(linkedOpts, GS.linked, (v) => { GS.linked = v; draw(); });
+      // 최근 기록: 기간을 5줄 목록(전체·1주~n주)으로 보여 주고 위·아래로 드래그해서 고른다
+      const lSel = report === "최근 기록" && !quarterOnly ? (() => {
+        const s2 = h("select", { class: "tbsel tblist", size: "5" }, linkedOpts.map(([v, t]) => h("option", { value: v }, t)));
+        s2.value = GS.linked; s2.onchange = () => { GS.linked = s2.value; draw(); };
+        requestAnimationFrame(() => { const o = s2.options[s2.selectedIndex]; if (o) s2.scrollTop = Math.max(0, o.offsetTop - o.offsetHeight * 2); });
+        return s2;
+      })() : sel(linkedOpts, GS.linked, (v) => { GS.linked = v; draw(); });
       const sortSel = report === "순위표" ? sel(["평균점수", "최고점수", "게임수"], GS.sort, (v) => { GS.sort = v; draw(); }) : null;
       const qEdit = quarterOnly && inputMode();
       queryCard = card(rSel, lab(linkedLabel), lSel, sortSel ? lab("정렬") : null, sortSel, btn("조회", draw, "pri"),
@@ -401,32 +407,36 @@
         weights: [256, 118, 118, 118, 118, 140, 152, 236],
         cellBg: (r) => ROW_BG[(roles.get(list[r].recordId) || {}).role], custom: (r, c) => (c >= 1 && c <= 4 ? scoreCell(list[r], c, refs, roles) : null) }) || empty("조회된 자료가 없습니다.");
     } else if (report === "최근 기록") {
-      const n = +(GS.linked.match(/\d+/) || [4])[0], gs = groups.slice(-Math.max(1, n));
+      // 기간(전체 / 최근 n주): 가장 최근 주차부터 거꾸로 n주
+      const nAll = GS.linked === "전체", n = nAll ? groups.length : Math.max(1, +(String(GS.linked).match(/\d+/) || [4])[0]);
+      const gs = nAll ? groups.slice() : groups.slice(-n);
+      const dateSet = new Set(gs.flatMap((gr) => gr.dates)), inWin = (d) => dateSet.has(d);
       const year = gs.length ? ynum(gs[gs.length - 1].dates[gs[gs.length - 1].dates.length - 1]) : ynum(today());
-      title = `모임 누적 현황 · ${year}년 기준 · ${GS.linked}`;
-      const yearGames = new Map(); stat.filter((g) => ynum(g.gameDate) === year).forEach((g) => { if (!yearGames.has(g.memberId)) yearGames.set(g.memberId, []); yearGames.get(g.memberId).push(g); });
+      const perLabel = nAll ? "전체" : `최근 ${n}주`;
+      const range = gs.length ? `${gs[gs.length - 1].label} ~ ${gs[0].label}` : "";
+      title = `모임 누적 현황 · ${year}년 기준 · ${perLabel}`;
+      const yearGames = new Map(), winGames = new Map();
+      stat.forEach((g) => {
+        if (ynum(g.gameDate) === year) { if (!yearGames.has(g.memberId)) yearGames.set(g.memberId, []); yearGames.get(g.memberId).push(g); }
+        if (inWin(g.gameDate)) { if (!winGames.has(g.memberId)) winGames.set(g.memberId, []); winGames.get(g.memberId).push(g); }
+      });
       const ids = [...yearGames.keys()].sort((a, b) => a - b);
-      const groupRefs = gs.map((gr) => { const l = games.filter((g) => gr.dates.includes(g.gameDate)); return meetingHighRefs(l, roleMap(l)); });
-      const cellOf = (id, k) => {
-        const w = (yearGames.get(id) || []).filter((g) => gs[k].dates.includes(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? -1 : 1));
-        if (!w.some((g) => cnt(g) > 0)) return null;
-        const span = h("span", { class: "tbcum" });
-        w.forEach((g, wi) => {
-          const raw = sc(g), lastI = raw.map((v) => v > 0).lastIndexOf(true); if (lastI < 0) return;
-          if (wi > 0 && span.childNodes.length) span.append("  ");
-          raw.slice(0, lastI + 1).forEach((v, si) => {
-            if (si > 0) span.append(" / ");
-            const high = v > 0 && groupRefs[k].has(g.recordId * 10 + si + 1);
-            span.append(h("span", { style: high || v >= 200 ? `color:${high ? "#8B0000" : "#B42318"};font-weight:700` : "" }, v > 0 ? String(v) : "   "));
-          });
-        });
-        span.append(h("b", {}, ` (${recAvg(w).toFixed(1).padStart(5, " ")})`));
-        return span;
-      };
-      body = table({ headers: ["순번", "회원명(에버)", "누적에버", "출석일수", ...gs.map((g) => g.label.replace("월", "월 "))],
-        rows: ids.map((id, i) => { const l = yearGames.get(id); return [String(i + 1), nameWithAvg(mm.get(id), yearEndRef(year)), fmt1(recAvg(l)), String(new Set(l.map((g) => g.gameDate)).size), ...gs.map(() => "")]; }),
-        weights: [60, 150, 100, 90, ...gs.map(() => (n <= 4 ? 260 : 200))], aligns: [0, 0, 0, 0, ...gs.map(() => 2)], cls: n >= 5 ? "small" : "",
-        custom: (r, c) => (c >= 4 ? cellOf(ids[r], c - 4) : null) }) || empty("조회된 자료가 없습니다.");
+      if (!ids.includes(GS.recMember)) GS.recMember = ids.length ? ids[0] : null;
+      const lcount = (l) => l.reduce((a, g) => a + cnt(g), 0);
+      const btbl = table({ headers: ["순번", "회원명(에버)", "누적에버", "출석일수", "최근에버", "최근게임"],
+        rows: ids.map((id, i) => { const l = yearGames.get(id), w = winGames.get(id) || []; return [String(i + 1), nameWithAvg(mm.get(id), yearEndRef(year)), fmt1(recAvg(l)), String(new Set(l.map((g) => g.gameDate)).size), w.length ? fmt1(recAvg(w)) : "-", w.length ? String(lcount(w)) : "-"]; }),
+        weights: [60, 170, 100, 100, 110, 110], selectedRow: ids.indexOf(GS.recMember), cellBg: (r, c) => (c >= 4 ? "#FFF4D6" : null),
+        onClick: (i) => { GS.recMember = ids[i]; RENDER[current](); } }) || empty("조회된 자료가 없습니다.");
+      // 선택한 회원의 기록: 게임일별 1줄씩, 최근 주차부터 (위·아래로 드래그)
+      const sm = mm.get(GS.recMember);
+      const cdet = h("div", { class: "tbdetail tbrecent" }, h("b", { class: "tbdh" }, sm ? `${nameWithAvg(sm, yearEndRef(year))} · ${perLabel} 기록${range ? ` (${range})` : ""}` : "회원을 선택하세요"));
+      const mine = stat.filter((g) => g.memberId === GS.recMember && inWin(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : b.recordId - a.recordId));
+      const wkOf = (d) => { const gr = gs.find((x) => x.dates.includes(d)); return gr ? gr.label : ""; };
+      const tr2 = (vals, cls, score) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: score && i >= 2 && i <= 5 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
+      if (!mine.length) cdet.append(h("p", { class: "tag" }, "선택한 기간에 기록이 없어요."));
+      else cdet.append(h("table", { class: "tbmini rk tbrec" }, h("tbody", {}, tr2(["주차", "게임일", "1G", "2G", "3G", "4G", "평균", "에버편차"], "hd"),
+        ...mine.map((g, k) => { const a = recAvg([g]), b = qBase(sm, g.gameDate); return tr2([wkOf(g.gameDate), `${pad2(mnum(g.gameDate))}/${pad2(dnum(g.gameDate))}`, ...sc(g).map((v) => (v > 0 ? String(v) : "")), fmt1(a), deviation(a, b)], k % 2 ? "alt" : "", true); }))));
+      body = h("div", { class: "tbsplit" }, h("div", { style: "flex:50;min-width:0;display:flex" }, btbl), h("div", { style: "flex:50;min-width:0;display:flex" }, cdet));
     } else if (report === "순위표") {
       const year = +GS.linked || ynum(today());
       title = `순위표 · ${year}년`;
