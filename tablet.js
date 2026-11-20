@@ -1176,13 +1176,13 @@
     let lopts = [];
     if (rep === "개인기록") lopts = activeMembers().slice().sort((a, b) => ko.compare(a.name, b.name)).map((m) => [String(m.memberId), m.name]);
     else if (rep === "모임기록") lopts = groups.slice().reverse().map((g) => [g.key, g.label]);
-    else if (rep === "최근 기록") lopts = ["최근2주", "최근3주", "최근4주", "최근5주"].map((x) => [x, x]);
+    else if (rep === "최근 기록") lopts = [["전체", "전체"], ...Array.from({ length: Math.max(1, groups.length) }, (_, i) => [`${i + 1}주`, `${i + 1}주`])];
     else if (rep === "분기에버") lopts = qOpts.map((o) => [o[0], o[0]]);
-    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? "최근4주" : rep === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4)][0] : (lopts[0] || [""])[0];
+    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "4주") ? "4주" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4)][0] : (lopts[0] || [""])[0];
     const repSel = fsel(reports, rep, (v) => { GS.report = v; GS.linked = null; QS.open.clear(); phqGames(); });
     const bar = rep === "순위표"
       ? fbar(repSel, fsel(["전회원", "남자", "여자"], QS.rk, (v) => { QS.rk = v; phqGames(); }), fsel(["전분기", "1분기", "2분기", "3분기", "4분기", "상반기", "하반기"], QS.period, (v) => { QS.period = v; phqGames(); }), refreshBtn())
-      : fbar(repSel, fsel(lopts, GS.linked, (v) => { GS.linked = v; QS.open.clear(); phqGames(); }), refreshBtn());
+      : fbar(repSel, rep === "최근 기록" ? h("button", { type: "button", class: "phfsel phdd", onclick: (ev) => { ev.stopPropagation(); openDrop(ev.currentTarget, lopts, GS.linked, (v) => { GS.linked = v; QS.open.clear(); phqGames(); }); } }, `기간 ${GS.linked}`) : fsel(lopts, GS.linked, (v) => { GS.linked = v; QS.open.clear(); phqGames(); }), refreshBtn());
     const body = [];
     const card = (key, head, detail, extraCls = "") => { const open = QS.open.has(key); return h("div", { class: "phrc" + (open ? " open" : "") + (extraCls ? " " + extraCls : "") }, h("div", { class: "phrh", onclick: () => toggleOpen(key) }, ...head, h("i", { class: "chev" }, open ? "︿" : "﹀")), open ? detail() : null); };
     const scoreDetail = (g) => () => h("div", { class: "phrd" }, h("div", { class: "phscores" }, ...sc(g).map((v, i) => h("div", {}, h("small", {}, `${i + 1}G`), h("b", { class: v >= 200 ? "red" : "" }, v > 0 ? String(v) : "-")))), g.note ? h("div", { class: "phnote" }, g.note) : null);
@@ -1196,15 +1196,31 @@
       body.push(pTitle("모임 기록", g0 ? `${g0.label} / ${[...new Set(list.map(gtype))].join("·")}` : ""));
       list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : ""), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role]) : null], scoreDetail(g), r ? "r-" + r.role.toLowerCase() : "")); });
     } else if (rep === "최근 기록") {
-      const n = +(String(GS.linked).match(/\d+/) || [4])[0], gs = groups.slice(-n), year = gs.length ? ynum(gs[gs.length - 1].dates[0]) : y0;
-      body.push(pTitle("최근 기록"));
-      const yg = new Map(); stat.filter((g) => ynum(g.gameDate) === year).forEach((g) => { if (!yg.has(g.memberId)) yg.set(g.memberId, []); yg.get(g.memberId).push(g); });
-      const refsBy = gs.map((gr) => { const l = games.filter((g) => gr.dates.includes(g.gameDate)); return meetingHighRefs(l, roleMap(l)); });
-      [...yg.entries()].map(([id, l]) => ({ id, l, acc: recAvg(l), wk: l.filter((g) => gs.some((gr) => gr.dates.includes(g.gameDate))) })).sort((a, b) => b.acc - a.acc).forEach((r) => {
-        const m = mm.get(r.id);
-        body.push(card("c" + r.id, [h("b", { class: "nm" }, nameWithAvg(m, yearEndRef(year))), h("span", { class: "pav" }, fmt1(r.acc)), h("span", { class: "pat" }, `출석 ${new Set(r.l.map((g) => g.gameDate)).size}`), h("span", { class: "ppa" }, `( ${r.wk.some((g) => cnt(g) > 0) ? recAvg(r.wk).toFixed(1) : "-"} )`)],
-          () => h("div", { class: "phrd wk" }, gs.map((gr, k) => { const w = r.l.filter((g) => gr.dates.includes(g.gameDate)); return h("div", { class: "phwk" }, h("span", { class: "lb" }, gr.label), h("span", { class: "sc" }, w.some((g) => cnt(g) > 0) ? [...w.flatMap((g) => scoreLine(g, refsBy[k])), ` (${recAvg(w).toFixed(1)})`] : "-")); }))));
+      // A: 기간(전체·1주~n주 드롭메뉴) / B: 회원 목록(최근에버·최근게임) / C: 회원을 누르면 기록 팝업(상·하 드래그)
+      const nAll = GS.linked === "전체", n = nAll ? groups.length : Math.max(1, +(String(GS.linked).match(/\d+/) || [4])[0]);
+      const gs = nAll ? groups.slice() : groups.slice(-n), dset = new Set(gs.flatMap((gr) => gr.dates)), inWin = (d) => dset.has(d);
+      const year = gs.length ? ynum(gs[gs.length - 1].dates[0]) : y0, perLabel = nAll ? "전체" : `최근 ${n}주`;
+      body.push(pTitle("최근 기록", `${perLabel}${gs.length ? ` (${gs[gs.length - 1].label} ~ ${gs[0].label})` : ""}`));
+      const yg = new Map(), wg = new Map();
+      stat.forEach((g) => {
+        if (ynum(g.gameDate) === year) { if (!yg.has(g.memberId)) yg.set(g.memberId, []); yg.get(g.memberId).push(g); }
+        if (inWin(g.gameDate)) { if (!wg.has(g.memberId)) wg.set(g.memberId, []); wg.get(g.memberId).push(g); }
       });
+      const lc = (l) => l.reduce((a, g) => a + cnt(g), 0);
+      const rows = [...yg.entries()].map(([id, l]) => ({ id, l, acc: recAvg(l), w: wg.get(id) || [] })).sort((a, b) => b.acc - a.acc);
+      const openRec = (r) => {
+        const m = mm.get(r.id), mine = stat.filter((g) => g.memberId === r.id && inWin(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : b.recordId - a.recordId));
+        const wkOf = (d) => { const gr = gs.find((x) => x.dates.includes(d)); return gr ? gr.label : ""; };
+        const tr2 = (vals, cls, score) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: score && i >= 2 && i <= 5 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
+        const pop = h("div", { class: "rcpop" }, h("div", { class: "rcsub" }, `${perLabel} 기록${gs.length ? ` (${gs[gs.length - 1].label} ~ ${gs[0].label})` : ""} · 위·아래로 밀어 보기`),
+          mine.length ? h("div", { class: "rcscroll" }, h("table", { class: "tbmini rk rctab" }, h("tbody", {}, tr2(["주차", "게임일", "1G", "2G", "3G", "4G", "평균", "편차"], "hd"), ...mine.map((g, k) => { const a = recAvg([g]), b = qBase(m, g.gameDate); return tr2([wkOf(g.gameDate), `${pad2(mnum(g.gameDate))}/${pad2(dnum(g.gameDate))}`, ...sc(g).map((v) => (v > 0 ? String(v) : "")), fmt1(a), deviation(a, b)], k % 2 ? "alt" : "", true); }))))
+            : h("div", { class: "phempty" }, "선택한 기간에 기록이 없어요."));
+        const md = $("modal"); md.classList.add("rkm", "rc1");
+        modal(`${nameWithAvg(m, yearEndRef(year))}`, pop, [["닫기", "close"]]).then(() => md.classList.remove("rkm", "rc1"));
+      };
+      const th = (x) => h("td", {}, x);
+      body.push(h("div", { class: "phrctab" }, h("table", { class: "tbmini rkb" }, h("thead", {}, h("tr", { class: "hd" }, ["회원명(에버)", "누적에버", "출석", "최근에버", "최근게임"].map(th))),
+        h("tbody", {}, ...rows.map((r, k) => h("tr", { class: k % 2 ? "alt" : "", onclick: () => openRec(r) }, h("td", { class: "nm" }, nameWithAvg(mm.get(r.id), yearEndRef(year))), h("td", {}, fmt1(r.acc)), h("td", {}, String(new Set(r.l.map((g) => g.gameDate)).size)), h("td", { class: "hl" }, r.w.length ? fmt1(recAvg(r.w)) : "-"), h("td", { class: "hl" }, r.w.length ? String(lc(r.w)) : "-")))))));
     } else if (rep === "분기에버") {
       const [lb, y, q] = qOpts.find((o) => o[0] === GS.linked), [py, pq] = q === 1 ? [y - 1, 4] : [y, q - 1], months = [q * 3 - 2, q * 3 - 1, q * 3];
       body.push(h("div", { class: "phqcap" }, h("b", {}, "전회원"), h("span", {}, `${months[0]}~${months[2]}월`)));
