@@ -52,6 +52,7 @@
   const tot = (g) => sc(g).filter((v) => v > 0).reduce((a, b) => a + b, 0);
   const gavg = (g) => (cnt(g) ? tot(g) / cnt(g) : 0);
   const smax = (g) => Math.max(...sc(g));
+  const recSum = (list) => { const g = list.reduce((a, x) => a + cnt(x), 0); const hi = list.length ? Math.max(...list.map(smax)) : 0; const ev = list.length ? Math.max(...list.map((x) => recAvg([x]))) : 0; return h("div", { class: "recsum" }, "총 게임 : ", h("em", {}, `${g}G`), h("i", {}, "/"), "최고하이 : ", h("em", {}, `${hi}점`), h("i", {}, "/"), "최고에버 : ", h("em", {}, `${fmt1(ev)}점`)); };
   const recAvg = (list) => { const c = list.reduce((a, g) => a + cnt(g), 0); return c ? list.reduce((a, g) => a + tot(g), 0) / c : 0; };
   const weekLabel = (d) => `${mnum(d)}월${Math.floor((dnum(d) - 1) / 7) + 1}주`;
   const weekKey = (d) => `${ynum(d)}|${mnum(d)}|${Math.floor((dnum(d) - 1) / 7)}`;
@@ -440,10 +441,11 @@
         onClick: (i) => { GS.recMember = ids[i]; RENDER[current](); } }) || empty("조회된 자료가 없습니다.");
       // 선택한 회원의 기록: 게임일별 1줄씩, 최근 주차부터 (위·아래로 드래그)
       const sm = mm.get(GS.recMember);
-      const cdet = h("div", { class: "tbdetail tbrecent" }, h("b", { class: "tbdh" }, sm ? `${nameWithAvg(sm, yearEndRef(year))} · ${perLabel} 기록${range ? ` (${range})` : ""}` : "회원을 선택하세요"));
+      const cdet = h("div", { class: "tbdetail tbrecent" }, h("b", { class: "tbdh" }, sm ? [nameWithAvg(sm, yearEndRef(year)), h("span", { class: "rcper" }, `${perLabel} 기록${range ? ` (${range})` : ""}`)] : "회원을 선택하세요"));
       const mine = stat.filter((g) => g.memberId === GS.recMember && inWin(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : b.recordId - a.recordId));
       const wkOf = (d) => { const gr = gs.find((x) => x.dates.includes(d)); return gr ? gr.label : ""; };
       const tr2 = (vals, cls, score) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: score && i >= 1 && i <= 4 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
+      if (sm) cdet.append(recSum(mine));
       if (!mine.length) cdet.append(h("p", { class: "tag" }, "선택한 기간에 기록이 없어요."));
       else cdet.append(h("table", { class: "tbmini rk tbrec" }, h("tbody", {}, tr2(["주차", "1G", "2G", "3G", "4G", "평균", "에버편차"], "hd"),
         ...mine.map((g, k) => { const a = recAvg([g]), b = qBase(sm, g.gameDate); return tr2([wkOf(g.gameDate), ...sc(g).map((v) => (v > 0 ? String(v) : "")), fmt1(a), deviation(a, b)], k % 2 ? "alt" : "", true); }))));
@@ -1212,11 +1214,12 @@
         const m = mm.get(r.id), mine = stat.filter((g) => g.memberId === r.id && inWin(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : b.recordId - a.recordId));
         const wkOf = (d) => { const gr = gs.find((x) => x.dates.includes(d)); return gr ? gr.label : ""; };
         const tr2 = (vals, cls, score) => h("tr", { class: cls || "" }, vals.map((v, i) => h("td", { class: score && i >= 1 && i <= 4 && parseFloat(v) >= 200 ? "r200" : "" }, v)));
-        const pop = h("div", { class: "rcpop" }, h("div", { class: "rcsub" }, `${perLabel} 기록${gs.length ? ` (${gs[gs.length - 1].label} ~ ${gs[0].label})` : ""} · 위·아래로 밀어 보기`),
+        const pop = h("div", { class: "rcpop" }, recSum(mine),
           mine.length ? h("div", { class: "rcscroll" }, h("table", { class: "tbmini rk rctab" }, h("tbody", {}, tr2(["주차", "1G", "2G", "3G", "4G", "평균", "편차"], "hd"), ...mine.map((g, k) => { const a = recAvg([g]), b = qBase(m, g.gameDate); return tr2([wkOf(g.gameDate), ...sc(g).map((v) => (v > 0 ? String(v) : "")), fmt1(a), deviation(a, b)], k % 2 ? "alt" : "", true); }))))
             : h("div", { class: "phempty" }, "선택한 기간에 기록이 없어요."));
         const md = $("modal"); md.classList.add("rkm", "rc1");
-        modal(`${nameWithAvg(m, yearEndRef(year))}`, pop, [["닫기", "close"]]).then(() => md.classList.remove("rkm", "rc1"));
+        const mp = modal(`${nameWithAvg(m, yearEndRef(year))}`, pop, [["닫기", "close"]]).then(() => md.classList.remove("rkm", "rc1"));
+        $("modalTitle").append(h("span", { class: "rcper" }, `${perLabel} 기록${gs.length ? ` (${gs[gs.length - 1].label} ~ ${gs[0].label})` : ""}`)); return mp;
       };
       const th = (x) => h("td", {}, x);
       body.push(h("div", { class: "phrctab" }, h("table", { class: "tbmini rkb" }, h("thead", {}, h("tr", { class: "hd" }, ["회원명(에버)", "누적에버", "출석", "최근에버", "최근게임"].map(th))),
