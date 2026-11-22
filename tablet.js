@@ -302,10 +302,17 @@
       const per = [0, 1, 2, 3].map((i) => { const v = rs.map((g) => sc(g)[i]).filter((x) => x > 0); return v.length ? v.reduce((a, x) => a + x, 0) / v.length : 0; });
       return [lbl, ...per.map((v) => (v > 0 ? fmt1(v) : "-")), fmt1(per.reduce((a, x) => a + x, 0)), fmt1(recAvg(rs)), dev(rs, c)];
     };
+    /* 팝업 제목줄 우측 가장자리: 이전/다음 탭 (순위표: 이전·다음 분기, 분기에버: 선택한 분기 안의 이전·다음 월) */
+    let titleText = "";
+    const go = (d) => { const nx = cur + d; if (nx < lo || nx > hi) return; cur = nx; draw(d); };
+    const prevB = h("button", { type: "button", class: "rkbtn", title: onlyMo ? "이전 월" : "이전 분기", onclick: (e) => { e.stopPropagation(); go(-1); } }, "‹ 이전");
+    const nextB = h("button", { type: "button", class: "rkbtn", title: onlyMo ? "다음 월" : "다음 분기", onclick: (e) => { e.stopPropagation(); go(1); } }, "다음 ›");
+    const navEl = h("span", { class: "rknav" }, prevB, nextB);
+    const setTitle = () => { const t = $("modalTitle"); t.textContent = ""; t.append(h("span", { class: "rktt" }, titleText), navEl); prevB.disabled = cur <= lo; nextB.disabled = cur >= hi; };
     const draw = (dir) => {
       const yy = onlyMo ? Math.floor(cur / 12) : Math.floor(cur / 4), pp = onlyMo ? (cur % 12) + 1 : (cur % 4) + 1;
       const months = onlyMo ? [pp] : [pp * 3 - 2, pp * 3 - 1, pp * 3];
-      $("modalTitle").textContent = onlyMo ? `${m.name} · ${yy}년 ${pp}월` : `${m.name} · ${yy}년 ${pp}분기`;
+      titleText = onlyMo ? `${m.name} · ${yy}년 ${pp}월` : `${m.name} · ${yy}년 ${pp}분기`; setTitle();
       body.textContent = "";
       months.forEach((mo) => {
         const recs = all.filter((g) => ynum(g.gameDate) === yy && mnum(g.gameDate) === mo), wc = recs.some((g) => Math.floor((dnum(g.gameDate) - 1) / 7) >= 4) ? 5 : 4;
@@ -333,7 +340,7 @@
       const nx = cur + (dx < 0 ? 1 : -1); if (nx < lo || nx > hi) return; cur = nx; draw(dx < 0 ? 1 : -1);
     });
     const md = $("modal"); md.classList.add("rkm"); md.classList.toggle("rk1", !!onlyMo);
-    const pr = modal($("modalTitle").textContent, body, [["닫기", "close"]]);
+    const pr = modal(titleText, body, [["닫기", "close"]]); setTitle(); // modal() 이 제목을 다시 쓰므로 이전/다음 탭을 다시 붙임
     return pr.then((v) => { md.classList.remove("rkm", "rk1"); return v; });
   }
   const SMALLQ = () => { const w = window.innerWidth, h2 = window.innerHeight; return w > h2 && (Math.max(w, h2) <= 1100 || h2 <= 650); };

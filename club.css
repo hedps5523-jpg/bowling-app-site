@@ -796,6 +796,11 @@ body.phmode .phpickit{font-size:15px}
 .rkpop .tbmh{margin:8px 0 3px}.rkpop .tbmini.rk td{height:28px}
 .pcmodal.rkm .pcdlg{width:98vw!important;max-width:98vw!important;height:min(94vh,94dvh,760px)!important;max-height:none!important;display:flex!important;flex-direction:column}
 .pcmodal.rkm .pcdlg-h{padding:7px 12px!important;font-size:15px!important;flex:none}
+.pcmodal.rkm .pcdlg-h{display:flex!important;align-items:center;justify-content:space-between;gap:8px}
+.pcmodal.rkm .rktt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcmodal.rkm .rknav{display:flex;gap:6px;flex:none;margin-left:auto}
+.pcmodal.rkm .rkbtn{height:30px;padding:0 10px;border:1px solid #9fb0c6;border-radius:6px;background:#fff;color:#14304f;font-size:13px;font-weight:700;line-height:1;cursor:pointer;white-space:nowrap}
+.pcmodal.rkm .rkbtn:disabled{opacity:.35;cursor:default}
 .pcmodal.rkm .pcdlg-b{padding:4px 6px!important;overflow:hidden!important;flex:1 1 0;min-height:0}
 .pcmodal.rkm .pcdlg-f{padding:5px 10px!important;flex:none}
 .rkpop{height:100%;display:flex;flex-direction:column;overflow:hidden!important;min-width:0!important;max-height:none!important}
