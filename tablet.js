@@ -1218,7 +1218,7 @@
     } else if (rep === "모임기록") {
       const g0 = groups.find((g) => g.key === GS.linked), list = games.filter((g) => g0 && g0.dates.includes(g.gameDate)).sort((a, b) => gavg(b) - gavg(a));
       body.push(pTitle("모임 기록", g0 ? `${g0.label} / ${[...new Set(list.map(gtype))].join("·")}` : ""));
-      list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : ""), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role]) : null], scoreDetail(g), r ? "r-" + r.role.toLowerCase() : "")); });
+      list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("span", { class: "mmain" }, h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : "")), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role]) : null], scoreDetail(g), (r ? "r-" + r.role.toLowerCase() : "") + " mcard")); });
     } else if (rep === "최근 기록") {
       // A: 기간(전체·1주~n주 드롭메뉴) / B: 회원 목록(최근에버·최근게임) / C: 회원을 누르면 기록 팝업(상·하 드래그)
       const RW = recWin(groups, GS.linked), { gs, inWin, perLabel, range, year } = RW;
@@ -1247,18 +1247,20 @@
     } else if (rep === "분기에버") {
       const [lb, y, q] = qOpts.find((o) => o[0] === GS.linked), [py, pq] = q === 1 ? [y - 1, 4] : [y, q - 1], months = [q * 3 - 2, q * 3 - 1, q * 3];
       body.push(h("div", { class: "phqcap" }, h("b", {}, "전회원"), h("span", {}, `${months[0]}~${months[2]}월`)));
-      activeMembers().map((m) => { const ex = S.sq[`${m.memberId}|${y}|${q}`], pv = S.sq[`${m.memberId}|${py}|${pq}`], base = ex != null ? ex : pv != null ? pv : m.currentBaseAverage; const recs = stat.filter((g) => g.memberId === m.memberId && ynum(g.gameDate) === y && months.includes(mnum(g.gameDate))); return { m, base, recs, avg: recAvg(recs) }; })
+      const qProg = y === y0 && q === Math.floor((mnum(today()) - 1) / 3) + 1 && !QA.isOpen(games.map((g) => g.gameDate), y, q); // 입력 화면과 같은 '진행중' 기준
+      activeMembers().map((m) => { const ex = S.sq[`${m.memberId}|${y}|${q}`], pv = S.sq[`${m.memberId}|${py}|${pq}`], base = ex != null ? ex : pv != null ? pv : m.currentBaseAverage; const recs = stat.filter((g) => g.memberId === m.memberId && ynum(g.gameDate) === y && months.includes(mnum(g.gameDate))); return { m, base, ex, recs, avg: recAvg(recs) }; })
         .sort((a, b) => b.avg - a.avg || b.base - a.base).forEach((r) => {
           const row = (lbl, rs) => { const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "—", "—", "—", "—", null]; const av = recAvg(rs), bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return [lbl, String(c), av.toFixed(1), String(Math.max(...rs.map(smax))), bw > 0 ? sgn1(av - bw) : "—", bw > 0 ? av - bw : null]; };
-          body.push(card("q" + r.m.memberId, [h("b", { class: "nm" }, `${r.m.name}(${r.base || "-"})`), h("span", { class: "lb" }, "에버"), h("span", { class: "pill" }, String(r.base || "-")), h("span", { class: "acc" }, h("small", {}, "총 누적에버"), h("b", {}, r.recs.some((g) => cnt(g) > 0) ? r.avg.toFixed(1) : "-"))],
+          body.push(card("q" + r.m.memberId, [h("b", { class: "nm" }, `${r.m.name}(${r.base || "-"})`), h("span", { class: "lb" }, "에버"), h("span", { class: "pill" + (qProg || r.ex == null ? " dim" : "") }, qProg ? "진행중" : r.ex != null ? String(r.ex) : "-"), h("span", { class: "acc" }, h("small", {}, "총 누적에버"), h("b", {}, r.recs.some((g) => cnt(g) > 0) ? r.avg.toFixed(1) : "-"))],
             () => h("div", { class: "phrd" }, h("table", { class: "phst" }, h("tbody", {}, h("tr", { class: "hd" }, ["구분", "게임수", "총에버", "최고게임", "편차"].map((x) => h("td", {}, x))),
-              ...[...months.map((mo) => row(`${mo}월`, r.recs.filter((g) => mnum(g.gameDate) === mo))), row("Total", r.recs)].map((v) => h("tr", v[0] === "Total" || v[1] === "—" ? { class: v[0] === "Total" ? "tot" : "" } : { class: "qtap", onclick: (e) => { e.stopPropagation(); rankQuarterPopup(r.m, y, q, r.recs, mm, parseInt(v[0])); } }, v.slice(0, 4).map((x) => h("td", {}, x)), h("td", { class: devCls(v[5]) }, v[4]))))))));
+              ...[...months.map((mo) => row(`${mo}월`, r.recs.filter((g) => mnum(g.gameDate) === mo))), row("Total", r.recs)].map((v) => h("tr", v[0] === "Total" || v[1] === "—" ? { class: v[0] === "Total" ? "tot" : "" } : { class: "qtap", onclick: (e) => { e.stopPropagation(); rankQuarterPopup(r.m, y, q, r.recs, mm, parseInt(v[0])); } }, v.slice(0, 4).map((x) => h("td", {}, x)), h("td", { class: devCls(v[5]) }, v[4])))))), "qcard"));
         });
     } else {
       const P = { 전분기: [1, 12], "1분기": [1, 3], "2분기": [4, 6], "3분기": [7, 9], "4분기": [10, 12], 상반기: [1, 6], 하반기: [7, 12] }[QS.period];
       const year = y0, curQ = Math.floor((mnum(today()) - 1) / 3) + 1;
       const label = QS.period === "전분기" ? `${year}년 전체` : `${year}년 ${QS.period}`;
       body.push(pTitle("랭킹 현황", QS.rk, label));
+      body.push(h("div", { class: "phrkhead" }, h("span", {}), h("span", { class: "hn" }, "회원명"), ["게임수", "총에버", "최고게임", "편차"].map((x) => h("span", { class: "hv" }, x)))); // 필드명 줄 (고정)
       const agg = new Map();
       stat.filter((g) => ynum(g.gameDate) === year && mnum(g.gameDate) >= P[0] && mnum(g.gameDate) <= P[1]).forEach((g) => { const m = mm.get(g.memberId); if (!m) return; if (QS.rk === "남자" && m.gender !== "MALE") return; if (QS.rk === "여자" && m.gender !== "FEMALE") return; if (!agg.has(g.memberId)) agg.set(g.memberId, []); agg.get(g.memberId).push(g); });
       const ref = QS.period === "전분기" ? yearEndRef(year) : (() => { const e = monthEnd(year, P[1]); return e > today() ? today() : e; })();
@@ -1270,8 +1272,9 @@
               ...[1, 2, 3, 4].filter((q) => q <= (year === y0 ? curQ : 4)).map((q) => { const rs = r.l.filter((g) => Math.floor((mnum(g.gameDate) - 1) / 3) + 1 === q), qb = qBase(r.m, ymd(year, q * 3 - 2, 1)), c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return null; const av = recAvg(rs), d = qb > 0 ? av - qb : null; return h("tr", { class: "qtap", onclick: (e) => { e.stopPropagation(); rankQuarterPopup(r.m, year, q, r.l, mm); } }, h("td", {}, `${q}분기(${qb || "-"})`), h("td", {}, String(c)), h("td", {}, av.toFixed(1)), h("td", {}, String(Math.max(...rs.map(smax)))), h("td", { class: devCls(d) }, d == null ? "-" : sgn1(d))); })))), "rank"));
         });
     }
-    if (body.length <= 1) body.push(h("div", { class: "phempty" }, "조회된 자료가 없습니다."));
-    phRootF(2, bar, ...body);
+    if (body.length <= (rep === "순위표" ? 2 : 1)) body.push(h("div", { class: "phempty" }, "조회된 자료가 없습니다."));
+    phRootF(rep === "순위표" ? 3 : 2, bar, ...body);
+    if (rep === "순위표") { const scEl = view.querySelector(".phscroll"), hd = view.querySelector(".phrkhead"); if (scEl && hd) hd.style.paddingRight = parseFloat(getComputedStyle(hd).paddingRight) + (scEl.offsetWidth - scEl.clientWidth) + "px"; } // 스크롤바가 있는 기기에서도 필드명 줄이 목록과 맞게
   }
 
   /* ---- 장부 ---- */
@@ -1385,9 +1388,14 @@
       if (!(await confirmBox("선택한 내역을 삭제하시겠습니까?"))) return;
       clear(); await save([op("ledger_entries", "delete", ledgerPayload(e), S.rv.ledger[e.ledgerId])], "장부가 삭제되었습니다.");
     }
+    /* 칸 폭 맞춤: 선택 목록(구분·내역)은 가장 긴 항목 글자폭 + 화살표 여유만큼, 금액은 7자리(1000000)까지만 */
+    const ff = getComputedStyle(document.body).fontFamily, mc = document.createElement("canvas").getContext("2d");
+    const selW = (s) => { mc.font = `600 15px ${ff}`; return Math.ceil(Math.max(...[...s.options].map((o) => mc.measureText(o.text).width))) + 34; };
+    tSel.style.setProperty("width", selW(tSel) + "px", "important"); cSel.style.setProperty("width", selW(cSel) + "px", "important"); // .tbsel 의 width:auto!important 를 이기도록 important
+    mc.font = `400 16px ${ff}`; aIn.style.setProperty("width", Math.ceil(mc.measureText("1000000").width) + 18 + "px", "important");
     const svL = pbtn("저장", () => saveP(false), "pri");
     phRootF(2, h("section", { class: "phcard phcompact" }, h("div", { class: "phttl" }, h("b", { class: "phct" }, "장부 입력"), h("span", { class: "phlinks" }, LS.editing > 0 ? plink("삭제", delP) : plink("초기화", () => { clear(); phLedger(); }), plink("수정", () => saveP(true)))),
-      h("div", { class: "phflds led" }, h("div", { class: "phrowl1" }, fm("일자", dIn), fm("구분", tSel), fm("내역", cSel)), h("div", { class: "phrowl2" }, fm("금액", aIn), fm("비고", nIn), svL))),
+      h("div", { class: "phflds led" }, fm("일자", h("div", { class: "phdate" }, h("span", {}, LS.date.slice(2, 4) + "." + LS.date.slice(5, 7) + "." + LS.date.slice(8, 10)), h("i", {}, "▾"), dIn), "m-d"), fm("구분", tSel, "m-t"), fm("내역", cSel, "m-c"), fm("금액", aIn, "m-a"), fm("비고", nIn, "m-n"), svL)),
       h("div", { class: "phpreview" }, `입력 중 월별 미리보기: ${+mk.slice(5)}월 / ${list.length}건`),
       h("div", { class: "phllist2" }, items.length ? items : h("div", { class: "phempty" }, "해당 월 장부 내역이 없습니다.")));
   }

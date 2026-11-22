@@ -1048,16 +1048,12 @@ body.phmode .topbar .phtbar .phmenu{padding:0 8px}
 .phcompact .phin{height:42px;font-size:16px;padding:0 6px}
 .phcompact .phin.sc{padding:0 4px}
 .phrown{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,.7fr) minmax(0,1fr);gap:6px;align-items:end}
-.phrown .phbtn,.phrowl2 .phbtn{height:42px;font-size:15px;padding:0 4px}
-.phrowl1{display:grid;grid-template-columns:minmax(0,1.5fr) 70px minmax(0,1.4fr);gap:6px}
-.phrowl2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.1fr) minmax(0,.6fr);gap:6px;align-items:end}
+.phrown .phbtn,.phflds.led .phbtn{height:42px;font-size:15px;padding:0 14px}
 .phcompact .phin[type=date]{font-size:14px;padding:0 2px 0 6px}
 .phcompact .phin[type=date]::-webkit-calendar-picker-indicator{margin:0 0 0 2px;padding:0}
 @media (min-width:580px){
   .phflds:not(.led){display:grid;grid-template-columns:minmax(96px,1.05fr) minmax(96px,1fr) minmax(96px,1.3fr) repeat(4,minmax(44px,.7fr));gap:6px}
   .phflds:not(.led) .phrow3,.phflds:not(.led) .phrow4{display:contents}
-  .phflds.led{display:grid;grid-template-columns:112px 70px minmax(102px,1.5fr) minmax(84px,1.05fr) minmax(50px,.75fr) 64px;gap:6px;align-items:end}
-  .phflds.led .phrowl1,.phflds.led .phrowl2{display:contents}
 }
 
 /* ===== 회원관리 수정 팝업 3열 배치 (2026-11-22 시안 적용) =====
@@ -1085,3 +1081,63 @@ body.phmode .topbar .phtbar .phmenu{padding:0 8px}
   .mf.m-rjm{order:1}.mf.m-rj{order:2}
   .pcmodal.mem3 .mf .chk{font-size:12.5px;padding:0 5px;gap:3px}
 }
+
+/* ===== 세로 화면 조회·입력 수정 (2026-11-22) ===== */
+/* 조회-모임기록: 이름·Avg·편차를 한 덩어리로, 배지는 세로 가운데에 (넓은 폭에서는 60% 지점) */
+.phrc.mcard .phrh{display:grid;grid-template-columns:minmax(0,1fr) auto 20px;align-items:center;gap:8px}
+.phrc.mcard .mmain{display:flex;align-items:baseline;gap:10px;min-width:0;grid-column:1}
+.phrc.mcard .mmain .nm{flex:0 1 auto}
+.phrc.mcard .phrh .badge{grid-column:2;margin:0!important;justify-self:start;align-self:center;line-height:1.3}
+.phrc.mcard .chev{grid-column:3;margin-left:0}
+@media (min-width:520px){.phrc.mcard .phrh{grid-template-columns:minmax(0,60%) auto 1fr 20px}.phrc.mcard .chev{grid-column:4}}
+/* 조회·입력-분기에버: 에버 문구와 조정값 칸을 이름 가까이(왼쪽)로, 총 누적에버는 오른쪽 */
+.phrc.qcard .phrh{display:flex;gap:8px}
+.phrc.qcard .phrh .nm{flex:0 1 40%;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.phrc.qcard .phrh .lb{margin-left:0}
+.phrc.qcard .phrh .pill{min-width:72px;text-align:center;padding:4px 12px;font-weight:700;color:#12285A}
+.phrc.qcard .phrh .pill.dim,.phqhead .phadj.lock{font-weight:400;color:#A0AABB}
+.phrc.qcard .phrh .acc{margin-left:auto}
+.phqhead .nm{flex:0 1 40%!important;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.phqhead .acc{margin-left:auto}
+.phqhead .phadj{width:84px;min-width:0}
+/* 조회-순위표: 필드명 줄(고정) + 숫자 칸을 이름 가까이로 모음 */
+.phrc.rank .phrh{display:grid;grid-template-columns:30px minmax(84px,30%) repeat(4,minmax(40px,64px)) 1fr 20px;align-items:center;gap:4px;font-size:15px}
+.phrc.rank .phrh .chev{grid-column:8;margin-left:0}
+.phrc.rank .phrh .nm{flex:none;min-width:0}
+.phrc.rank .phrh .pn,.phrc.rank .phrh .pav,.phrc.rank .phrh .pdv{min-width:0;text-align:center}
+.phrkhead{display:grid;grid-template-columns:30px minmax(84px,30%) repeat(4,minmax(40px,64px)) 1fr 20px;gap:4px;align-items:end;padding:0 13px 3px 15px;font-size:11px;font-weight:700;color:#4A5D80;line-height:1.1}
+.phrkhead .hn{text-align:left;white-space:nowrap}
+.phrkhead .hv{text-align:center;white-space:nowrap}
+/* 조회-회비: 이름 열 고정, 납부상태 배지를 이름 가까이로, 금액은 오른쪽 */
+.phfi>b:first-child{flex:0 1 38%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phfi .st{margin-left:0}
+.phfi .st+.amt,.phfi .amt{margin-left:auto}
+/* 입력-장부: 칸 폭을 내용에 맞추고 남는 폭은 비고가 차지 (좁으면 비고·저장이 다음 줄로) */
+.phflds.led{display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;align-items:flex-end}
+.phflds.led .phf{flex:none;min-width:0}
+.phflds.led .phf.m-n{flex:1 1 90px;min-width:90px}
+.phflds.led .phfs.phbox{width:auto;max-width:100%}
+.phflds.led .phdate{position:relative;display:flex;align-items:center;gap:4px;height:36px;padding:0 6px;border:1px solid #CFD9E6;border-radius:10px;background:#fff;font-size:15px;font-weight:700;color:#12285A;white-space:nowrap}
+.phflds.led .phdate i{font-style:normal;font-size:12px;color:#5B6B84}
+.phflds.led .phdate input{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;padding:0;border:0;cursor:pointer}
+.phflds.led .m-a .phin{width:calc(7ch + 24px);padding:0 6px;text-align:right}
+.phflds.led .m-n .phin{width:100%}
+.phrc.qcard .phrh .chev{margin-left:0}
+/* 좁은 폭(폰): 이름·Avg·편차가 잘리지 않도록 배지는 다음 줄 왼쪽에 둔다 */
+@media (max-width:519px){
+  .phrc.mcard .phrh{grid-template-columns:minmax(0,1fr) 20px;row-gap:2px;padding-top:6px;padding-bottom:6px}
+  .phrc.mcard .phrh .chev{grid-column:2;grid-row:1}
+  .phrc.mcard .phrh .badge{grid-column:1;grid-row:2;justify-self:start}
+}
+/* 순위표: 폰 폭에서는 이름 열이 남는 폭을 쓰고 숫자 칸을 바로 옆에 붙여 한 줄에 맞춘다 */
+@media (max-width:479px){
+  .phrc.rank .phrh,.phrkhead{grid-template-columns:24px minmax(80px,1fr) repeat(4,38px) 14px;gap:3px}
+  .phrc.rank .phrh{font-size:14px}.phrc.rank .phrh .nm{font-size:14px}
+  .phrc.rank .phrh .rk{width:24px;height:24px;font-size:13px}
+  .phrc.rank .phrh .chev{grid-column:7;width:14px}
+  .phrkhead{padding:0 11px 3px 13px;font-size:10.5px}
+}
+.phqhead .lb,.phrc.qcard .phrh .lb{flex:none;white-space:nowrap}
+@media (max-width:479px){.phqhead .phadj{width:76px}.phrc.qcard .phrh .pill{min-width:66px;padding:4px 8px}}
+/* 구분·내역 선택칸: 기본 화살표 대신 작은 화살표를 그려 칸 폭을 글자 길이에 맞게 줄임 */
+.phflds.led .phfs.phbox{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235B6B84' stroke-width='1.5'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 7px center!important;background-size:10px 6px!important}
