@@ -1263,7 +1263,7 @@
   function phqLedger() {
     const all = S.ledger.filter((e) => e.date), signed = (e) => (e.type === "수입" ? e.amount : -e.amount);
     const keys = new Set(all.map((e) => e.date.slice(0, 7))); keys.add(today().slice(0, 7));
-    const mk = [...keys].sort().reverse(); if (!mk.includes(LS.month)) LS.month = mk[0];
+    const mk = [...keys].sort().reverse(); if (!mk.includes(LS.month) || QS.all) LS.month = mk[0]; // 전체 탭 선택 시 월 선택 필드에 가장 최근 월 표시
     const list = (QS.all ? all : all.filter((e) => e.date.startsWith(LS.month))).slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.ledgerId - b.ledgerId));
     const inc = list.filter((e) => e.type === "수입").reduce((a, e) => a + e.amount, 0), exp = list.filter((e) => e.type === "지출").reduce((a, e) => a + e.amount, 0);
     const end = QS.all ? null : monthEnd(+LS.month.slice(0, 4), +LS.month.slice(5));
