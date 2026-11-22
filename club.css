@@ -1141,3 +1141,6 @@ body.phmode .topbar .phtbar .phmenu{padding:0 8px}
 @media (max-width:479px){.phqhead .phadj{width:76px}.phrc.qcard .phrh .pill{min-width:66px;padding:4px 8px}}
 /* 구분·내역 선택칸: 기본 화살표 대신 작은 화살표를 그려 칸 폭을 글자 길이에 맞게 줄임 */
 .phflds.led .phfs.phbox{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235B6B84' stroke-width='1.5'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 7px center!important;background-size:10px 6px!important}
+
+/* ===== 가로 화면 기록조회: 순위표·분기에버 상세 박스의 제목 행(○○○ · 상세내역) 고정 (2026-11-23) ===== */
+.tbdetail:not(.tbrecent)>.tbdh{position:sticky;top:-8px;z-index:3;background:#fff;margin:-8px -8px 6px;padding:8px 10px 6px;border-bottom:1px solid #DBE5F3;border-radius:7px 7px 0 0}
