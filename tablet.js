@@ -374,11 +374,13 @@
       const noteIn = h("input", { class: "tbin note", value: GS.note });
       // 3자리를 입력하면 다음 칸(1G→2G→3G→4G→비고)으로 자동 이동
       // 점수는 1~300점만: 3자리가 300을 넘으면 막고, 3자리가 되면 다음 칸으로 이동(2자리는 탭키·터치로 직접 이동)
-      scoreIn.forEach((e, i) => { e.onfocus = () => { try { e.select(); } catch {} }; e.oninput = () => { let v = e.value.replace(/\D/g, "").slice(0, 3); if (v.length === 3 && +v > 300) { toast(`${i + 1}G 점수는 1~300점까지만 입력할 수 있어요.`); v = v.slice(0, 2); } e.value = v; GS.scores[i] = v; if (v.length === 3) (scoreIn[i + 1] || noteIn).focus(); }; e.onkeydown = (ev) => { if (ev.key === "Enter") saveInput(GS.editing > 0); }; });
+      const sumChip = h("span", { class: "tbchip" }); // 합계·에버 (넓은 화면 한 줄 입력줄 안에 표시)
+      const updChip = () => { const sv = GS.scores.map((x) => +x || 0).filter((x) => x > 0), sm = sv.reduce((a, b) => a + b, 0); sumChip.textContent = `합계 ${sv.length ? sm : "—"} · 에버 ${sv.length ? (sm / sv.length).toFixed(1) : "—"}`; }; updChip();
+      scoreIn.forEach((e, i) => { e.onfocus = () => { try { e.select(); } catch {} }; e.oninput = () => { let v = e.value.replace(/\D/g, "").slice(0, 3); if (v.length === 3 && +v > 300) { toast(`${i + 1}G 점수는 1~300점까지만 입력할 수 있어요.`); v = v.slice(0, 2); } e.value = v; GS.scores[i] = v; updChip(); if (v.length === 3) (scoreIn[i + 1] || noteIn).focus(); }; e.onkeydown = (ev) => { if (ev.key === "Enter") saveInput(GS.editing > 0); }; });
       noteIn.oninput = () => GS.note = noteIn.value; noteIn.onkeydown = (ev) => { if (ev.key === "Enter") saveInput(GS.editing > 0); };
       const add = btn("등록", () => saveInput(false), "pri"), edit = btn("수정", () => saveInput(true));
       add.disabled = GS.editing > 0; edit.disabled = !(GS.editing > 0);
-      inputCard = card(lab("게임일"), dSel, lab("모임 구분"), tSel, lab("회원명"), mSel, ...scoreIn.flatMap((e, i) => [lab(`${i + 1}G`), e]), lab("비고"), noteIn, add, edit);
+      inputCard = card(lab("게임일"), dSel, lab("모임 구분"), tSel, lab("회원명"), mSel, ...scoreIn.flatMap((e, i) => [lab(`${i + 1}G`), e]), lab("비고"), noteIn, sumChip, add, edit);
       batchRow = h("div", { class: "tbbatch" }, h("span", { class: "tbbtitle" }, `게임기록 · ${weekLabel(GS.date)}`), GS.editing > 0 ? btn("입력 취소", () => { clearInput(); draw(); }) : null, btn("일괄변경", bulkChange));
     }
 
@@ -937,6 +939,9 @@
   const pcard = (title, ...kids) => h("section", { class: "phcard" }, title ? h("b", { class: "phct" }, title) : null, ...kids.filter(Boolean));
   const psel = (opts, value, onchange, cls = "") => { const s = sel(opts, value, onchange, "phfs " + cls); return s; };
   const pbtn = (t, onclick, cls = "") => h("button", { type: "button", class: "phbtn " + cls, onclick }, t);
+  /* 입력 카드 배치(시안 2026-11-22): 작은 라벨을 입력칸 위에 두고 한 행에 최대한 배치 */
+  const fm = (label, field, cls = "") => h("div", { class: "phf" + (cls ? " " + cls : "") }, h("span", { class: "phml" }, label), field);
+  const plink = (t, onclick) => h("button", { type: "button", class: "phlink", onclick }, t);
   /* 앞의 n개는 고정, 나머지는 아래에서만 스크롤 (세로 입력모드) */
   let PH_KEEP = false; // 펼침/접힘 때는 스크롤 위치를 그대로 유지
   function phRootF(n, ...kids) {
@@ -976,11 +981,11 @@
     [today(), GS.date, addDays(last, 7), addDays(last, 14)].forEach((d) => { if (!opts.some((o) => weekKey(o[1]) === weekKey(d))) opts.push([weekLabel(d), d]); });
     opts.sort((a, b) => (a[1] < b[1] ? 1 : -1));
     if (GS.type == null) applyMeetingTypeRule(weekLabel(GS.date));
-    const dSel = psel(opts.map((o, i) => [String(i), o[0]]), String(Math.max(0, opts.findIndex((o) => weekKey(o[1]) === weekKey(GS.date)))), (v) => { const o = opts[+v]; GS.date = o[1]; GS.editing = 0; applyMeetingTypeRule(o[0]); phGames(); });
-    const tSel = psel(typeList(), GS.type, (v) => { GS.type = v; phGames(); }); tSel.disabled = !!GS.lockedType;
+    const dSel = psel(opts.map((o, i) => [String(i), o[0]]), String(Math.max(0, opts.findIndex((o) => weekKey(o[1]) === weekKey(GS.date)))), (v) => { const o = opts[+v]; GS.date = o[1]; GS.editing = 0; applyMeetingTypeRule(o[0]); phGames(); }, "phbox");
+    const tSel = psel(typeList(), GS.type, (v) => { GS.type = v; phGames(); }, "phbox"); tSel.disabled = !!GS.lockedType;
     const ims = inputMembersFor(games, true);
     if (!ims.some((m) => m.memberId === GS.member)) GS.member = ims.length ? ims[0].memberId : null;
-    const mSel = ppick(ims.length ? ims.map((m) => [m.memberId, m.name]) : [["", "등록 가능한 회원 없음"]], GS.member, (v) => { GS.member = +v; }); mSel.disabled = !ims.length; mSel.id = "tbMember";
+    const mSel = ppick(ims.length ? ims.map((m) => [m.memberId, m.name]) : [["", "등록 가능한 회원 없음"]], GS.member, (v) => { GS.member = +v; }, "phbox"); mSel.disabled = !ims.length; mSel.id = "tbMember";
     const sumBar = h("div", { class: "phsumbar" });
     const scoreIn = GS.scores.map((v, i) => h("input", { class: "phin sc", inputmode: "numeric", maxlength: "3", placeholder: `${i + 1}G`, value: v }));
     const noteIn = h("input", { class: "phin note", placeholder: "비고", value: GS.note });
@@ -998,7 +1003,10 @@
     const rows = list.map((g) => h("tr", { class: g.recordId === GS.editing ? "sel" : "", onclick: () => { GS.editing = g.recordId; GS.date = g.gameDate; GS.type = gtype(g); GS.member = g.memberId; GS.scores = sc(g).map((v) => (v > 0 ? String(v) : "")); GS.note = g.note || ""; phGames(); window.scrollTo({ top: 0, behavior: "smooth" }); } },
       h("td", { class: "nm" }, nameWithAvg(mm.get(g.memberId), g.gameDate)), ...sc(g).map((v) => h("td", {}, v > 0 ? String(v) : "")), h("td", { class: "nt" }, g.note || "")));
     const tbl = h("div", { class: "phtable" }, h("table", {}, h("thead", {}, h("tr", {}, ["회원명(에버)", "1G", "2G", "3G", "4G", "비고"].map((x) => h("th", {}, x)))), h("tbody", {}, rows)));
-    phRootF(2, pcard("점수 입력", h("div", { class: "phrow3" }, dSel, tSel, mSel), h("div", { class: "phrow4" }, scoreIn), sumBar, noteIn, h("div", { class: "phbtns" }, del, sv)),
+    const inCard = pcard(null, h("div", { class: "phttl" }, h("b", { class: "phct" }, "점수 입력"), sumBar),
+      h("div", { class: "phflds" }, h("div", { class: "phrow3" }, fm("게임일", dSel), fm("구분", tSel), fm("회원명", mSel)), h("div", { class: "phrow4" }, scoreIn.map((e, i) => fm(`${i + 1}G`, e)))),
+      h("div", { class: "phrown" }, fm("비고", noteIn), del, sv)); inCard.classList.add("phcompact");
+    phRootF(2, inCard,
       h("div", { class: "phpreview" }, `입력 중 미리보기: ${weekLabel(GS.date)} / ${list.length}건${GS.editing > 0 ? " · 수정 중" : ""}`), list.length ? tbl : h("div", { class: "phempty" }, "등록된 게임 기록이 없습니다."));
     function clear() { GS.editing = 0; GS.scores = ["", "", "", ""]; GS.note = ""; }
     async function saveIt() {
@@ -1377,9 +1385,9 @@
       if (!(await confirmBox("선택한 내역을 삭제하시겠습니까?"))) return;
       clear(); await save([op("ledger_entries", "delete", ledgerPayload(e), S.rv.ledger[e.ledgerId])], "장부가 삭제되었습니다.");
     }
-    phRootF(2, h("section", { class: "phcard" }, h("b", { class: "phct" }, "장부 입력"),
-      h("div", { class: "phrow2e" }, dIn, tSel), cSel, h("div", { class: "phrow2e" }, aIn, nIn),
-      h("div", { class: "phbtns three" }, LS.editing > 0 ? pbtn("삭제", delP) : pbtn("초기화", () => { clear(); phLedger(); }), pbtn("수정", () => saveP(true)), pbtn("저장", () => saveP(false), "pri"))),
+    const svL = pbtn("저장", () => saveP(false), "pri");
+    phRootF(2, h("section", { class: "phcard phcompact" }, h("div", { class: "phttl" }, h("b", { class: "phct" }, "장부 입력"), h("span", { class: "phlinks" }, LS.editing > 0 ? plink("삭제", delP) : plink("초기화", () => { clear(); phLedger(); }), plink("수정", () => saveP(true)))),
+      h("div", { class: "phflds led" }, h("div", { class: "phrowl1" }, fm("일자", dIn), fm("구분", tSel), fm("내역", cSel)), h("div", { class: "phrowl2" }, fm("금액", aIn), fm("비고", nIn), svL))),
       h("div", { class: "phpreview" }, `입력 중 월별 미리보기: ${+mk.slice(5)}월 / ${list.length}건`),
       h("div", { class: "phllist2" }, items.length ? items : h("div", { class: "phempty" }, "해당 월 장부 내역이 없습니다.")));
   }

@@ -1011,3 +1011,51 @@ body.phmode .topbar .phtbar .phmenu{padding:0 8px}
 .tbrecent .tbrec tr.hd td{position:static}
 .tbrecent .tbrec td:nth-child(1){width:20%}
 .tbrecent p.tag{padding:8px}
+
+/* ===== 점수관리·장부관리 입력줄 배치 시안 적용 (2026-11-22) =====
+   입력칸 내용(회원·구분·내역 등)은 서버 자료를 그대로 쓰고, 배치만 바꿈 */
+.tbchip{background:#EEF3FB;border:1px solid #D3DFF0;border-radius:14px;color:#14304F;font-weight:700;font-size:13px;height:34px;display:flex;align-items:center;padding:0 10px;white-space:nowrap;flex:none}
+/* ① 노트북·PC·가로 태블릿: 1행. 1280px 미만은 라벨을 입력칸 위에 작게 올려서 1행 유지 */
+@media (max-width:1279px){
+  html body.tbon .tbcard:has(.tbin.num),html body.tbon .tbcard:has(.tbin.amt){flex-wrap:nowrap;overflow:hidden;align-items:flex-end;gap:6px;padding:6px 10px 8px;min-height:0}
+  html body.tbon .tbcard:has(.tbin.num) .tbchip{display:none}
+  html body.tbon .tbcard:has(.tbin.num) .tbf,html body.tbon .tbcard:has(.tbin.amt) .tbf,html body.tbon .tbcard:has(.tbin.num) .tbf.full:has(.tbsel),html body.tbon .tbcard:has(.tbin.amt) .tbf.full:has(.tbsel){flex-direction:column!important;align-items:flex-start;gap:2px;margin:0;flex:none!important;min-width:0}
+  html body.tbon .tbcard:has(.tbin.num) .tbf.full:not(:has(.tbsel)),html body.tbon .tbcard:has(.tbin.amt) .tbf.full:not(:has(.tbsel)){flex:1 1 60px!important;min-width:60px}
+  html body.tbon .tbcard:has(.tbin.num) .tblab,html body.tbon .tbcard:has(.tbin.amt) .tblab{margin:0;font-size:11px;font-weight:700;color:#4A5D80;line-height:1.1}
+  html body.tbon .tbcard:has(.tbin.num) .tbf>.tbsel,html body.tbon .tbcard:has(.tbin.amt) .tbf>.tbsel,html body.tbon .tbcard:has(.tbin.num) .tbf.full>.tbsel{width:auto!important;min-width:0!important;max-width:none!important;height:38px!important;padding:0 20px 0 8px!important;font-size:14px;text-overflow:clip}
+  html body.tbon .tbcard:has(.tbin.num) .tbin,html body.tbon .tbcard:has(.tbin.amt) .tbin{height:38px!important;font-size:14px}
+  html body.tbon .tbcard:has(.tbin.num) .tbin.num{width:48px!important;padding:0 2px!important}
+  html body.tbon .tbcard:has(.tbin.amt) .tbin.date{width:122px!important;padding:0 4px!important}
+  html body.tbon .tbcard:has(.tbin.amt) .tbin.amt{width:100px!important;padding:0 6px!important}
+  html body.tbon .tbcard:has(.tbin.num) .tbin.note,html body.tbon .tbcard:has(.tbin.amt) .tbin.note{width:100%!important;flex:1 1 auto!important;min-width:0}
+  html body.tbon .tbcard:has(.tbin.num) .tbbtn,html body.tbon .tbcard:has(.tbin.amt) .tbbtn{height:38px;padding:0 10px;white-space:nowrap;flex:none}
+}
+/* ② 폰·8인치 세로: 작은 라벨 + 최대한 적은 행 (점수 3행·장부 2행, 600px 이상은 점수 2행·장부 1행) */
+.phcompact{padding:10px!important;gap:6px!important}
+.phttl{display:flex;align-items:center;gap:8px}
+.phttl .phct{font-size:16px}
+.phttl .phsumbar{height:26px;padding:0 10px;gap:8px;margin-left:auto;font-size:12px;border-width:1px;border-radius:14px;white-space:nowrap}
+.phttl .phsumbar b{margin-left:4px}
+.phlinks{margin-left:auto;display:flex;gap:4px}
+.phlink{border:0;background:none;color:#2F6BFF;font:inherit;font-size:14px;font-weight:700;height:30px;padding:0 8px;margin:0;width:auto;cursor:pointer}
+.phf{display:flex;flex-direction:column;gap:2px;min-width:0}
+.phml{font-size:11.5px;font-weight:700;color:#4A5D80;line-height:1.1;white-space:nowrap;overflow:hidden}
+.phflds{display:flex;flex-direction:column;gap:6px}
+.phcompact .phrow3{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr) minmax(0,1.15fr);gap:6px}
+.phcompact .phrow4{gap:6px}
+.phcompact .phfs.phbox{height:42px!important;font-size:15px!important;padding:0 20px 0 8px!important;text-overflow:clip}
+.phcompact .phpickbtn.phbox{justify-content:space-between;padding:0 8px!important}
+.phcompact .phin{height:42px;font-size:16px;padding:0 6px}
+.phcompact .phin.sc{padding:0 4px}
+.phrown{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,.7fr) minmax(0,1fr);gap:6px;align-items:end}
+.phrown .phbtn,.phrowl2 .phbtn{height:42px;font-size:15px;padding:0 4px}
+.phrowl1{display:grid;grid-template-columns:minmax(0,1.5fr) 70px minmax(0,1.4fr);gap:6px}
+.phrowl2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.1fr) minmax(0,.6fr);gap:6px;align-items:end}
+.phcompact .phin[type=date]{font-size:14px;padding:0 2px 0 6px}
+.phcompact .phin[type=date]::-webkit-calendar-picker-indicator{margin:0 0 0 2px;padding:0}
+@media (min-width:580px){
+  .phflds:not(.led){display:grid;grid-template-columns:minmax(96px,1.05fr) minmax(96px,1fr) minmax(96px,1.3fr) repeat(4,minmax(44px,.7fr));gap:6px}
+  .phflds:not(.led) .phrow3,.phflds:not(.led) .phrow4{display:contents}
+  .phflds.led{display:grid;grid-template-columns:112px 70px minmax(102px,1.5fr) minmax(84px,1.05fr) minmax(50px,.75fr) 64px;gap:6px;align-items:end}
+  .phflds.led .phrowl1,.phflds.led .phrowl2{display:contents}
+}
