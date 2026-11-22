@@ -1059,3 +1059,29 @@ body.phmode .topbar .phtbar .phmenu{padding:0 8px}
   .phflds.led{display:grid;grid-template-columns:112px 70px minmax(102px,1.5fr) minmax(84px,1.05fr) minmax(50px,.75fr) 64px;gap:6px;align-items:end}
   .phflds.led .phrowl1,.phflds.led .phrowl2{display:contents}
 }
+
+/* ===== 회원관리 수정 팝업 3열 배치 (2026-11-22 시안 적용) =====
+   기본 필드(회원명~기준에버) 3열, 추가항목(회비면제~재가입 납부월)은 버튼으로 펼쳐 3열 */
+.pcmodal.mem3 .pcdlg{width:min(720px,100%)}
+.mgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px}
+.mf{display:flex;flex-direction:column;gap:3px;min-width:0}
+.mf>label{font-size:12px;font-weight:700;color:#4A5D80;white-space:nowrap;overflow:hidden;line-height:1.1;text-align:left}
+.pcmodal.mem3 .mf .pcin,.pcmodal.mem3 .mf .pcsel{width:100%;height:34px;padding:0 8px;font-size:14px;text-align:left;border-radius:3px}
+.pcmodal.mem3 .mf .pcsel{background:#fff}
+.pcmodal.mem3 .mf .chk{display:flex;align-items:center;gap:6px;height:34px;padding:0 8px;border:1px solid #B9C4D3;border-radius:3px;background:#fff;font-size:14px;white-space:nowrap;overflow:hidden}
+.pcmodal.mem3 .mf .chk input{width:16px;height:16px;margin:0;flex:none}
+.msec{display:flex;align-items:center;gap:8px;margin:10px 0 8px}
+.mtg{font:inherit;font-size:13px;font-weight:700;color:#14304F;background:#E9F0FA;border:1px solid #C3D2E2;border-radius:14px;padding:3px 12px;white-space:nowrap;cursor:pointer}
+.mline{flex:1;height:1px;background:#CFD9E6}
+.mhint{font-size:11.5px;color:#6B7C99;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.mx{margin-top:0}
+@media (max-width:699px){
+  .pcmodal.mem3 .mf .pcin,.pcmodal.mem3 .mf .pcsel,.pcmodal.mem3 .mf .chk{height:40px}
+}
+@media (max-width:479px){
+  .pcmodal.mem3 .pcdlg{width:100%}
+  .mf.m-ph,.mf.m-join,.mf.m-wd,.mf.m-rj{grid-column:span 2}
+  .mf.m-join{order:2}
+  .mf.m-rjm{order:1}.mf.m-rj{order:2}
+  .pcmodal.mem3 .mf .chk{font-size:12.5px;padding:0 5px;gap:3px}
+}

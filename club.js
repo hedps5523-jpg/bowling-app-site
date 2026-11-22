@@ -619,12 +619,23 @@ async function editMember(m) {
   const ro = !canWrite();
   if (ro) Object.values(f).forEach((x) => x.disabled = true);
   const chk = (c, t) => h("span", { class: "chk" }, c, t);
-  const body = h("div", { class: "pcgrid" },
-    h("label", {}, "회원명"), f.name, h("label", {}, "연락처"), f.phone, h("label", {}, "등급"), f.grade, h("label", {}, "성별"), f.gender,
-    h("label", {}, "가입일"), f.join, h("label", {}, "기준에버"), f.avg, h("label", {}, "회비면제"), chk(f.feeExempt, "회비 면제"),
-    h("label", {}, "첫납부월"), f.feeStart, h("label", {}, "운영진"), chk(f.exec, "3개월 면제"),
-    h("label", {}, "탈퇴일자"), f.wd, h("label", {}, "재가입"), f.rj, h("label", {}, "재가입 납부월"), f.rjMonth);
+  /* 3열 배치 (시안 2026-11-22): 기본 필드(회원명~기준에버)는 항상, 추가항목(회비면제~재가입 납부월)은 선택하면 펼침 */
+  const mf = (label, c, cls = "") => h("div", { class: "mf" + (cls ? " " + cls : "") }, h("label", {}, label), c);
+  const hasExtra = m.feeExempt || m.executiveThreeMonthExempt || m.withdrawalDate || m.rejoinDate;
+  const extra = h("div", { class: "mgrid mx", hidden: true },
+    mf("회비면제", chk(f.feeExempt, "회비 면제")), mf("첫납부월", f.feeStart), mf("운영진", chk(f.exec, "3개월 면제")),
+    mf("탈퇴일자", f.wd, "m-wd"), mf("재가입", f.rj, "m-rj"), mf("재가입 납부월", f.rjMonth, "m-rjm"));
+  const hint = h("span", { class: "mhint" }, hasExtra ? "설정된 항목이 있어요" : "회비면제 · 첫납부월 · 운영진 · 탈퇴일자 · 재가입 · 재가입 납부월");
+  const tg = h("button", { type: "button", class: "mtg" }, "추가항목 ▸");
+  tg.onclick = () => { extra.hidden = !extra.hidden; tg.textContent = extra.hidden ? "추가항목 ▸" : "추가항목 ▾"; hint.hidden = !extra.hidden; };
+  const body = h("div", { class: "mbody" },
+    h("div", { class: "mgrid" },
+      mf("회원명", f.name), mf("연락처", f.phone, "m-ph"), mf("등급", f.grade), mf("성별", f.gender), mf("가입일", f.join, "m-join"), mf("기준에버", f.avg)),
+    h("div", { class: "msec" }, tg, h("span", { class: "mline" }), hint),
+    extra);
+  const mdl = $("modal"); mdl.classList.add("mem3");
   const r = await modal("선택 회원 수정", body, ro ? [["닫기", "cancel"]] : [["수정", "save"], ["취소", "cancel"], ["삭제", "delete"]]);
+  mdl.classList.remove("mem3");
   if (r === "save") {
     if (!/^\d+$/.test(f.avg.value.trim())) return toast("기준에버를 숫자로 입력하세요.");
     const wd = f.wd.value || null, rj = f.rj.value || null;
