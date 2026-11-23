@@ -233,7 +233,7 @@ function albumCard() {
   const wide = window.__albumMq.matches; // 가로 2단(왼쪽 모임·공지 / 오른쪽 기록앨범 박스)
   const sel = h("select", { class: "albsel", "aria-label": "기록앨범 선택", disabled: true }, h("option", { value: "" }, "불러오는 중…"));
   const head = h("div", { class: "albhead" }, h("h2", {}, "📒 기록앨범"), sel);
-  const card = h("section", { class: "card albumcard" }, head);
+  const card = h("section", { class: "card albumcard" + (wide ? " albwide" : "") }, head);
   const wrap = h("div", { class: "albwrap" }); // 가로: 박스 안에 그림이 나타나는 자리
   const msg = h("p", { class: "tag albmsg" }, "기록앨범을 불러오는 중…");
   if (wide) card.append(msg, wrap); else card.append(msg);
@@ -262,12 +262,12 @@ function albumCard() {
         if (wide) { // 가로: 박스 위쪽부터 하단 메뉴 위까지 남은 높이 (필요하면 박스가 화면 맨 위에 오도록 스크롤)
           const nav = document.querySelector(".bnav"), navH = nav && getComputedStyle(nav).display !== "none" ? nav.offsetHeight : 0;
           const top = wrap.getBoundingClientRect().top;
-          H = Math.floor(window.innerHeight - top - navH - 14);
+          H = Math.floor(window.innerHeight - top - navH - 18); // 카드 아래 여백(10)·하단 메뉴 간격 포함
           if (H < 300) { card.scrollIntoView({ block: "start" }); const t2 = wrap.getBoundingClientRect().top; H = Math.floor(window.innerHeight - t2 - navH - 14); }
         } else H = Math.floor(popBody.clientHeight); // 세로: 팝업 안 가능한 높이
         H = Math.max(200, H);
         // 돋보기: 폭 최대, 위·아래 스크롤은 그림 화면 안에서(제목~필드명 줄 고정) / 보통: 한 화면에 전부
-        const r = await A.show(k, W, H, !wide); // 세로(팝업): 글자를 키워 폭을 꽉 채우고 위·아래로 스크롤 / 가로 박스: 한 화면 맞춤
+        const r = await A.show(k, W, H, true); // 가로 박스·세로 팝업 모두: 위쪽 제목 배너·요약 카드는 작게 고정, 표는 글자를 키워 폭을 채우고 아래로 스크롤
         f.style.width = r.width + "px"; f.style.height = r.height + "px";
       };
       // 창 크기가 바뀌면(회전·분할 화면 등) 지금 보는 한 장을 새 크기에 맞춰 다시 그려요
