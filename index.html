@@ -237,14 +237,14 @@ function albumCard() {
   const wrap = h("div", { class: "albwrap" }); // 가로: 박스 안에 그림이 나타나는 자리
   const msg = h("p", { class: "tag albmsg" }, "기록앨범을 불러오는 중…");
   if (wide) card.append(msg, wrap); else card.append(msg);
-  let pop = null, popBody = null, popTitle = null;
+  let pop = null, popBody = null, popTitle = null, popSel = null;
   const run = async () => {
     try {
       let host = wrap;
       if (!wide) { // 세로: 팝업 안에 (처음엔 숨김) 그림 틀을 미리 준비해 두면 선택할 때 바로 떠요
-        popTitle = h("b", {});
+        popTitle = h("b", {}); popSel = h("select", { class: "albsel albpopsel", "aria-label": "기록앨범 선택" }); // 팝업 제목줄 가운데 드롭메뉴: 팝업을 닫지 않고 바로 다른 화면으로
         popBody = h("div", { class: "albpopbody" });
-        pop = h("div", { class: "albpop", hidden: true }, h("div", { class: "albpanel", role: "dialog", "aria-modal": "true" }, h("div", { class: "albpophead" }, popTitle, h("button", { type: "button", class: "albclose", onclick: closePop }, "닫기")), popBody));
+        pop = h("div", { class: "albpop", hidden: true }, h("div", { class: "albpanel", role: "dialog", "aria-modal": "true" }, h("div", { class: "albpophead" }, popTitle, popSel, h("button", { type: "button", class: "albclose", onclick: closePop }, "닫기")), popBody));
         pop.addEventListener("click", (e) => { if (e.target === pop) closePop(); });
         document.body.append(pop); host = popBody;
       }
@@ -273,11 +273,17 @@ function albumCard() {
       let rt = 0; window.__albResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (!document.body.contains(card)) return; const k = sel.value; if (!k || (!wide && pop.hidden)) return; draw(k).catch(() => {}); }, 250); };
       window.addEventListener("resize", window.__albResize);
       if (wide) { await draw(sel.value); sel.onchange = () => draw(sel.value).catch(() => {}); }
-      else sel.onchange = async () => {
-        const k = sel.value; if (!k) return;
-        popTitle.textContent = sel.selectedOptions[0].textContent; pop.hidden = false; document.body.classList.add("albopen"); popBody.scrollTop = 0;
-        try { await draw(k); } catch { popBody.append(h("p", { class: "tag" }, "기록앨범을 그리지 못했어요.")); }
-      };
+      else {
+        // 팝업 제목줄 드롭메뉴에도 같은 분류별 목록을 채움
+        groups.forEach(([g, items]) => { const og = h("optgroup", { label: g }); items.forEach(([k, l]) => og.append(h("option", { value: k }, l))); popSel.append(og); });
+        const showK = async (k) => {
+          const opt = [...popSel.options].find((o) => o.value === k); popSel.value = k; sel.value = k; popTitle.textContent = opt ? opt.textContent : "";
+          pop.hidden = false; document.body.classList.add("albopen");
+          try { await draw(k); } catch { popBody.append(h("p", { class: "tag" }, "기록앨범을 그리지 못했어요.")); }
+        };
+        sel.onchange = () => { const k = sel.value; if (k) showK(k); };      // 본문 드롭메뉴로 고르면 팝업이 열림
+        popSel.onchange = () => { if (popSel.value) showK(popSel.value); };  // 팝업 안에서 고르면 바로 다른 화면으로 바뀜
+      }
     } catch (e) {
       msg.textContent = "기록앨범을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."; sel.remove();
     }
