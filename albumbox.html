@@ -19,7 +19,8 @@ html,body{margin:0;background:transparent;overflow:hidden;touch-action:pan-x pan
 #abox .alp{position:absolute;left:0;top:0;transform-origin:0 0}
 #awrap{position:relative}
 #aA{position:relative;overflow:hidden;background:#fff}
-#aA .alp{position:absolute;left:0;top:0;transform-origin:0 0}
+#aA .alp,#apin .alp{position:absolute;left:0;top:0;transform-origin:0 0}
+#apin{position:relative;overflow:hidden;background:#fff;border-bottom:1px solid #d6e0ea}
 .alp.alb .alp-body{padding-top:12px}
 /* A영역(제목 배너·요약 카드): 글자와 여백을 최대한 줄여 B(표)가 더 많이 보이게 */
 .alp.ala .alp-head{padding:12px 36px 10px;display:flex;align-items:baseline;gap:16px;flex-wrap:nowrap;white-space:nowrap}
@@ -37,7 +38,6 @@ html,body{margin:0;background:transparent;overflow:hidden;touch-action:pan-x pan
 .alp.alz .alp-t td,.alp.alz .alp-t th{white-space:nowrap}.alp.alz .alp-t td.wr{white-space:normal}  /* 확대해도 표 글자는 한 줄(긴 비고만 줄바꿈 허용) */
 .alp.alz .alp-kpis{gap:10px}
 #ain{position:relative}
-#apin{position:sticky;top:0;z-index:3;overflow:hidden;background:#fff;box-shadow:0 2px 4px rgba(15,25,45,.18)}
 .abmsg{padding:18px 12px;text-align:center;color:#6b7f93;font-size:14px}
 </style>
 </head>
@@ -52,6 +52,6 @@ html,body{margin:0;background:transparent;overflow:hidden;touch-action:pan-x pan
 <script>window.CLUB_VIEW_ONLY = true; window.ALBUM_BOX = true;</script>
 <script src="/common.js"></script>
 <script src="/club.js?v=20261123g"></script>
-<script src="/album.js?v=20261123z"></script>
+<script src="/album.js?v=20261124b"></script>
 </body>
 </html>

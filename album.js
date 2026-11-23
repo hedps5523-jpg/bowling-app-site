@@ -651,13 +651,16 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       const top0 = root.getBoundingClientRect().top, th = root.querySelector("thead"), k0 = Math.max(0.1, W / Wd);
       fixPx = th ? th.getBoundingClientRect().bottom - top0 + 4 : 0; // 표 필드명 줄까지는 B 안에서도 위에 고정
       if (fixPx > need * 0.5 || fixPx * k0 > Hb * 0.5) fixPx = 0; // 고정 영역이 B 의 절반을 넘으면(그래프가 있는 월별 요약 등) 고정하지 않음
+      // 필드명 줄 고정: 스크롤 영역(#abox) 밖에 따로 둔 고정 줄(#apin)이라 드래그해도 행이 겹치거나 밀리지 않아요(sticky 를 쓰지 않음)
+      const old = wrap.querySelector("#apin"); if (old) old.remove();
       const apin = h("div", { id: "apin" }), ain = h("div", { id: "ain" }), clone = root.cloneNode(true);
-      box.textContent = ""; box.classList.add("pin"); box.append(apin, ain); ain.append(root); apin.append(clone);
+      box.textContent = ""; box.classList.add("pin"); wrap.insertBefore(apin, box); box.append(ain); ain.append(root); apin.append(clone);
+      box.onscroll = () => { clone.style.left = -box.scrollLeft + "px"; }; // 확대해서 좌우로 밀 때 필드명 줄도 같이 이동
       const apply = (kk) => {
         const sw = Math.floor(Wd * kk), sh = Math.floor(need * kk), fp0 = Math.floor(fixPx * kk), fp = fp0 > Hb * 0.5 ? 0 : fp0; // 두 손가락 확대로 고정 영역이 B 의 절반을 넘으면 고정을 풀어 내용이 보이게
         root.style.transform = clone.style.transform = `scale(${kk})`;
-        apin.style.width = sw + "px"; apin.style.height = fp + "px"; ain.style.width = sw + "px"; ain.style.height = sh + "px"; ain.style.marginTop = -fp + "px";
-        box.style.width = W + "px"; box.style.height = Math.min(Hb, sh) + "px";
+        apin.style.width = W + "px"; apin.style.height = fp + "px"; ain.style.width = sw + "px"; ain.style.height = sh + "px"; ain.style.marginTop = -fp + "px";
+        box.style.width = W + "px"; box.style.height = Math.max(40, Math.min(Hb - fp, sh - fp)) + "px"; apin.style.width = (box.clientWidth || W) + "px"; clone.style.left = -box.scrollLeft + "px";
       };
       apply(k0);
       const sb = box.offsetWidth - box.clientWidth; // 세로 스크롤바가 생기면 그 폭만큼만 줄여 다시(폭을 넘지 않게)
@@ -669,7 +672,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     const z0 = Math.max(1, Math.floor(Math.min(1.8, 1080 / Math.max(600, W / 0.72)) * 10) / 10);
     // 글자가 커져도 한 줄로 보이게: 칸 글자는 줄바꿈 없음(.alz nowrap, 긴 비고(.wr)만 예외)이라 한 줄에 안 들어가면 잘림으로 잡혀 배율을 낮춤. 설계 폭(1.0배)에서도 안 맞으면 0.7배까지 더 낮춰요
     for (let z = z0; z >= 0.7; z = Math.round((z - 0.1) * 10) / 10) { build(Math.round(1080 / z)); await tick(); if (!clipped()) break; }
-    return { width: W, height: hAs + parseInt(box.style.height, 10), zoom: Math.round((1080 / Wd) * 100) / 100, hA: hAs };
+    return { width: W, height: Math.ceil(wrap.getBoundingClientRect().height), zoom: Math.round((1080 / Wd) * 100) / 100, hA: hAs };
   }
   window.AlbumBox = {
     // [[분류, [[kind, 라벨], …]], …] — 표시할 수 있는 항목만
