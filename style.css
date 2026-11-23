@@ -342,7 +342,7 @@ html[data-dev="mobile"] #view.r-home{display:block}
 .albpophead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
 .albclose{border:0;background:#eef2f9;border-radius:10px;padding:7px 14px;font:inherit;font-weight:700;color:var(--text)}
 .albpophead b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%;font-size:15px;flex:0 1 auto}
-.albpopsel{flex:1;max-width:none;padding:6px 8px;font-size:14px}
+.albpopsel{flex:1;max-width:none;padding:8px 10px;font-size:15px;font-weight:800}
 .albpopbody{overflow:hidden;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
 body.albopen{overflow:hidden}
 /* 태블릿(터치 기기, data-dev=mobile)도 가로 폭 1000px 이상이면 홈을 2단(왼쪽 모임·공지 / 오른쪽 기록앨범)으로 */
