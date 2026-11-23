@@ -325,7 +325,7 @@
       const prev = carried(m.memberId, sy, sq) ?? saved ?? fb, cur = saved ?? prev;
       const v = S.games.filter((g) => g.memberId === m.memberId && g.gameDate && yearOf(g.gameDate) === sy && Math.floor((mn(g.gameDate) - 1) / 3) + 1 === sq).flatMap((g) => sc(g).filter((x) => x > 0));
       return { m, prev, act: v.length ? v.reduce((a, b) => a + b, 0) / v.length : null, cur };
-    }).sort((a, b) => (b.cur || 0) - (a.cur || 0) || ko.compare(a.m.name, b.m.name));
+    }).sort((a, b) => (b.cur || 0) - (a.cur || 0) || (b.act || 0) - (a.act || 0) || ko.compare(a.m.name, b.m.name));
     const dl = (r) => (r.prev != null && r.cur != null ? r.cur - r.prev : null);
     const up = rows.filter((r) => (dl(r) || 0) > 0).length, dw = rows.filter((r) => (dl(r) || 0) < 0).length, cv = rows.map((r) => r.cur).filter((v) => v != null);
     const pg = newPage("분기 에버 변동", `${sy}년 ${sq}분기 → ${ty}년 ${tq}분기 책정에버`);
