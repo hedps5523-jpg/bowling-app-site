@@ -548,16 +548,20 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     AL.items = buildItems();
     const valid = new Set(AL.items.map((i) => i.key)); [...AL.sel].forEach((k) => { if (!valid.has(k)) AL.sel.delete(k); });
     // 같은 화면에서 항목을 선택·해제할 때 목록이 맨 위로 올라가지 않도록 스크롤 위치를 기억했다가 되돌린다
-    const scrollSel = ".alscroll,.alcol,.alcard", sameScr = AL._scr === AL.screen + "|" + (AL.group || "");
+    const scrollSel = ".alscroll,.alcols,.alcol,.alcard", sameScr = AL._scr === AL.screen + "|" + (AL.group || "");
     const keep = sameScr ? [...view.querySelectorAll(scrollSel)].map((e) => e.scrollTop) : null, keepY = sameScr ? window.scrollY : 0, phone = document.body.classList.contains("phmode");
     AL._scr = AL.screen + "|" + (AL.group || "");
     const parts = AL.screen === "sub" ? renderSub() : AL.screen === "confirm" ? renderConfirm() : AL.screen === "result" ? renderResult() : renderMain();
     const title = AL.screen === "sub" ? `${AL.group} 세부항목` : AL.screen === "confirm" ? "기록앨범 만들기 확인" : "기록앨범 만들기";
     const root = h("div", { class: "tbroot alroot" }, h("div", { class: "altitle" }, title, h("small", {}, `${clubName()} · ${S.year}년 자료`)), ...parts);
+    // 세로(폰) 고정 영역: 기록앨범 만들기 = 제목 줄('한가람 B.C · 2026년 자료')까지 고정·아래는 스크롤 /
+    //   장부기록·게임기록 세부항목 = 위쪽 전체(전체 선택·항목·'최근 3개월 선택' 또는 '0 / 46' 줄)까지 고정·아래 목록만 스크롤. 만들기/완료 버튼 줄은 맨 아래 고정
+    const fixedPh = phone && AL.screen !== "result", subFix = fixedPh && AL.screen === "sub" && (AL.group === G_LEDGER || AL.group === G_GAME);
+    if (fixedPh) { root.classList.add("alph"); if (subFix) root.classList.add("alsubfix"); }
     view.textContent = ""; view.append(root);
     const nav = $("bnav"), navTop = nav && !nav.hidden && getComputedStyle(nav).display !== "none" ? nav.getBoundingClientRect().top : window.innerHeight;
-    if (phone) { root.style.height = ""; document.documentElement.classList.remove("fitpage"); window.scrollTo(0, keepY); } // 세로(폰): 한 화면 고정 없이 길면 화면 전체가 위·아래로 스크롤
-    else { window.scrollTo(0, 0); root.style.height = Math.max(420, navTop - root.getBoundingClientRect().top - 6) + "px"; document.documentElement.classList.add("fitpage"); }
+    if (phone && !fixedPh) { root.style.height = ""; document.documentElement.classList.remove("fitpage"); window.scrollTo(0, keepY); } // 만드는 중 화면: 길면 화면 전체 스크롤
+    else { window.scrollTo(0, 0); const hh = Math.max(420, navTop - root.getBoundingClientRect().top - 6) + "px"; root.style.height = hh; root.style.setProperty("--alph", hh); document.documentElement.classList.add("fitpage"); } // --alph: 폰 CSS 의 height:auto!important 를 이기기 위한 값
     if (window.tbSqueeze) window.tbSqueeze(); // 목록이 잘리지 않게 줄 간격 자동 조절
     if (keep) { const els = [...root.querySelectorAll(scrollSel)]; if (els.length === keep.length) els.forEach((e, i) => { if (keep[i] > 0) e.scrollTop = keep[i]; }); }
   }
