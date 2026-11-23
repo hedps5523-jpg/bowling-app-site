@@ -348,7 +348,7 @@ html[data-dev="mobile"] #view.r-home{display:block}
 .albzoom.on{background:var(--brand);color:#fff}
 .albpop.zoom{padding:0}
 .albpop.zoom .albpanel{max-width:none;border-radius:0}
-.albpop.zoom .albpopbody{display:block;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.albpop.zoom .albpopbody{display:block;overflow:hidden}
 .albpop.zoom .albframe{margin:0 auto}
 .albpopbody{overflow:hidden;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
 body.albopen{overflow:hidden}

@@ -265,10 +265,10 @@ function albumCard() {
           const top = wrap.getBoundingClientRect().top;
           H = Math.floor(window.innerHeight - top - navH - 14);
           if (H < 300) { card.scrollIntoView({ block: "start" }); const t2 = wrap.getBoundingClientRect().top; H = Math.floor(window.innerHeight - t2 - navH - 14); }
-        } else H = zoomed ? 0 : Math.floor(popBody.clientHeight); // 세로: 보통은 팝업 안 한 화면에 전부, 돋보기를 켜면 폭 최대·높이는 폭에 비례(넘치면 위·아래 스크롤)
-        H = zoomed ? 0 : Math.max(200, H);
-        let r = await A.show(k, W, H);
-        if (zoomed && popBody.clientWidth + 1 < W) { W = Math.max(200, popBody.clientWidth); r = await A.show(k, W, 0); } // 스크롤바가 생겨 폭이 줄면 그 폭에 맞춰 다시
+        } else H = Math.floor(popBody.clientHeight); // 세로: 팝업 안 가능한 높이
+        H = Math.max(200, H);
+        // 돋보기: 폭 최대, 위·아래 스크롤은 그림 화면 안에서(제목~필드명 줄 고정) / 보통: 한 화면에 전부
+        const r = await A.show(k, W, H, zoomed);
         f.style.width = r.width + "px"; f.style.height = r.height + "px";
       };
       redraw = () => { const k = popSel && popSel.value; if (k) draw(k).catch(() => {}); }; // 돋보기 전환 때 지금 보는 한 장을 다시 그림

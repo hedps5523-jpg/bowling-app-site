@@ -579,7 +579,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     if (kind === "month") { const m = curMonth(); return m ? { label: `${m}월 장부 상세`, make: () => pageLedgerMonth(m) } : null; }
     if (kind === "fee") return { label: "회비 납부 현황", make: () => pageFee() };
     if (kind === "locker") return lockersShown().length ? { label: "락카 현황", make: () => pageLocker() } : null;
-    if (kind === "member") return { label: "회원 목록 (연락처 가림)", make: () => { const old = AL.maskPhone; AL.maskPhone = true; try { return pageMembers(false); } finally { AL.maskPhone = old; } } };
+    if (kind === "member") return { label: "회원목록", make: () => { const old = AL.maskPhone; AL.maskPhone = true; try { return pageMembers(false); } finally { AL.maskPhone = old; } } };
     return null;
   };
   const BOX_GROUPS = [["기록현황", ["meet", "quarter"]], ["장부현황", ["annual", "summary", "month"]], ["회비현황", ["fee"]], ["락카현황", ["locker"]], ["회원현황", ["member"]]];
@@ -587,7 +587,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     // [[분류, [[kind, 라벨], …]], …] — 표시할 수 있는 항목만
     async groups() { await window.__albumData; return BOX_GROUPS.map(([g, ks]) => [g, ks.map((k) => { const p = boxPick(k); return p ? [k, p.label] : null; }).filter(Boolean)]).filter(([, l]) => l.length); },
     // W·H: 쓸 수 있는 폭·높이(px). 1080×1920 한 장을 폭과 높이에 모두 맞춰 스크롤 없이 한 화면에 보이게 줄여서 그려요. 반환: {width, height}
-    async show(kind, W, H) {
+    async show(kind, W, H, pin) {
       await window.__albumData;
       const p = boxPick(kind); view.textContent = "";
       if (!p) { view.append(h("p", { class: "abmsg" }, "표시할 기록이 없어요.")); return { width: W, height: 80 }; }
@@ -597,6 +597,24 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       const hd = root.querySelector(".alp-head"), bd = root.querySelector(".alp-body"), ft = root.querySelector(".alp-foot");
       const need = Math.min(1920, Math.max(900, hd.offsetHeight + bd.scrollHeight + ft.offsetHeight + 56));
       root.style.height = need + "px";
+      if (pin) { // 돋보기(확대) 모드: 폭을 꽉 채우고, 위·아래 스크롤은 이 화면 안에서. 제목부터 첫 표의 필드명 줄까지는 위에 고정(스크롤해도 안 움직임)
+        const top0 = root.getBoundingClientRect().top, th = root.querySelector("thead");
+        let fixPx = th ? th.getBoundingClientRect().bottom - top0 + 4 : hd.getBoundingClientRect().bottom - top0 + 4;
+        if (fixPx > need * 0.5 || (H > 0 && fixPx * (W / 1080) > H * 0.5)) fixPx = hd.getBoundingClientRect().bottom - top0 + 4; // 고정 영역이 화면의 절반을 넘으면(그래프가 있는 월별 요약 등) 제목부만 고정
+        const apin = h("div", { id: "apin" }), ain = h("div", { id: "ain" }), clone = root.cloneNode(true);
+        box.textContent = ""; box.classList.add("pin"); box.append(apin, ain); ain.append(root); apin.append(clone);
+        const apply = (kk) => {
+          const sw = Math.floor(1080 * kk), sh = Math.floor(need * kk), fp = Math.floor(fixPx * kk);
+          root.style.transform = clone.style.transform = `scale(${kk})`;
+          apin.style.width = sw + "px"; apin.style.height = fp + "px"; ain.style.width = sw + "px"; ain.style.height = sh + "px"; ain.style.marginTop = -fp + "px";
+          box.style.width = W + "px"; box.style.height = Math.min(H > 0 ? H : sh, sh) + "px";
+          return sh;
+        };
+        let kk = Math.max(0.1, W / 1080); apply(kk);
+        const sb = box.offsetWidth - box.clientWidth; // 스크롤바가 생기면 그 폭만큼 줄여서 다시
+        if (sb > 0) { kk = Math.max(0.1, (W - sb) / 1080); apply(kk); }
+        return { width: W, height: parseInt(box.style.height, 10) };
+      }
       const k = Math.max(0.1, Math.min(W / 1080, H > 0 ? H / need : 1));
       root.style.transform = `scale(${k})`;
       const wd = Math.floor(1080 * k), hgt = Math.floor(need * k); box.style.width = wd + "px"; box.style.height = hgt + "px";
