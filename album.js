@@ -588,6 +588,35 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     return null;
   };
   const BOX_GROUPS = [["기록현황", ["meet", "quarter"]], ["장부현황", ["annual", "summary", "month"]], ["회비현황", ["fee"]], ["락카현황", ["locker"]], ["회원현황", ["member"]]];
+  /* 두 손가락 확대(핀치): 팝업 제목줄·박스 크기는 그대로 두고 그림(결과물)만 같은 비율로 키워요. 확대하면 그림 화면 안에서 손가락으로 밀어 이동하고, 다시 오므리면(1배) 원래대로.
+     한 화면 맞춤(fit)에서는 그림 화면을 팝업 본문 크기로 넓히고, 돋보기(pin)에서는 확대 배율만 곱해요. 브라우저 자체 확대는 touch-action 으로 막아 두었어요(albumbox.html). */
+  const UZ = {
+    U: 1, mode: null,
+    // 최대 배율은 기기 화면 크기에서 정해요: 한 장의 설계 크기(1080px 기준)의 1.2배까지(글자가 설계 크기를 넘어 커지지 않게), 최소 2배·최대 6배. 가로·세로는 항상 같은 비율로 키움.
+    maxFor(base) { return Math.min(6, Math.max(2, 1.2 / base)); },
+    setFit(box, root, base, W, H, wd, hgt) { Object.assign(this, { mode: "fit", U: 1, box, root, base, W, H, wd, hgt, max: this.maxFor(base) }); },
+    setPin(apply, base, W, H, box) { Object.assign(this, { mode: "pin", U: 1, apply, base, W, H, box, max: this.maxFor(base) }); },
+    to(U, fx, fy) {
+      if (!this.mode) return;
+      U = Math.max(1, Math.min(this.max || 4, U)); if (U < 1.08) U = 1; /* 거의 1배면 1배로 붙임 */ const box = this.box, fe = window.frameElement, old = this.base * this.U, now = this.base * U;
+      const leftOld = this.mode === "fit" ? (parseFloat(this.root.style.left) || 0) : 0;
+      const cx = (box.scrollLeft + fx - leftOld) / old, cy = (box.scrollTop + fy) / old; // 두 손가락 가운데 점의 그림 안 위치
+      if (this.mode === "fit") {
+        const root = this.root, big = U > 1.001;
+        if (fe) { fe.style.width = (big ? this.W : this.wd) + "px"; fe.style.height = (big ? this.H : this.hgt) + "px"; }
+        box.style.width = (big ? this.W : this.wd) + "px"; box.style.height = (big ? this.H : this.hgt) + "px"; box.style.overflow = big ? "auto" : "hidden";
+        root.style.transform = `scale(${now})`; root.style.left = big ? Math.max(0, (this.W - 1080 * now) / 2) + "px" : "0px";
+      } else { this.apply(now); box.style.overflowX = U > 1.001 ? "auto" : "hidden"; }
+      this.U = U;
+      if (U > 1.001) { const leftNew = this.mode === "fit" ? (parseFloat(this.root.style.left) || 0) : 0; box.scrollLeft = cx * now + leftNew - fx; box.scrollTop = cy * now - fy; } else { box.scrollLeft = 0; box.scrollTop = 0; }
+    },
+  };
+  if (window.ALBUM_BOX) {
+    let g = null; const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    document.addEventListener("touchstart", (e) => { g = e.touches.length === 2 ? { d: dist(e.touches) || 1, U0: UZ.U } : null; }, { passive: true });
+    document.addEventListener("touchmove", (e) => { if (g && e.touches.length === 2) { e.preventDefault(); UZ.to(g.U0 * dist(e.touches) / g.d, (e.touches[0].clientX + e.touches[1].clientX) / 2, (e.touches[0].clientY + e.touches[1].clientY) / 2); } }, { passive: false });
+    document.addEventListener("touchend", (e) => { if (e.touches.length < 2) g = null; }, { passive: true });
+  }
   /* 돋보기(확대) 모드: 기기 화면 폭(W)을 최대 폭으로 삼아 그 안에 한 장을 가득 채워 보여 주되, 글자는 키워서 보여 줘요.
      한 장(1080px 설계)의 바깥 여백·칸 안쪽 여백을 줄이고(.alz), 표 글자가 잘리지 않는 범위에서 가장 좁은 설계 폭(최대 1080/1.8)으로 다시 배치한 뒤
      그 폭을 화면 폭 W 에 맞춰 늘려 그려요 → 좌우로 밀 필요 없이 화면 폭을 꽉 채우고 글자도 커져요. 위·아래 스크롤은 이 화면 안에서, 제목~첫 표 필드명 줄은 위에 고정. */
@@ -607,14 +636,15 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       const apin = h("div", { id: "apin" }), ain = h("div", { id: "ain" }), clone = root.cloneNode(true);
       box.textContent = ""; box.classList.add("pin"); box.append(apin, ain); ain.append(root); apin.append(clone);
       const apply = (kk) => {
-        const sw = Math.floor(Wd * kk), sh = Math.floor(need * kk), fp = Math.floor(fixPx * kk);
+        const sw = Math.floor(Wd * kk), sh = Math.floor(need * kk), fp0 = Math.floor(fixPx * kk), fp = H > 0 && fp0 > H * 0.5 ? 0 : fp0; // 두 손가락 확대로 고정 영역이 화면 절반을 넘으면 고정을 풀어 내용이 보이게
         root.style.transform = clone.style.transform = `scale(${kk})`;
         apin.style.width = sw + "px"; apin.style.height = fp + "px"; ain.style.width = sw + "px"; ain.style.height = sh + "px"; ain.style.marginTop = -fp + "px";
         box.style.width = W + "px"; box.style.height = Math.min(H > 0 ? H : sh, sh) + "px";
       };
       apply(k0);
       const sb = box.offsetWidth - box.clientWidth; // 세로 스크롤바가 생기면 그 폭만큼만 줄여 다시(폭을 넘지 않게)
-      if (sb > 0) apply(Math.max(0.1, (W - sb) / Wd));
+      const kf = sb > 0 ? Math.max(0.1, (W - sb) / Wd) : k0; if (sb > 0) apply(kf);
+      UZ.setPin(apply, kf, W, H, box);
     };
     const clipped = () => root.scrollWidth > root.clientWidth + 1 || [...root.querySelectorAll("td,th")].some((c) => c.scrollWidth > c.clientWidth + 2);
     for (let z = 1.8; z >= 1.0; z = Math.round((z - 0.1) * 10) / 10) { build(Math.round(1080 / z)); await tick(); if (!clipped()) break; }
@@ -626,7 +656,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     // W·H: 쓸 수 있는 폭·높이(px). 1080×1920 한 장을 폭과 높이에 모두 맞춰 스크롤 없이 한 화면에 보이게 줄여서 그려요. 반환: {width, height}
     async show(kind, W, H, pin) {
       await window.__albumData; try { await document.fonts.ready; } catch {} // 글꼴이 다 로드된 뒤 글자 폭을 재야 잘림 판정이 맞아요
-      const p = boxPick(kind); view.textContent = "";
+      UZ.mode = null; UZ.U = 1; const p = boxPick(kind); view.textContent = "";
       if (!p) { view.append(h("p", { class: "abmsg" }, "표시할 기록이 없어요.")); return { width: W, height: 80 }; }
       const pg = p.make(), root = pg.root || pg, box = h("div", { id: "abox" });
       view.append(box); box.append(root);
@@ -639,6 +669,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       const k = Math.max(0.1, Math.min(W / 1080, H > 0 ? H / need : 1));
       root.style.transform = `scale(${k})`;
       const wd = Math.floor(1080 * k), hgt = Math.floor(need * k); box.style.width = wd + "px"; box.style.height = hgt + "px";
+      UZ.setFit(box, root, k, W, H, wd, hgt);
       return { width: wd, height: hgt };
     },
   };

@@ -359,3 +359,5 @@ body.albopen{overflow:hidden}
   html[data-dev="mobile"] #view.r-home>.pagehead{display:flex;justify-content:center;align-items:center;gap:12px}
   html[data-dev="mobile"] #view.r-home>.pagehead .badge{margin:0}
 }
+/* 기록앨범 팝업: 두 손가락 확대는 페이지 전체가 아니라 그림(결과물)만 확대되게 브라우저 확대를 막음 */
+.albpop,.albpopbody,.albframe{touch-action:pan-x pan-y}
