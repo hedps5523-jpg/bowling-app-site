@@ -547,6 +547,10 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
   function draw() {
     AL.items = buildItems();
     const valid = new Set(AL.items.map((i) => i.key)); [...AL.sel].forEach((k) => { if (!valid.has(k)) AL.sel.delete(k); });
+    // 같은 화면에서 항목을 선택·해제할 때 목록이 맨 위로 올라가지 않도록 스크롤 위치를 기억했다가 되돌린다
+    const scrollSel = ".alscroll,.alcol,.alcard", sameScr = AL._scr === AL.screen + "|" + (AL.group || "");
+    const keep = sameScr ? [...view.querySelectorAll(scrollSel)].map((e) => e.scrollTop) : null;
+    AL._scr = AL.screen + "|" + (AL.group || "");
     const parts = AL.screen === "sub" ? renderSub() : AL.screen === "confirm" ? renderConfirm() : AL.screen === "result" ? renderResult() : renderMain();
     const title = AL.screen === "sub" ? `${AL.group} 세부항목` : AL.screen === "confirm" ? "기록앨범 만들기 확인" : "기록앨범 만들기";
     const root = h("div", { class: "tbroot alroot" }, h("div", { class: "altitle" }, title, h("small", {}, `${clubName()} · ${S.year}년 자료`)), ...parts);
@@ -554,6 +558,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     const nav = $("bnav"), navTop = nav && !nav.hidden && getComputedStyle(nav).display !== "none" ? nav.getBoundingClientRect().top : window.innerHeight;
     window.scrollTo(0, 0); root.style.height = Math.max(420, navTop - root.getBoundingClientRect().top - 6) + "px"; document.documentElement.classList.add("fitpage");
     if (window.tbSqueeze) window.tbSqueeze(); // 목록이 잘리지 않게 줄 간격 자동 조절
+    if (keep) { const els = [...root.querySelectorAll(scrollSel)]; if (els.length === keep.length) els.forEach((e, i) => { if (keep[i] > 0) e.scrollTop = keep[i]; }); }
   }
   window.ClubAlbum = { render: draw };
   TABS.album = { render: draw };
