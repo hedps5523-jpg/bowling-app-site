@@ -100,6 +100,7 @@ function setBar(title, back) {
   else { left.innerHTML = '<span class="lg">🎳</span>'; left.setAttribute("href", "#/"); }
 }
 function setNav(route) {
+  if (window.__clubfoot) document.querySelector(".wrap").append(window.__clubfoot); // 로그아웃·저작권 줄은 항상 먼저 원래 자리로(가로 홈에서만 다시 왼쪽 아래로 옮김)
   setBnav(route);
   $("logoutFoot").hidden = !token;
 }
@@ -194,7 +195,7 @@ async function vHome() {
   setBar(); setNav("home");
   const { d } = await api("home");
   view.textContent = "";
-  view.append(h("div", { class: "pagehead" }, h("p", { class: "tag" }, `${disp(d.me.name, d.me.role)}님, 안녕하세요 👋`), h("span", { class: "badge" }, `클럽 회원 ${d.memberCount}명`)));
+  const ph = h("div", { class: "pagehead" }, h("p", { class: "tag" }, `${disp(d.me.name, d.me.role)}님, 안녕하세요 👋`), h("span", { class: "badge" }, `클럽 회원 ${d.memberCount}명`));
   const nx = d.next, c = h("section", { class: "card" }, h("h2", {}, "다음 모임"));
   if (!nx) c.append(h("p", { class: "tag" }, "예정된 모임이 없어요."));
   else {
@@ -210,7 +211,12 @@ async function vHome() {
   if (!d.recent.length) r.append(h("p", { class: "tag" }, "아직 공지가 없어요."));
   for (const n of d.recent) r.append(h("a", { class: "li", href: "#/notice/" + n.id }, n.pinned ? h("span", { class: "pin" }, "고정") : null, n.title));
   // 넓은 가로 화면: 왼쪽 = 모임·공지(최근 공지 + 다음 모임) / 오른쪽 = 기록앨범 박스. 세로 화면: 위에서 아래로 쌓고 기록앨범은 드롭메뉴 → 팝업
-  view.append(h("div", { class: "homeleft" }, r, c), albumCard());
+  if (window.__albumMq.matches) { // 가로: 인사 줄은 왼쪽 맨 위, 로그아웃·저작권 줄은 왼쪽 맨 아래로 옮기고 기록앨범 박스를 위아래로 넓게
+    const ft = window.__clubfoot || (window.__clubfoot = document.querySelector(".clubfoot"));
+    view.classList.add("hwide"); view.append(h("div", { class: "homeleft" }, ph, r, c, ft), albumCard());
+    const nv = document.querySelector(".bnav"), navH = nv && getComputedStyle(nv).display !== "none" ? nv.offsetHeight : 0;
+    view.style.minHeight = Math.max(300, window.innerHeight - view.getBoundingClientRect().top - navH - 12) + "px";
+  } else view.append(ph, h("div", { class: "homeleft" }, r, c), albumCard());
 }
 
 /* ---------- 홈: 기록앨범 박스 ----------
@@ -760,6 +766,7 @@ async function vLessonEdit(id) {
 /* ---------- 라우터 ---------- */
 let gErr = null;
 async function route() {
+  if (window.__clubfoot) document.querySelector(".wrap").append(window.__clubfoot); view.style.minHeight = ""; // 가로 홈에서 왼쪽 아래로 옮겨 둔 로그아웃·저작권 줄을 원래 자리(맨 아래)로 되돌림
   document.querySelectorAll(".albpop").forEach((e) => e.remove()); document.body.classList.remove("albopen"); // 기록앨범 팝업 정리
   { const k = (location.hash.replace(/^#/, "") || "/").split("/")[1] || "home"; view.className = token ? "r-" + k : "r-guest"; }
   if (!token) return guest(gErr);
