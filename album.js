@@ -520,7 +520,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       const meets = list.filter((i) => i.key.startsWith("GAME_MEET_")), mk = meets.map((i) => i.key);
       left.append(h("div", { class: "alcard" }, list.filter((i) => !i.key.startsWith("GAME_MEET_")).map((i) => itemRow(i))), quarterPicker());
       right.append(hint("모임기록 (일자별)", `${mk.filter((k) => AL.sel.has(k)).length} / ${mk.length}`),
-        h("div", { class: "alcard alscroll" }, meets.length ? [checkRow(stateOf(mk), "모임기록 전체", `${meets.length}회`, null, () => { stateOf(mk) === 2 ? mk.forEach((k) => AL.sel.delete(k)) : mk.forEach((k) => AL.sel.add(k)); draw(); }), meets.map((i) => itemRow(i, true))] : h("div", { class: "alnote" }, "올해 모임기록이 없습니다.")));
+        h("div", { class: "alcard alscroll" }, meets.length ? [checkRow(stateOf(mk), "모임기록 전체", `${meets.length}회`, null, () => { stateOf(mk) === 2 ? mk.forEach((k) => AL.sel.delete(k)) : mk.forEach((k) => AL.sel.add(k)); draw(); }), ...meets.map((i) => itemRow(i, true))] : h("div", { class: "alnote" }, "올해 모임기록이 없습니다.")));
     } else left.append(h("div", { class: "alcard" }, list.map((i) => itemRow(i))));
     return [h("div", { class: "alcols" }, left, right), h("div", { class: "albar" }, abtn("해제", () => { keys.forEach((k) => AL.sel.delete(k)); draw(); }), abtn(`${keys.filter((k) => AL.sel.has(k)).length}개 선택 완료`, () => { AL.screen = "main"; draw(); }, "pri"))];
   }
