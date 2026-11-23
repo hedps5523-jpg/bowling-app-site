@@ -237,15 +237,14 @@ function albumCard() {
   const wrap = h("div", { class: "albwrap" }); // 가로: 박스 안에 그림이 나타나는 자리
   const msg = h("p", { class: "tag albmsg" }, "기록앨범을 불러오는 중…");
   if (wide) card.append(msg, wrap); else card.append(msg);
-  let pop = null, popBody = null, popTitle = null, popSel = null, popZoom = null, zoomed = false, redraw = null;
+  let pop = null, popBody = null, popTitle = null, popSel = null;
   const run = async () => {
     try {
       let host = wrap;
       if (!wide) { // 세로: 팝업 안에 (처음엔 숨김) 그림 틀을 미리 준비해 두면 선택할 때 바로 떠요
         popTitle = h("b", {}); popSel = h("select", { class: "albsel albpopsel", "aria-label": "기록앨범 선택" }); // 팝업 제목줄 드롭메뉴: 팝업을 닫지 않고 바로 다른 화면으로
-        popZoom = h("button", { type: "button", class: "albzoom", "aria-label": "확대해서 보기", "aria-pressed": "false", onclick: () => toggleZoom() }, "🔍"); // 돋보기: 폭을 최대로 넓혀 크게 보기(세로 스크롤)
         popBody = h("div", { class: "albpopbody" });
-        pop = h("div", { class: "albpop", hidden: true }, h("div", { class: "albpanel", role: "dialog", "aria-modal": "true" }, h("div", { class: "albpophead" }, popSel, popZoom, h("button", { type: "button", class: "albclose", onclick: closePop }, "닫기")), popBody));
+        pop = h("div", { class: "albpop", hidden: true }, h("div", { class: "albpanel", role: "dialog", "aria-modal": "true" }, h("div", { class: "albpophead" }, popSel, h("button", { type: "button", class: "albclose", onclick: closePop }, "닫기")), popBody));
         pop.addEventListener("click", (e) => { if (e.target === pop) closePop(); });
         document.body.append(pop); host = popBody;
       }
@@ -268,10 +267,9 @@ function albumCard() {
         } else H = Math.floor(popBody.clientHeight); // 세로: 팝업 안 가능한 높이
         H = Math.max(200, H);
         // 돋보기: 폭 최대, 위·아래 스크롤은 그림 화면 안에서(제목~필드명 줄 고정) / 보통: 한 화면에 전부
-        const r = await A.show(k, W, H, zoomed);
+        const r = await A.show(k, W, H, !wide); // 세로(팝업): 글자를 키워 폭을 꽉 채우고 위·아래로 스크롤 / 가로 박스: 한 화면 맞춤
         f.style.width = r.width + "px"; f.style.height = r.height + "px";
       };
-      redraw = () => { const k = popSel && popSel.value; if (k) draw(k).catch(() => {}); }; // 돋보기 전환 때 지금 보는 한 장을 다시 그림
       // 창 크기가 바뀌면(회전·분할 화면 등) 지금 보는 한 장을 새 크기에 맞춰 다시 그려요
       if (window.__albResize) window.removeEventListener("resize", window.__albResize);
       let rt = 0; window.__albResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (!document.body.contains(card)) return; const k = sel.value; if (!k || (!wide && pop.hidden)) return; draw(k).catch(() => {}); }, 250); };
@@ -292,8 +290,7 @@ function albumCard() {
       msg.textContent = "기록앨범을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."; sel.remove();
     }
   };
-  function toggleZoom() { zoomed = !zoomed; if (pop) pop.classList.toggle("zoom", zoomed); if (popZoom) { popZoom.classList.toggle("on", zoomed); popZoom.setAttribute("aria-pressed", String(zoomed)); } if (popBody) popBody.scrollTop = 0; if (redraw) redraw(); }
-  function closePop() { if (pop) pop.hidden = true; document.body.classList.remove("albopen"); sel.value = ""; if (zoomed) { zoomed = false; pop.classList.remove("zoom"); popZoom.classList.remove("on"); popZoom.setAttribute("aria-pressed", "false"); } }
+  function closePop() { if (pop) pop.hidden = true; document.body.classList.remove("albopen"); sel.value = ""; }
   setTimeout(run, 0);
   return card;
 }

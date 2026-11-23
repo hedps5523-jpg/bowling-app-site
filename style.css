@@ -336,21 +336,17 @@ html[data-dev="mobile"] #view.r-home{display:block}
 .albsel{flex:1;max-width:62%;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;font-weight:600;background:#fff;color:var(--text)}
 .albwrap{display:flex;justify-content:center;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
 .albframe{display:block;border:0;max-width:100%}
-.albpop{position:fixed;inset:0;z-index:80;background:rgba(15,25,45,.55);display:flex;align-items:center;justify-content:center;padding:10px}
+.albpop{position:fixed;inset:0;z-index:80;background:rgba(15,25,45,.55);display:flex;align-items:stretch;justify-content:center;padding:0}
 .albpop[hidden]{display:none}
-.albpanel{background:#fff;border-radius:14px;width:100%;max-width:640px;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.albpanel{background:#fff;border-radius:0;width:100%;max-width:none;height:100%;display:flex;flex-direction:column;overflow:hidden}
 .albpophead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
 .albclose{border:0;background:#eef2f9;border-radius:10px;padding:7px 14px;font:inherit;font-weight:700;color:var(--text)}
 .albpophead b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%;font-size:15px;flex:0 1 auto}
 .albpophead{justify-content:flex-start}
 .albpopsel{flex:0 0 50%;max-width:50%;min-width:0;padding:8px 10px;font-size:15px;font-weight:800}
-.albzoom{margin-left:auto;border:0;background:#eef2f9;border-radius:10px;padding:6px 12px;font-size:18px;line-height:1.2;color:var(--text)}
-.albzoom.on{background:var(--brand);color:#fff}
-.albpop.zoom{padding:0}
-.albpop.zoom .albpanel{max-width:none;border-radius:0}
-.albpop.zoom .albpopbody{display:block;overflow:hidden}
-.albpop.zoom .albframe{margin:0 auto}
-.albpopbody{overflow:hidden;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.albpopbody{overflow:hidden;flex:1;min-height:0;display:block}
+.albpopbody .albframe{margin:0 auto}
+.albpophead .albclose{margin-left:auto}
 body.albopen{overflow:hidden}
 /* 태블릿(터치 기기, data-dev=mobile)도 가로 폭 1000px 이상이면 홈을 2단(왼쪽 모임·공지 / 오른쪽 기록앨범)으로 */
 @media (orientation: landscape) and (min-width: 1000px) {

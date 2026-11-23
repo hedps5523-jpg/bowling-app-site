@@ -600,6 +600,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       if (!this.mode) return;
       U = Math.max(1, Math.min(this.max || 4, U)); if (U < 1.08) U = 1; /* 거의 1배면 1배로 붙임 */ const box = this.box, fe = window.frameElement, old = this.base * this.U, now = this.base * U;
       const leftOld = this.mode === "fit" ? (parseFloat(this.root.style.left) || 0) : 0;
+      if (this.mode === "pin") fy -= box.getBoundingClientRect().top; // B 영역(A 아래)을 기준으로
       const cx = (box.scrollLeft + fx - leftOld) / old, cy = (box.scrollTop + fy) / old; // 두 손가락 가운데 점의 그림 안 위치
       if (this.mode === "fit") {
         const root = this.root, big = U > 1.001;
@@ -618,37 +619,57 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     document.addEventListener("touchend", (e) => { if (e.touches.length < 2) g = null; }, { passive: true });
   }
   /* 돋보기(확대) 모드: 기기 화면 폭(W)을 최대 폭으로 삼아 그 안에 한 장을 가득 채워 보여 주되, 글자는 키워서 보여 줘요.
-     한 장(1080px 설계)의 바깥 여백·칸 안쪽 여백을 줄이고(.alz), 표 글자가 잘리지 않는 범위에서 가장 좁은 설계 폭(최대 1080/1.8)으로 다시 배치한 뒤
+     (돋보기 버튼은 없앴고 세로 팝업은 항상 이 방식이에요) 한 장(1080px 설계)의 바깥 여백·칸 안쪽 여백을 줄이고(.alz), 표 글자가 잘리지 않는 범위에서 가장 좁은 설계 폭(최대 1080/1.8)으로 다시 배치한 뒤
      그 폭을 화면 폭 W 에 맞춰 늘려 그려요 → 좌우로 밀 필요 없이 화면 폭을 꽉 채우고 글자도 커져요. 위·아래 스크롤은 이 화면 안에서, 제목~첫 표 필드명 줄은 위에 고정. */
   async function pinShow(box, root, W, H) {
+    // A영역(제목 배너 + 요약 카드): 확대하지 않고 위에 고정 / B영역(표·그래프·꼬리말): 글자를 키워 폭을 채우고 위·아래 스크롤·두 손가락 확대
+    const rootA = root.cloneNode(true);
     const hd = root.querySelector(".alp-head"), bd = root.querySelector(".alp-body"), ft = root.querySelector(".alp-foot");
-    root.classList.add("alz");
+    const kp = bd && bd.querySelector(".alp-kpis");
+    root.classList.add("alz", "alb"); hd.style.display = "none"; if (kp) kp.style.display = "none"; // B: 제목부·요약 카드는 A 에서 보여 줌
     const tick = () => new Promise((r) => setTimeout(r, 60));
+    // ----- A 영역: 설계 폭(1080)을 화면 폭에 맞춘 크기(확대 없음), 위에 고정 -----
+    const wrap = h("div", { id: "awrap" }), aEl = h("div", { id: "aA" });
+    view.textContent = ""; view.append(wrap); wrap.append(aEl, box); aEl.append(rootA);
+    rootA.classList.add("ala"); rootA.style.width = "1080px"; rootA.style.height = "4000px";
+    const bdA = rootA.querySelector(".alp-body"), kpA = bdA && bdA.querySelector(".alp-kpis"), hdA = rootA.querySelector(".alp-head");
+    let hA = 0;
+    if (bdA) { let past = false; [...bdA.children].forEach((c) => { if (past) c.style.display = "none"; if (c === kpA) past = true; }); } // 요약 카드까지만 보이게
+    rootA.querySelector(".alp-foot").style.display = "none";
+    if (!kpA && bdA) bdA.style.display = "none";
+    void rootA.offsetHeight; hA = Math.ceil((kpA ? kpA.getBoundingClientRect().bottom : hdA.getBoundingClientRect().bottom) - rootA.getBoundingClientRect().top) + 8;
+    const kA = Math.max(0.1, W / 1080), hAs = Math.floor(hA * kA);
+    rootA.style.height = hA + "px"; rootA.style.transform = `scale(${kA})`; aEl.style.width = W + "px"; aEl.style.height = hAs + "px";
+    const Hb = Math.max(140, (H > 0 ? H : 99999) - hAs); // B 영역에 남은 높이
+    // ----- B 영역 -----
     root.style.width = "1080px"; root.style.height = "4000px"; void root.offsetHeight; try { await document.fonts.ready; } catch {} await tick(); // 이 한 장에 쓰는 글꼴이 로드되기를 기다린 뒤 글자 폭을 재요
     let Wd = 1080, need = 0, fixPx = 0;
     // 실제로 보여 줄 구조(위 고정 복제본 + 본문)를 만든 상태에서 잘림을 재야 정확해요
     const build = (w) => {
       Wd = w; root.style.transform = "none"; root.style.width = Wd + "px"; root.style.height = "4000px";
-      need = Math.max(900, hd.offsetHeight + bd.scrollHeight + ft.offsetHeight + 56); root.style.height = need + "px";
+      need = Math.max(300, bd.scrollHeight + ft.offsetHeight + 56); root.style.height = need + "px";
       const top0 = root.getBoundingClientRect().top, th = root.querySelector("thead"), k0 = Math.max(0.1, W / Wd);
-      fixPx = th ? th.getBoundingClientRect().bottom - top0 + 4 : hd.getBoundingClientRect().bottom - top0 + 4;
-      if (fixPx > need * 0.5 || (H > 0 && fixPx * k0 > H * 0.5)) fixPx = hd.getBoundingClientRect().bottom - top0 + 4; // 고정 영역이 화면의 절반을 넘으면(그래프가 있는 월별 요약 등) 제목부만 고정
+      fixPx = th ? th.getBoundingClientRect().bottom - top0 + 4 : 0; // 표 필드명 줄까지는 B 안에서도 위에 고정
+      if (fixPx > need * 0.5 || fixPx * k0 > Hb * 0.5) fixPx = 0; // 고정 영역이 B 의 절반을 넘으면(그래프가 있는 월별 요약 등) 고정하지 않음
       const apin = h("div", { id: "apin" }), ain = h("div", { id: "ain" }), clone = root.cloneNode(true);
       box.textContent = ""; box.classList.add("pin"); box.append(apin, ain); ain.append(root); apin.append(clone);
       const apply = (kk) => {
-        const sw = Math.floor(Wd * kk), sh = Math.floor(need * kk), fp0 = Math.floor(fixPx * kk), fp = H > 0 && fp0 > H * 0.5 ? 0 : fp0; // 두 손가락 확대로 고정 영역이 화면 절반을 넘으면 고정을 풀어 내용이 보이게
+        const sw = Math.floor(Wd * kk), sh = Math.floor(need * kk), fp0 = Math.floor(fixPx * kk), fp = fp0 > Hb * 0.5 ? 0 : fp0; // 두 손가락 확대로 고정 영역이 B 의 절반을 넘으면 고정을 풀어 내용이 보이게
         root.style.transform = clone.style.transform = `scale(${kk})`;
         apin.style.width = sw + "px"; apin.style.height = fp + "px"; ain.style.width = sw + "px"; ain.style.height = sh + "px"; ain.style.marginTop = -fp + "px";
-        box.style.width = W + "px"; box.style.height = Math.min(H > 0 ? H : sh, sh) + "px";
+        box.style.width = W + "px"; box.style.height = Math.min(Hb, sh) + "px";
       };
       apply(k0);
       const sb = box.offsetWidth - box.clientWidth; // 세로 스크롤바가 생기면 그 폭만큼만 줄여 다시(폭을 넘지 않게)
       const kf = sb > 0 ? Math.max(0.1, (W - sb) / Wd) : k0; if (sb > 0) apply(kf);
-      UZ.setPin(apply, kf, W, H, box);
+      UZ.setPin(apply, kf, W, Hb, box);
     };
     const clipped = () => root.scrollWidth > root.clientWidth + 1 || [...root.querySelectorAll("td,th")].some((c) => c.scrollWidth > c.clientWidth + 2);
-    for (let z = 1.8; z >= 1.0; z = Math.round((z - 0.1) * 10) / 10) { build(Math.round(1080 / z)); await tick(); if (!clipped()) break; }
-    return { width: W, height: parseInt(box.style.height, 10), zoom: Math.round((1080 / Wd) * 100) / 100 };
+    // 시작 배율: 좁은 기기는 최대 1.8배(설계 폭 600px)까지, 넓은 기기(Z 폴드 메인·8인치 태블릿 세로 등)는 글자가 화면에서 설계 글자의 0.72배(약 21px)를 넘지 않게 낮춰요
+    const z0 = Math.max(1, Math.floor(Math.min(1.8, 1080 / Math.max(600, W / 0.72)) * 10) / 10);
+    // 글자가 커져도 한 줄로 보이게: 칸 글자는 줄바꿈 없음(.alz nowrap, 긴 비고(.wr)만 예외)이라 한 줄에 안 들어가면 잘림으로 잡혀 배율을 낮춤. 설계 폭(1.0배)에서도 안 맞으면 0.7배까지 더 낮춰요
+    for (let z = z0; z >= 0.7; z = Math.round((z - 0.1) * 10) / 10) { build(Math.round(1080 / z)); await tick(); if (!clipped()) break; }
+    return { width: W, height: hAs + parseInt(box.style.height, 10), zoom: Math.round((1080 / Wd) * 100) / 100, hA: hAs };
   }
   window.AlbumBox = {
     // [[분류, [[kind, 라벨], …]], …] — 표시할 수 있는 항목만
