@@ -654,7 +654,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       // 필드명 줄 고정: 스크롤 영역(#abox) 밖에 따로 둔 고정 줄(#apin)이라 드래그해도 행이 겹치거나 밀리지 않아요(sticky 를 쓰지 않음)
       const old = wrap.querySelector("#apin"); if (old) old.remove();
       const apin = h("div", { id: "apin" }), ain = h("div", { id: "ain" }), clone = root.cloneNode(true);
-      box.textContent = ""; box.classList.add("pin"); wrap.insertBefore(apin, box); box.append(ain); ain.append(root); apin.append(clone);
+      box.textContent = ""; box.classList.add("zpin"); wrap.insertBefore(apin, box); box.append(ain); ain.append(root); apin.append(clone);
       box.onscroll = () => { clone.style.left = -box.scrollLeft + "px"; }; // 확대해서 좌우로 밀 때 필드명 줄도 같이 이동
       const apply = (kk) => {
         const sw = Math.floor(Wd * kk), sh = Math.floor(need * kk), fp0 = Math.floor(fixPx * kk), fp = fp0 > Hb * 0.5 ? 0 : fp0; // 두 손가락 확대로 고정 영역이 B 의 절반을 넘으면 고정을 풀어 내용이 보이게
