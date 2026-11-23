@@ -27,6 +27,16 @@ function h(tag, props = {}, ...kids) {
 const view = $("view");
 let toastT;
 function toast(t, ms = 2600) { const e = $("toastc"); e.textContent = t; e.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => e.hidden = true, ms); }
+/* 갤럭시 Z 폴드 전면(커버) 세로 화면 판별 → <html class="foldcover">. 기종(SM-F9xx) + 좁은 세로 폭일 때만 켜진다.
+   확인용으로 주소 뒤에 ?fold=1 을 붙이면 어느 기기에서나 켜진다. (폴드를 펼친 안쪽 화면·가로 화면·다른 기종은 해당 없음) */
+(() => {
+  const root = document.documentElement;
+  let isFold = /SM-F9\d{2}/.test(navigator.userAgent) || /[?&]fold=1\b/.test(location.search);
+  const apply = () => root.classList.toggle("foldcover", isFold && window.innerWidth < 520 && window.innerHeight > window.innerWidth);
+  apply();
+  try { if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) navigator.userAgentData.getHighEntropyValues(["model"]).then((h) => { if (/^SM-F9\d{2}/.test((h && h.model) || "")) { isFold = true; apply(); } }).catch(() => {}); } catch {}
+  window.addEventListener("resize", apply); window.addEventListener("orientationchange", apply);
+})();
 /* 날짜 입력칸: 브라우저 기본 표시(2026. 11. 22.) 대신 yy-mm-dd 로 보여 주고, 누르면 선택한 입력칸 바로 아래에 달력을 연다.
    입력칸의 value 는 그대로 yyyy-mm-dd 로 읽고 쓰므로 저장·검증 코드는 바뀌지 않는다.
    달력은 기기 기본 날짜 선택기(화면 가운데 등에 뜸) 대신 직접 그려서 모든 화면에서 같은 위치(입력칸 바로 아래)에 나타나게 한다. */

@@ -1164,3 +1164,20 @@ input.dfmt{cursor:pointer;caret-color:transparent}
 .dfcal .dff{display:flex;gap:6px;margin-top:6px}
 .dfcal .dfb{flex:1;height:34px;border:1px solid #C3D2E2;border-radius:8px;background:#E9F0FA;font:inherit;font-size:13px;font-weight:700;color:#14304F;cursor:pointer;padding:0;margin:0}
 @media (max-height:560px){.dfcal{padding:6px}.dfcal .dfd{height:28px}.dfcal .dfnav,.dfcal .dfsel,.dfcal .dfb{height:28px}.dfcal .dfh{margin-bottom:4px}.dfcal .dff{margin-top:4px}}
+
+/* ===== 갤럭시 Z 폴드 전면 세로 화면 전용 (html.foldcover, 2026-11-23) : 기록조회-모임기록 한 줄에 이름·Avg·편차·배지를 모두 표시 ===== */
+html.foldcover .phrc.mcard .phrh{grid-template-columns:minmax(0,1fr) auto 18px;column-gap:6px;row-gap:0;padding-top:4px;padding-bottom:4px}
+html.foldcover .phrc.mcard .phrh .chev{grid-column:3;grid-row:1;width:18px}
+html.foldcover .phrc.mcard .phrh .badge{grid-column:2;grid-row:1;justify-self:end;font-size:12px;padding:2px 9px}
+html.foldcover .phrc.mcard .mmain{gap:6px}
+html.foldcover .phrc.mcard .mmain .nm{font-size:14.5px}
+html.foldcover .phrc.mcard .mmain .pav,html.foldcover .phrc.mcard .mmain .pdv{font-size:14px}
+@media (max-width:380px){
+  html.foldcover .phrc.mcard .phrh{column-gap:4px;padding-left:10px;padding-right:8px}
+  html.foldcover .phrc.mcard .mmain{gap:4px}
+  html.foldcover .phrc.mcard .mmain .nm{font-size:13px;letter-spacing:-.3px}
+  html.foldcover .phrc.mcard .mmain .pav,html.foldcover .phrc.mcard .mmain .pdv{font-size:12.5px;letter-spacing:-.3px}
+  html.foldcover .phrc.mcard .phrh .badge{font-size:11px;padding:2px 7px}
+  html.foldcover .phrc.mcard .phrh .chev{width:14px;font-size:16px}
+  html.foldcover .phrc.mcard .phrh{grid-template-columns:minmax(0,1fr) auto 14px}
+}
