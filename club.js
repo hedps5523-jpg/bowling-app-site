@@ -27,34 +27,82 @@ function h(tag, props = {}, ...kids) {
 const view = $("view");
 let toastT;
 function toast(t, ms = 2600) { const e = $("toastc"); e.textContent = t; e.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => e.hidden = true, ms); }
-/* 날짜 입력칸: 브라우저 기본 표시(2026. 11. 22.) 대신 yy-mm-dd 로 보여 주고, 누르면 기본 날짜 선택기를 연다.
-   입력칸의 value 는 그대로 yyyy-mm-dd 로 읽고 쓰므로 저장·검증 코드는 바뀌지 않는다. */
+/* 날짜 입력칸: 브라우저 기본 표시(2026. 11. 22.) 대신 yy-mm-dd 로 보여 주고, 누르면 선택한 입력칸 바로 아래에 달력을 연다.
+   입력칸의 value 는 그대로 yyyy-mm-dd 로 읽고 쓰므로 저장·검증 코드는 바뀌지 않는다.
+   달력은 기기 기본 날짜 선택기(화면 가운데 등에 뜸) 대신 직접 그려서 모든 화면에서 같은 위치(입력칸 바로 아래)에 나타나게 한다. */
 (() => {
   const nativeSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-  let pk = null;
-  const picker = () => { if (!pk) { pk = document.createElement("input"); pk.type = "date"; pk.dataset.dfmt = "1"; pk.tabIndex = -1; pk.setAttribute("aria-hidden", "true"); pk.style.cssText = "position:fixed;opacity:0;width:1px;height:1px;border:0;padding:0;pointer-events:none;z-index:-1"; document.body.append(pk); } return pk; };
+  const p2 = (n) => String(n).padStart(2, "0");
+  const WD = ["일", "월", "화", "수", "목", "금", "토"];
+  let cal = null; // { box, inp, off }
+  const closeCal = () => { if (!cal) return; cal.off(); if (cal.lifted) cal.lifted.style.transform = ""; cal.box.remove(); cal = null; };
+  const place = (box, inp) => {
+    const small = window.innerWidth < 700 || window.innerHeight < 640; // 핸드폰·낮은 해상도 화면은 입력칸 위로 표시해도 된다
+    let r = inp.getBoundingClientRect(); const bw = box.offsetWidth, bh = box.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+    let left = Math.min(Math.max(8, r.left), Math.max(8, vw - bw - 8)), top = r.bottom + 2; // 기본: 입력칸 바로 아래
+    if (top + bh > vh - 8 && cal && !small) { // 큰 화면: 팝업 창을 위로 조금 올려서 달력이 입력칸 바로 아래에 오게 한다
+      const dlg = inp.closest(".pcdlg");
+      if (dlg) { const need = top + bh - (vh - 8), room = dlg.getBoundingClientRect().top - 8; if (need <= room) { const curY = parseFloat((dlg.style.transform.match(/-?[\d.]+/) || [0])[0]) || 0; dlg.style.transform = `translateY(${curY - need}px)`; cal.lifted = dlg; r = inp.getBoundingClientRect(); top = r.bottom + 2; } }
+    }
+    if (top + bh > vh - 8) { const above = r.top - bh - 2; top = above >= 8 ? above : Math.max(8, vh - bh - 8); } // 아래 공간이 모자랄 때만 위로
+    box.style.left = left + "px"; box.style.top = top + "px";
+  };
+  const openCal = (inp, getIso, setIso) => {
+    if (cal && cal.inp === inp) return closeCal();
+    closeCal();
+    const cur = getIso(), todayD = new Date(), tIso = `${todayD.getFullYear()}-${p2(todayD.getMonth() + 1)}-${p2(todayD.getDate())}`;
+    let vy = cur ? +cur.slice(0, 4) : todayD.getFullYear(), vm = cur ? +cur.slice(5, 7) - 1 : todayD.getMonth();
+    const box = document.createElement("div"); box.className = "dfcal"; box.setAttribute("role", "dialog");
+    const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+    const pick = (iso) => { setIso(iso); closeCal(); };
+    const draw = () => {
+      box.textContent = "";
+      const head = el("div", "dfh"), prev = el("button", "dfnav", "‹"), next = el("button", "dfnav", "›");
+      prev.type = next.type = "button";
+      const ys = el("select", "dfsel"), ms = el("select", "dfsel");
+      for (let y = Math.min(1990, vy); y <= Math.max(todayD.getFullYear() + 10, vy); y++) { const o = el("option", "", y + "년"); o.value = y; ys.append(o); }
+      for (let m = 0; m < 12; m++) { const o = el("option", "", (m + 1) + "월"); o.value = m; ms.append(o); }
+      ys.value = vy; ms.value = vm;
+      ys.onchange = () => { vy = +ys.value; draw(); }; ms.onchange = () => { vm = +ms.value; draw(); };
+      prev.onclick = () => { vm--; if (vm < 0) { vm = 11; vy--; } draw(); }; next.onclick = () => { vm++; if (vm > 11) { vm = 0; vy++; } draw(); };
+      head.append(prev, ys, ms, next); box.append(head);
+      const wk = el("div", "dfw"); WD.forEach((d, i) => wk.append(el("span", i === 0 ? "sun" : i === 6 ? "sat" : "", d))); box.append(wk);
+      const grid = el("div", "dfg"), first = new Date(vy, vm, 1), start = new Date(vy, vm, 1 - first.getDay());
+      for (let i = 0; i < 42; i++) { // 항상 6주 표시 (달마다 높이가 바뀌지 않게)
+        const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i), iso = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+        const b = el("button", "dfd" + (d.getMonth() !== vm ? " out" : "") + (iso === tIso ? " today" : "") + (iso === cur ? " sel" : "") + (d.getDay() === 0 ? " sun" : d.getDay() === 6 ? " sat" : ""), String(d.getDate()));
+        b.type = "button"; b.onclick = () => pick(iso); grid.append(b);
+      }
+      box.append(grid);
+      const foot = el("div", "dff"), bt = el("button", "dfb", "오늘"), bc = el("button", "dfb", "지우기"), bx = el("button", "dfb", "닫기");
+      bt.type = bc.type = bx.type = "button"; bt.onclick = () => pick(tIso); bc.onclick = () => pick(""); bx.onclick = closeCal;
+      foot.append(bt, bc, bx); box.append(foot);
+      if (cal) place(box, inp);
+    };
+    draw(); document.body.append(box); cal = { box, inp, off: () => {} };
+    place(box, inp);
+    const onDown = (e) => { if (!box.contains(e.target) && e.target !== inp) closeCal(); };
+    const onKey = (e) => { if (e.key === "Escape") closeCal(); };
+    const onScroll = (e) => { if (!box.contains(e.target)) closeCal(); };
+    document.addEventListener("pointerdown", onDown, true); document.addEventListener("keydown", onKey, true); window.addEventListener("scroll", onScroll, true); window.addEventListener("resize", closeCal);
+    cal.off = () => { document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("keydown", onKey, true); window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", closeCal); };
+  };
   const enhance = (inp) => {
-    if (inp.dataset.dfmt || inp.closest(".phdate")) return;
+    if (inp.dataset.dfmt) return;
     inp.dataset.dfmt = "1";
     let iso = inp.value || "";
     inp.type = "text"; inp.readOnly = true; inp.setAttribute("inputmode", "none"); inp.placeholder = "yy-mm-dd"; inp.classList.add("dfmt");
     const show = () => nativeSet.call(inp, iso ? iso.slice(2) : "");
     Object.defineProperty(inp, "value", { configurable: true, get: () => iso, set: (v) => { const n = typeof v === "string" ? v : ""; iso = /^\d{4}-\d{2}-\d{2}$/.test(n) ? n : ""; show(); } });
     show();
-    const open = () => {
-      if (inp.disabled) return;
-      const p = picker(), r = inp.getBoundingClientRect();
-      p.style.left = r.left + "px"; p.style.top = r.bottom + "px"; p.value = iso;
-      p.onchange = () => { if (p.value) { iso = p.value; show(); inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); } };
-      try { p.showPicker(); } catch { p.focus(); p.click(); }
-    };
+    const setIso = (v) => { if (v === iso) return; iso = v; show(); inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); };
+    const open = () => { if (!inp.disabled) openCal(inp, () => iso, setIso); };
     inp.addEventListener("click", open);
-    inp.addEventListener("keydown", (e) => { if (e.key === " ") { e.preventDefault(); open(); } else if ((e.key === "Delete" || e.key === "Backspace") && !inp.disabled) { e.preventDefault(); if (iso) { iso = ""; show(); inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); } } });
+    inp.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter" && e.altKey) { e.preventDefault(); open(); } else if ((e.key === "Delete" || e.key === "Backspace") && !inp.disabled) { e.preventDefault(); setIso(""); } });
   };
   const scan = (root) => { if (root.querySelectorAll) root.querySelectorAll('input[type="date"]').forEach(enhance); };
   new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach((n) => { if (n.nodeType !== 1) return; if (n.matches && n.matches('input[type="date"]')) enhance(n); else scan(n); }); }).observe(document.documentElement, { childList: true, subtree: true });
-  scan(document);
-})();
+  scan(document);})();
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
 const pad2 = (n) => String(n).padStart(2, "0");
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };

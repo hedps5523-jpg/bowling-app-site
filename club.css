@@ -1147,3 +1147,20 @@ body.phmode .topbar .phtbar .phmenu{padding:0 8px}
 
 /* ===== 날짜 표시 yy-mm-dd (2026-11-23) : 날짜 입력칸은 글자로 표시하고 눌러서 날짜 선택 ===== */
 input.dfmt{cursor:pointer;caret-color:transparent}
+
+/* ===== 날짜 입력칸 바로 아래에 뜨는 달력 (2026-11-23) ===== */
+.dfcal{position:fixed;z-index:400;width:min(296px,calc(100vw - 16px));background:#fff;border:1px solid #9FB0C6;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.28);padding:8px;font-size:14px;color:#12285A;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.dfcal .dfh{display:flex;align-items:center;gap:4px;margin-bottom:6px}
+.dfcal .dfnav{flex:none;width:34px;height:34px;border:1px solid #CFD9E6;border-radius:8px;background:#F3F6FB;font-size:20px;line-height:1;color:#12285A;cursor:pointer;padding:0}
+.dfcal .dfsel{flex:1 1 0;min-width:0;height:34px;border:1px solid #CFD9E6;border-radius:8px;background:#fff;font:inherit;font-size:14px;font-weight:700;color:#12285A;padding:0 4px;margin:0}
+.dfcal .dfw,.dfcal .dfg{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dfcal .dfw span{text-align:center;font-size:12px;font-weight:700;color:#4A5D80;padding:2px 0}
+.dfcal .dfw .sun,.dfcal .dfd.sun{color:#C0392B}.dfcal .dfw .sat,.dfcal .dfd.sat{color:#1F5FBF}
+.dfcal .dfd{height:36px;border:0;border-radius:8px;background:#fff;font:inherit;font-size:14px;color:inherit;cursor:pointer;padding:0;margin:0}
+.dfcal .dfd:hover{background:#E9F0FA}
+.dfcal .dfd.out{opacity:.38}
+.dfcal .dfd.today{box-shadow:inset 0 0 0 1.5px #2F6BFF}
+.dfcal .dfd.sel{background:#2F6BFF;color:#fff;font-weight:700;opacity:1}
+.dfcal .dff{display:flex;gap:6px;margin-top:6px}
+.dfcal .dfb{flex:1;height:34px;border:1px solid #C3D2E2;border-radius:8px;background:#E9F0FA;font:inherit;font-size:13px;font-weight:700;color:#14304F;cursor:pointer;padding:0;margin:0}
+@media (max-height:560px){.dfcal{padding:6px}.dfcal .dfd{height:28px}.dfcal .dfnav,.dfcal .dfsel,.dfcal .dfb{height:28px}.dfcal .dfh{margin-bottom:4px}.dfcal .dff{margin-top:4px}}
