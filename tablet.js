@@ -1425,7 +1425,7 @@
   const PC = {}; TB_KEYS.forEach((k) => { PC[k] = TABS[k]; TABS[k] = { render() { TB.wasOn = MODE_KEY(); RENDER[k](); } }; });
   const pcHeader = drawHeader;
   /* 세로 화면 구역 목록 (모바일 볼링클럽: 입력모드 / 조회모드 선택목록) */
-  const PH_INPUT = [["members", "회원관리"], ["games", "점수관리"], ["quarter", "분기에버"], ["ledger", "장부관리"], ["fees", "회비관리"], ["lockers", "락카 사용현황"], ["settings", "환경설정"]];
+  const PH_INPUT = [["members", "회원관리"], ["games", "점수관리"], ["quarter", "분기에버"], ["ledger", "장부관리"], ["fees", "회비관리"], ["lockers", "락카 사용현황"], ["album", "기록앨범"], ["settings", "환경설정"]];
   const PH_QUERY = [["members", "회원"], ["games", "게임기록"], ["ledger", "장부"], ["fees", "회비"], ["lockers", "락카"]];
   const phList = () => (inputMode() ? PH_INPUT : PH_QUERY);
   drawHeader = function () {
@@ -1454,7 +1454,7 @@
     const nav = $("pcnav"); nav.textContent = "";
     $("pcsub").textContent = "";
     const me = Conn.me, mgr = cleanTitle(S.settings.key_management_name || "");
-    if (current === "album" && (phone || VIEWONLY)) current = "games";
+    if (current === "album" && (VIEWONLY || (phone && !inputMode()))) current = "games"; // 기록앨범은 클럽관리(입력 모드)에서만: 가로·세로 모두
     if (phone) {
       // 조회모드에는 분기에버 구역이 없어요 → 게임기록의 분기에버 보고서로 보여 줘요
       if (!inputMode() && current === "quarter") { current = "games"; GS.report = "분기에버"; GS.linked = null; }
