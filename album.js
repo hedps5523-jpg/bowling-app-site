@@ -561,20 +561,31 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     if (keep) { const els = [...root.querySelectorAll(scrollSel)]; if (els.length === keep.length) els.forEach((e, i) => { if (keep[i] > 0) e.scrollTop = keep[i]; }); }
   }
   /* ---------- 홈 화면 '기록앨범' 박스 (albumbox.html 안에서만 사용) ----------
-     홈이 같은 출처 iframe 으로 이 화면을 끼워 넣고 AlbumBox.labels() / show() 를 불러요.
-     meet = 가장 최근 모임, month = 이번 달(장부가 없으면 가장 최근 달) 월별 장부 상세, fee = 오늘 기준 회비 납부 현황 */
+     홈이 같은 출처 iframe 으로 이 화면을 끼워 넣고 AlbumBox.groups() / show() 를 불러요.
+     분류(기록현황·장부현황·회비현황·락카현황·회원현황)별로 항목을 묶어 드롭메뉴에 보여 줘요.
+       meet 최근 모임 / quarter 분기에버(분기가 끝나 책정에버가 결정된 뒤에만) / annual 1년결산 / summary 월별 요약 / month 이번 달 월별 장부 상세
+       fee 회비 납부 현황 / locker 락카 현황 / member 회원 목록(연락처 가운데 4자리 가림) */
   const boxPick = (kind) => {
+    const curMonth = () => { const months = [...new Set(ledgerAll().map((l) => mn(l.date)))].sort((a, b) => a - b); return months.length ? (months.includes(mn(today())) ? mn(today()) : months[months.length - 1]) : 0; };
     if (kind === "meet") { const ms = meetings(); const mt = ms[ms.length - 1]; return mt ? { label: `최근 모임 (${mn(mt.date)}/${dn(mt.date)} ${mt.type})`, make: () => pageMeeting(mt) } : null; }
-    if (kind === "month") {
-      const months = [...new Set(ledgerAll().map((l) => mn(l.date)))].sort((a, b) => a - b); if (!months.length) return null;
-      const m = months.includes(mn(today())) ? mn(today()) : months[months.length - 1];
-      return { label: `${m}월 장부 상세`, make: () => pageLedgerMonth(m) };
+    if (kind === "quarter") {
+      const y = Y(), q = Math.floor((mn(today()) - 1) / 3) + 1;
+      if (!activeMembers().some((m) => S.sq[`${m.memberId}|${y}|${q}`] != null)) return null; // 이번 분기 책정에버가 아직 결정되지 않았으면 표시하지 않음
+      const [sy, sq, ty, tq] = spanOf(0);
+      return { label: `분기에버 (${sy !== ty ? pad2(sy % 100) + "년 " : ""}${sq}→${tq}분기)`, make: () => pageQuarter(0) };
     }
+    if (kind === "annual") return ledgerAll().length ? { label: `1년결산 (${S.year}년)`, make: () => pageLedgerAnnual() } : null;
+    if (kind === "summary") { const m = curMonth(); return m ? { label: `월별 요약 (${m}월 기준)`, make: () => pageLedgerSummary() } : null; }
+    if (kind === "month") { const m = curMonth(); return m ? { label: `${m}월 장부 상세`, make: () => pageLedgerMonth(m) } : null; }
     if (kind === "fee") return { label: "회비 납부 현황", make: () => pageFee() };
+    if (kind === "locker") return lockersShown().length ? { label: "락카 현황", make: () => pageLocker() } : null;
+    if (kind === "member") return { label: "회원 목록 (연락처 가림)", make: () => { const old = AL.maskPhone; AL.maskPhone = true; try { return pageMembers(false); } finally { AL.maskPhone = old; } } };
     return null;
   };
+  const BOX_GROUPS = [["기록현황", ["meet", "quarter"]], ["장부현황", ["annual", "summary", "month"]], ["회비현황", ["fee"]], ["락카현황", ["locker"]], ["회원현황", ["member"]]];
   window.AlbumBox = {
-    async labels() { await window.__albumData; return ["meet", "month", "fee"].map((k) => { const p = boxPick(k); return [k, p ? p.label : null]; }); },
+    // [[분류, [[kind, 라벨], …]], …] — 표시할 수 있는 항목만
+    async groups() { await window.__albumData; return BOX_GROUPS.map(([g, ks]) => [g, ks.map((k) => { const p = boxPick(k); return p ? [k, p.label] : null; }).filter(Boolean)]).filter(([, l]) => l.length); },
     // W·H: 쓸 수 있는 폭·높이(px). 1080×1920 한 장을 폭과 높이에 모두 맞춰 스크롤 없이 한 화면에 보이게 줄여서 그려요. 반환: {width, height}
     async show(kind, W, H) {
       await window.__albumData;
