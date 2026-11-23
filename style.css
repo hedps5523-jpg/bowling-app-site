@@ -328,3 +328,25 @@ body.club footer.clubfoot div{line-height:1.4;font-size:12px}
 
 /* 휴대폰·태블릿(터치 기기)은 가로로 돌려도 홈은 한 열로 */
 html[data-dev="mobile"] #view.r-home{display:block}
+
+/* ===== 홈: 기록앨범 박스 (2026-11-23) — 가로: 왼쪽 모임·공지 / 오른쪽 기록앨범(드롭메뉴), 세로: 드롭메뉴 → 팝업 ===== */
+.homeleft{min-width:0}
+.albumcard .albhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.albumcard .albhead h2{margin:0;white-space:nowrap}
+.albsel{flex:1;max-width:62%;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;font-weight:600;background:#fff;color:var(--text)}
+.albwrap{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.albframe{display:block;border:0;max-width:100%}
+.albpop{position:fixed;inset:0;z-index:80;background:rgba(15,25,45,.55);display:flex;align-items:center;justify-content:center;padding:10px}
+.albpop[hidden]{display:none}
+.albpanel{background:#fff;border-radius:14px;width:100%;max-width:640px;max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.albpophead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.albclose{border:0;background:#eef2f9;border-radius:10px;padding:7px 14px;font:inherit;font-weight:700;color:var(--text)}
+.albpopbody{overflow:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
+body.albopen{overflow:hidden}
+/* 태블릿(터치 기기, data-dev=mobile)도 가로 폭 1000px 이상이면 홈을 2단(왼쪽 모임·공지 / 오른쪽 기록앨범)으로 */
+@media (orientation: landscape) and (min-width: 1000px) {
+  html[data-dev="mobile"] #view.r-home{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
+  html[data-dev="mobile"] #view.r-home>.pagehead,html[data-dev="mobile"] #view.r-home>button{grid-column:1/-1}
+  html[data-dev="mobile"] #view.r-home>.pagehead{display:flex;justify-content:center;align-items:center;gap:12px}
+  html[data-dev="mobile"] #view.r-home>.pagehead .badge{margin:0}
+}

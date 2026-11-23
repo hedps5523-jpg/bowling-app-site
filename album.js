@@ -560,6 +560,33 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     if (window.tbSqueeze) window.tbSqueeze(); // 목록이 잘리지 않게 줄 간격 자동 조절
     if (keep) { const els = [...root.querySelectorAll(scrollSel)]; if (els.length === keep.length) els.forEach((e, i) => { if (keep[i] > 0) e.scrollTop = keep[i]; }); }
   }
+  /* ---------- 홈 화면 '기록앨범' 박스 (albumbox.html 안에서만 사용) ----------
+     홈이 같은 출처 iframe 으로 이 화면을 끼워 넣고 AlbumBox.labels() / show() 를 불러요.
+     meet = 가장 최근 모임, month = 이번 달(장부가 없으면 가장 최근 달) 월별 장부 상세, fee = 오늘 기준 회비 납부 현황 */
+  const boxPick = (kind) => {
+    if (kind === "meet") { const ms = meetings(); const mt = ms[ms.length - 1]; return mt ? { label: `최근 모임 (${mn(mt.date)}/${dn(mt.date)} ${mt.type})`, make: () => pageMeeting(mt) } : null; }
+    if (kind === "month") {
+      const months = [...new Set(ledgerAll().map((l) => mn(l.date)))].sort((a, b) => a - b); if (!months.length) return null;
+      const m = months.includes(mn(today())) ? mn(today()) : months[months.length - 1];
+      return { label: `${m}월 장부 상세`, make: () => pageLedgerMonth(m) };
+    }
+    if (kind === "fee") return { label: "회비 납부 현황", make: () => pageFee() };
+    return null;
+  };
+  window.AlbumBox = {
+    async labels() { await window.__albumData; return ["meet", "month", "fee"].map((k) => { const p = boxPick(k); return [k, p ? p.label : null]; }); },
+    // W: 표시할 폭(px). 1080×1920 한 장을 폭에 맞춰 줄여서 그려요. 반환: {height}
+    async show(kind, W) {
+      await window.__albumData;
+      const p = boxPick(kind); view.textContent = "";
+      if (!p) { view.append(h("p", { class: "abmsg" }, "표시할 기록이 없어요.")); return { height: 80 }; }
+      const pg = p.make(), root = pg.root || pg, box = h("div", { id: "abox" });
+      view.append(box); box.append(root); fit(root);
+      const k = Math.max(0.1, W / 1080); root.style.transform = `scale(${k})`;
+      const hgt = Math.round(1920 * k); box.style.width = W + "px"; box.style.height = hgt + "px";
+      return { height: hgt };
+    },
+  };
   window.ClubAlbum = { render: draw };
   TABS.album = { render: draw };
   TITLES.album = "기록앨범";

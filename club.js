@@ -2087,7 +2087,7 @@ const AutoSync = {
     return true;
   },
   async check(force) {
-    if (this.busy || document.hidden || !Conn.me || !S.dataVersion || Pend.ops.length) return; // UpLoad 대기 중에는 덮어쓰지 않아요
+    if (window.ALBUM_BOX || this.busy || document.hidden || !Conn.me || !S.dataVersion || Pend.ops.length) return; // UpLoad 대기 중에는 덮어쓰지 않아요
     if (!force && Date.now() - this.last < 30000) return;       // 너무 자주 확인하지 않게 30초 간격
     this.busy = true; this.last = Date.now();
     try {
@@ -2108,4 +2108,12 @@ window.addEventListener("focus", () => AutoSync.check(false));
 window.addEventListener("online", () => AutoSync.check(true));
 setInterval(() => AutoSync.check(false), 180000);
 $("logoutBtn").onclick = logout;
-boot();
+/* 홈 화면 '기록앨범' 박스(albumbox.html): 클럽 화면은 그리지 않고 조회 전용 자료만 읽어 와요(album.js 의 AlbumBox 가 한 장을 그림). 저장본(SnapCache)은 건드리지 않아요. */
+async function albumBoxBoot() {
+  const st = await Conn.start();
+  if (st.need) throw new Error(st.reason || st.need);
+  const snap = await Conn.snapshot();
+  Pend.base = snap; rebuildWork();
+  return true;
+}
+if (window.ALBUM_BOX) { window.__albumData = albumBoxBoot(); window.__albumData.catch(() => {}); } else boot();

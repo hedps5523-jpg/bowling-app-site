@@ -209,7 +209,69 @@ async function vHome() {
   const r = h("section", { class: "card" }, h("h2", {}, "최근 공지"));
   if (!d.recent.length) r.append(h("p", { class: "tag" }, "아직 공지가 없어요."));
   for (const n of d.recent) r.append(h("a", { class: "li", href: "#/notice/" + n.id }, n.pinned ? h("span", { class: "pin" }, "고정") : null, n.title));
-  view.append(r, c); // 왼쪽: 최근 공지 / 오른쪽: 다음 모임 (넓은 화면 2열)
+  // 넓은 가로 화면: 왼쪽 = 모임·공지(최근 공지 + 다음 모임) / 오른쪽 = 기록앨범 박스. 세로 화면: 위에서 아래로 쌓고 기록앨범은 드롭메뉴 → 팝업
+  view.append(h("div", { class: "homeleft" }, r, c), albumCard());
+}
+
+/* ---------- 홈: 기록앨범 박스 ----------
+   기록앨범 한 장(최근 모임 · 이번 달 월별 장부 · 회비 납부 현황)을 홈에서 바로 보여 줘요.
+   그림은 albumbox.html(기록 조회와 같은 조회 전용 자료)을 같은 출처 iframe(srcdoc)으로 끼워 넣어 그려요. */
+const WIDE_HOME = "(orientation: landscape) and (min-width: 900px)";
+if (!window.__albumMq) { window.__albumMq = matchMedia(WIDE_HOME); window.__albumMq.addEventListener("change", () => { if (view.classList.contains("r-home")) route(); }); }
+async function albumFrame(parent) {
+  const html = await (await fetch("/albumbox", { cache: "no-store" })).text();
+  const f = h("iframe", { class: "albframe", title: "기록앨범", scrolling: "no" });
+  parent.append(f);
+  const loaded = new Promise((res) => { f.addEventListener("load", res, { once: true }); });
+  f.srcdoc = html.replace("<head>", `<head><base href="${location.origin}/">`);
+  await loaded;
+  const A = f.contentWindow.AlbumBox;
+  if (!A) throw new Error("album");
+  return { f, A };
+}
+function albumCard() {
+  const wide = window.__albumMq.matches && (document.documentElement.dataset.dev === "desktop" || window.innerWidth >= 1000); // 노트북·PC·태블릿 가로(폭 1000 이상)만 2단 박스, 휴대폰은 팝업
+  const sel = h("select", { class: "albsel", "aria-label": "기록앨범 선택", disabled: true }, h("option", { value: "" }, "불러오는 중…"));
+  const head = h("div", { class: "albhead" }, h("h2", {}, "📒 기록앨범"), sel);
+  const card = h("section", { class: "card albumcard" }, head);
+  const wrap = h("div", { class: "albwrap" }); // 가로: 박스 안에 그림이 나타나는 자리
+  const msg = h("p", { class: "tag albmsg" }, "기록앨범을 불러오는 중…");
+  if (wide) card.append(msg, wrap); else card.append(msg);
+  let pop = null, popBody = null, popTitle = null;
+  const run = async () => {
+    try {
+      let host = wrap;
+      if (!wide) { // 세로: 팝업 안에 (처음엔 숨김) 그림 틀을 미리 준비해 두면 선택할 때 바로 떠요
+        popTitle = h("b", {});
+        popBody = h("div", { class: "albpopbody" });
+        pop = h("div", { class: "albpop", hidden: true }, h("div", { class: "albpanel", role: "dialog", "aria-modal": "true" }, h("div", { class: "albpophead" }, popTitle, h("button", { type: "button", class: "albclose", onclick: closePop }, "닫기")), popBody));
+        pop.addEventListener("click", (e) => { if (e.target === pop) closePop(); });
+        document.body.append(pop); host = popBody;
+      }
+      const { f, A } = await albumFrame(host);
+      const labels = await A.labels();
+      msg.remove();
+      sel.textContent = ""; sel.disabled = false;
+      if (!wide) sel.append(h("option", { value: "" }, "기록앨범 선택 ▾"));
+      labels.forEach(([k, l]) => { if (l) sel.append(h("option", { value: k }, l)); });
+      if (sel.options.length <= (wide ? 0 : 1)) { sel.disabled = true; sel.append(h("option", { value: "" }, "표시할 기록 없음")); return; }
+      const draw = async (k) => {
+        const W = Math.max(240, Math.floor((wide ? wrap : popBody).clientWidth));
+        const r = await A.show(k, W); f.style.height = r.height + "px"; f.style.width = W + "px";
+      };
+      if (wide) { await draw(sel.value); sel.onchange = () => draw(sel.value).catch(() => {}); }
+      else sel.onchange = async () => {
+        const k = sel.value; if (!k) return;
+        popTitle.textContent = sel.selectedOptions[0].textContent; pop.hidden = false; document.body.classList.add("albopen"); popBody.scrollTop = 0;
+        try { await draw(k); } catch { popBody.append(h("p", { class: "tag" }, "기록앨범을 그리지 못했어요.")); }
+      };
+    } catch (e) {
+      msg.textContent = "기록앨범을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."; sel.remove();
+    }
+  };
+  function closePop() { if (pop) pop.hidden = true; document.body.classList.remove("albopen"); sel.value = ""; }
+  setTimeout(run, 0);
+  return card;
 }
 
 /* ---------- 공지 · 투표 목록 ---------- */
@@ -677,6 +739,7 @@ async function vLessonEdit(id) {
 /* ---------- 라우터 ---------- */
 let gErr = null;
 async function route() {
+  document.querySelectorAll(".albpop").forEach((e) => e.remove()); document.body.classList.remove("albopen"); // 기록앨범 팝업 정리
   { const k = (location.hash.replace(/^#/, "") || "/").split("/")[1] || "home"; view.className = token ? "r-" + k : "r-guest"; }
   if (!token) return guest(gErr);
   const hash = location.hash.replace(/^#/, "") || "/";
