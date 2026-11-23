@@ -255,10 +255,23 @@ function albumCard() {
       if (!wide) sel.append(h("option", { value: "" }, "기록앨범 선택 ▾"));
       labels.forEach(([k, l]) => { if (l) sel.append(h("option", { value: k }, l)); });
       if (sel.options.length <= (wide ? 0 : 1)) { sel.disabled = true; sel.append(h("option", { value: "" }, "표시할 기록 없음")); return; }
+      // 기기 화면 크기(해상도)를 재서 스크롤 없이 한 화면에 들어오도록 폭·높이에 모두 맞춰 그려요
       const draw = async (k) => {
-        const W = Math.max(240, Math.floor((wide ? wrap : popBody).clientWidth));
-        const r = await A.show(k, W); f.style.height = r.height + "px"; f.style.width = W + "px";
+        const W = Math.max(200, Math.floor((wide ? wrap : popBody).clientWidth));
+        let H;
+        if (wide) { // 가로: 박스 위쪽부터 하단 메뉴 위까지 남은 높이 (필요하면 박스가 화면 맨 위에 오도록 스크롤)
+          const nav = document.querySelector(".bnav"), navH = nav && getComputedStyle(nav).display !== "none" ? nav.offsetHeight : 0;
+          const top = wrap.getBoundingClientRect().top;
+          H = Math.floor(window.innerHeight - top - navH - 14);
+          if (H < 300) { card.scrollIntoView({ block: "start" }); const t2 = wrap.getBoundingClientRect().top; H = Math.floor(window.innerHeight - t2 - navH - 14); }
+        } else H = Math.floor(popBody.clientHeight); // 세로: 팝업 안 가능한 높이 전부
+        H = Math.max(200, H);
+        const r = await A.show(k, W, H); f.style.width = r.width + "px"; f.style.height = r.height + "px";
       };
+      // 창 크기가 바뀌면(회전·분할 화면 등) 지금 보는 한 장을 새 크기에 맞춰 다시 그려요
+      if (window.__albResize) window.removeEventListener("resize", window.__albResize);
+      let rt = 0; window.__albResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (!document.body.contains(card)) return; const k = sel.value; if (!k || (!wide && pop.hidden)) return; draw(k).catch(() => {}); }, 250); };
+      window.addEventListener("resize", window.__albResize);
       if (wide) { await draw(sel.value); sel.onchange = () => draw(sel.value).catch(() => {}); }
       else sel.onchange = async () => {
         const k = sel.value; if (!k) return;

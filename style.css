@@ -334,14 +334,14 @@ html[data-dev="mobile"] #view.r-home{display:block}
 .albumcard .albhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
 .albumcard .albhead h2{margin:0;white-space:nowrap}
 .albsel{flex:1;max-width:62%;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;font-weight:600;background:#fff;color:var(--text)}
-.albwrap{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.albwrap{display:flex;justify-content:center;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
 .albframe{display:block;border:0;max-width:100%}
 .albpop{position:fixed;inset:0;z-index:80;background:rgba(15,25,45,.55);display:flex;align-items:center;justify-content:center;padding:10px}
 .albpop[hidden]{display:none}
-.albpanel{background:#fff;border-radius:14px;width:100%;max-width:640px;max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.albpanel{background:#fff;border-radius:14px;width:100%;max-width:640px;height:100%;display:flex;flex-direction:column;overflow:hidden}
 .albpophead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
 .albclose{border:0;background:#eef2f9;border-radius:10px;padding:7px 14px;font:inherit;font-weight:700;color:var(--text)}
-.albpopbody{overflow:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
+.albpopbody{overflow:hidden;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
 body.albopen{overflow:hidden}
 /* 태블릿(터치 기기, data-dev=mobile)도 가로 폭 1000px 이상이면 홈을 2단(왼쪽 모임·공지 / 오른쪽 기록앨범)으로 */
 @media (orientation: landscape) and (min-width: 1000px) {

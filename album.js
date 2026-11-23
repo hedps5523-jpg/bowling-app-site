@@ -575,16 +575,21 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
   };
   window.AlbumBox = {
     async labels() { await window.__albumData; return ["meet", "month", "fee"].map((k) => { const p = boxPick(k); return [k, p ? p.label : null]; }); },
-    // W: 표시할 폭(px). 1080×1920 한 장을 폭에 맞춰 줄여서 그려요. 반환: {height}
-    async show(kind, W) {
+    // W·H: 쓸 수 있는 폭·높이(px). 1080×1920 한 장을 폭과 높이에 모두 맞춰 스크롤 없이 한 화면에 보이게 줄여서 그려요. 반환: {width, height}
+    async show(kind, W, H) {
       await window.__albumData;
       const p = boxPick(kind); view.textContent = "";
-      if (!p) { view.append(h("p", { class: "abmsg" }, "표시할 기록이 없어요.")); return { height: 80 }; }
+      if (!p) { view.append(h("p", { class: "abmsg" }, "표시할 기록이 없어요.")); return { width: W, height: 80 }; }
       const pg = p.make(), root = pg.root || pg, box = h("div", { id: "abox" });
       view.append(box); box.append(root); fit(root);
-      const k = Math.max(0.1, W / 1080); root.style.transform = `scale(${k})`;
-      const hgt = Math.round(1920 * k); box.style.width = W + "px"; box.style.height = hgt + "px";
-      return { height: hgt };
+      // 내용 아래 빈 공간은 잘라서(꼬리말은 바로 아래에 붙임) 같은 화면에서 더 크게 보이게 해요
+      const hd = root.querySelector(".alp-head"), bd = root.querySelector(".alp-body"), ft = root.querySelector(".alp-foot");
+      const need = Math.min(1920, Math.max(900, hd.offsetHeight + bd.scrollHeight + ft.offsetHeight + 56));
+      root.style.height = need + "px";
+      const k = Math.max(0.1, Math.min(W / 1080, H > 0 ? H / need : 1));
+      root.style.transform = `scale(${k})`;
+      const wd = Math.floor(1080 * k), hgt = Math.floor(need * k); box.style.width = wd + "px"; box.style.height = hgt + "px";
+      return { width: wd, height: hgt };
     },
   };
   window.ClubAlbum = { render: draw };
