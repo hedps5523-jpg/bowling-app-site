@@ -588,40 +588,49 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     return null;
   };
   const BOX_GROUPS = [["기록현황", ["meet", "quarter"]], ["장부현황", ["annual", "summary", "month"]], ["회비현황", ["fee"]], ["락카현황", ["locker"]], ["회원현황", ["member"]]];
-  /* 돋보기(확대) 모드: 한 장을 화면 폭에 맞춘 크기의 1.5배로 키워서 그림과 글자가 함께 커지게 해요(글자 ≈ 14px).
-     화면 폭보다 넓어지므로 좌·우로도 밀어서 볼 수 있고, 위·아래 스크롤은 이 화면 안에서, 제목~첫 표 필드명 줄은 위에 고정(위·아래로 안 움직임). */
-  const BOX_ZOOM = 1.5;
-  function pinShow(box, root, W, H) {
+  /* 돋보기(확대) 모드: 기기 화면 폭(W)을 최대 폭으로 삼아 그 안에 한 장을 가득 채워 보여 주되, 글자는 키워서 보여 줘요.
+     한 장(1080px 설계)의 바깥 여백·칸 안쪽 여백을 줄이고(.alz), 표 글자가 잘리지 않는 범위에서 가장 좁은 설계 폭(최대 1080/1.8)으로 다시 배치한 뒤
+     그 폭을 화면 폭 W 에 맞춰 늘려 그려요 → 좌우로 밀 필요 없이 화면 폭을 꽉 채우고 글자도 커져요. 위·아래 스크롤은 이 화면 안에서, 제목~첫 표 필드명 줄은 위에 고정. */
+  async function pinShow(box, root, W, H) {
     const hd = root.querySelector(".alp-head"), bd = root.querySelector(".alp-body"), ft = root.querySelector(".alp-foot");
-    root.style.height = "4000px";
-    const need = Math.max(900, hd.offsetHeight + bd.scrollHeight + ft.offsetHeight + 56);
-    root.style.height = need + "px";
-    const top0 = root.getBoundingClientRect().top, th = root.querySelector("thead");
-    const k0 = Math.max(0.1, (W / 1080) * BOX_ZOOM);
-    let fixPx = th ? th.getBoundingClientRect().bottom - top0 + 4 : hd.getBoundingClientRect().bottom - top0 + 4;
-    if (fixPx > need * 0.5 || (H > 0 && fixPx * k0 > H * 0.5)) fixPx = hd.getBoundingClientRect().bottom - top0 + 4; // 고정 영역이 화면의 절반을 넘으면(그래프가 있는 월별 요약 등) 제목부만 고정
-    const apin = h("div", { id: "apin" }), ain = h("div", { id: "ain" }), clone = root.cloneNode(true);
-    box.textContent = ""; box.classList.add("pin"); box.append(apin, ain); ain.append(root); apin.append(clone);
-    const apply = (kk) => {
-      const sw = Math.floor(1080 * kk), sh = Math.floor(need * kk), fp = Math.floor(fixPx * kk);
-      root.style.transform = clone.style.transform = `scale(${kk})`;
-      apin.style.width = sw + "px"; apin.style.height = fp + "px"; ain.style.width = sw + "px"; ain.style.height = sh + "px"; ain.style.marginTop = -fp + "px";
-      box.style.width = W + "px"; box.style.height = Math.min(H > 0 ? H : sh, sh + 20) + "px";
+    root.classList.add("alz");
+    const tick = () => new Promise((r) => setTimeout(r, 60));
+    root.style.width = "1080px"; root.style.height = "4000px"; void root.offsetHeight; try { await document.fonts.ready; } catch {} await tick(); // 이 한 장에 쓰는 글꼴이 로드되기를 기다린 뒤 글자 폭을 재요
+    let Wd = 1080, need = 0, fixPx = 0;
+    // 실제로 보여 줄 구조(위 고정 복제본 + 본문)를 만든 상태에서 잘림을 재야 정확해요
+    const build = (w) => {
+      Wd = w; root.style.transform = "none"; root.style.width = Wd + "px"; root.style.height = "4000px";
+      need = Math.max(900, hd.offsetHeight + bd.scrollHeight + ft.offsetHeight + 56); root.style.height = need + "px";
+      const top0 = root.getBoundingClientRect().top, th = root.querySelector("thead"), k0 = Math.max(0.1, W / Wd);
+      fixPx = th ? th.getBoundingClientRect().bottom - top0 + 4 : hd.getBoundingClientRect().bottom - top0 + 4;
+      if (fixPx > need * 0.5 || (H > 0 && fixPx * k0 > H * 0.5)) fixPx = hd.getBoundingClientRect().bottom - top0 + 4; // 고정 영역이 화면의 절반을 넘으면(그래프가 있는 월별 요약 등) 제목부만 고정
+      const apin = h("div", { id: "apin" }), ain = h("div", { id: "ain" }), clone = root.cloneNode(true);
+      box.textContent = ""; box.classList.add("pin"); box.append(apin, ain); ain.append(root); apin.append(clone);
+      const apply = (kk) => {
+        const sw = Math.floor(Wd * kk), sh = Math.floor(need * kk), fp = Math.floor(fixPx * kk);
+        root.style.transform = clone.style.transform = `scale(${kk})`;
+        apin.style.width = sw + "px"; apin.style.height = fp + "px"; ain.style.width = sw + "px"; ain.style.height = sh + "px"; ain.style.marginTop = -fp + "px";
+        box.style.width = W + "px"; box.style.height = Math.min(H > 0 ? H : sh, sh) + "px";
+      };
+      apply(k0);
+      const sb = box.offsetWidth - box.clientWidth; // 세로 스크롤바가 생기면 그 폭만큼만 줄여 다시(폭을 넘지 않게)
+      if (sb > 0) apply(Math.max(0.1, (W - sb) / Wd));
     };
-    apply(k0);
-    return { width: W, height: parseInt(box.style.height, 10), zoom: BOX_ZOOM };
+    const clipped = () => root.scrollWidth > root.clientWidth + 1 || [...root.querySelectorAll("td,th")].some((c) => c.scrollWidth > c.clientWidth + 2);
+    for (let z = 1.8; z >= 1.0; z = Math.round((z - 0.1) * 10) / 10) { build(Math.round(1080 / z)); await tick(); if (!clipped()) break; }
+    return { width: W, height: parseInt(box.style.height, 10), zoom: Math.round((1080 / Wd) * 100) / 100 };
   }
   window.AlbumBox = {
     // [[분류, [[kind, 라벨], …]], …] — 표시할 수 있는 항목만
     async groups() { await window.__albumData; return BOX_GROUPS.map(([g, ks]) => [g, ks.map((k) => { const p = boxPick(k); return p ? [k, p.label] : null; }).filter(Boolean)]).filter(([, l]) => l.length); },
     // W·H: 쓸 수 있는 폭·높이(px). 1080×1920 한 장을 폭과 높이에 모두 맞춰 스크롤 없이 한 화면에 보이게 줄여서 그려요. 반환: {width, height}
     async show(kind, W, H, pin) {
-      await window.__albumData;
+      await window.__albumData; try { await document.fonts.ready; } catch {} // 글꼴이 다 로드된 뒤 글자 폭을 재야 잘림 판정이 맞아요
       const p = boxPick(kind); view.textContent = "";
       if (!p) { view.append(h("p", { class: "abmsg" }, "표시할 기록이 없어요.")); return { width: W, height: 80 }; }
       const pg = p.make(), root = pg.root || pg, box = h("div", { id: "abox" });
       view.append(box); box.append(root);
-      if (pin) return pinShow(box, root, W, H);
+      if (pin) return await pinShow(box, root, W, H);
       fit(root);
       // 내용 아래 빈 공간은 잘라서(꼬리말은 바로 아래에 붙임) 같은 화면에서 더 크게 보이게 해요
       const hd = root.querySelector(".alp-head"), bd = root.querySelector(".alp-body"), ft = root.querySelector(".alp-foot");
