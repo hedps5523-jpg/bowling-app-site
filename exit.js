@@ -1,15 +1,11 @@
 /* ---------- 화면별 표시 방식 ----------
-   기록 조회·클럽관리·관리·내 앱: 터치 기기(태블릿·폰)에서 첫 터치 때 전체화면으로 표시하고, ☰ 메뉴의 종료 항목은 두지 않아요.
+   기록 조회·클럽관리·관리·내 앱: ☰ 메뉴의 종료 항목은 두지 않아요. (첫 터치 자동 전체화면은 2026-11-23 제거)
    홈·회원·공지·투표(홈 화면 안): 기기 하단 메뉴가 보이는 일반 앱 화면에 종료 항목을 둬요. */
 const FULL_PATHS = ["/club", "/records", "/admin", "/myapps", "/apps"];
 const IS_FULL_PAGE = FULL_PATHS.includes(location.pathname.replace(/\/+$/, "").replace(/\.html$/, ""));
-if (IS_FULL_PAGE && window.matchMedia && matchMedia("(pointer: coarse)").matches) {
-  const goFull = () => {
-    if (document.fullscreenElement || !document.documentElement.requestFullscreen) return;
-    try { const r = document.documentElement.requestFullscreen({ navigationUI: "hide" }); if (r && r.catch) r.catch(() => {}); } catch {}
-  };
-  document.addEventListener("click", goFull, { once: true, capture: true });
-}
+/* 2026-11-23: 첫 터치 때 자동으로 전체화면(requestFullscreen)으로 바꾸던 동작을 없앴어요.
+   전체화면에 들어갈 때 하단에 뜨는 안내 문구는 브라우저(Chrome·Android)가 직접 보여 주는 것이라 표시 시간을 사이트에서 바꿀 수 없어요.
+   (PC ☰ 메뉴의 '전체화면' 항목은 사용자가 직접 선택할 때만 동작하므로 그대로 둬요.) */
 /* ---------- 종료 (☰ 메뉴): 작업을 마무리하고 창 닫기 ---------- */
 function exitApp() {
   let pend = 0; try { if (typeof Pend !== "undefined") pend = Pend.ops.length; } catch {}
