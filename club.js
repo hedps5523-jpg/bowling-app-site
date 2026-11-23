@@ -27,6 +27,34 @@ function h(tag, props = {}, ...kids) {
 const view = $("view");
 let toastT;
 function toast(t, ms = 2600) { const e = $("toastc"); e.textContent = t; e.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => e.hidden = true, ms); }
+/* 날짜 입력칸: 브라우저 기본 표시(2026. 11. 22.) 대신 yy-mm-dd 로 보여 주고, 누르면 기본 날짜 선택기를 연다.
+   입력칸의 value 는 그대로 yyyy-mm-dd 로 읽고 쓰므로 저장·검증 코드는 바뀌지 않는다. */
+(() => {
+  const nativeSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+  let pk = null;
+  const picker = () => { if (!pk) { pk = document.createElement("input"); pk.type = "date"; pk.dataset.dfmt = "1"; pk.tabIndex = -1; pk.setAttribute("aria-hidden", "true"); pk.style.cssText = "position:fixed;opacity:0;width:1px;height:1px;border:0;padding:0;pointer-events:none;z-index:-1"; document.body.append(pk); } return pk; };
+  const enhance = (inp) => {
+    if (inp.dataset.dfmt || inp.closest(".phdate")) return;
+    inp.dataset.dfmt = "1";
+    let iso = inp.value || "";
+    inp.type = "text"; inp.readOnly = true; inp.setAttribute("inputmode", "none"); inp.placeholder = "yy-mm-dd"; inp.classList.add("dfmt");
+    const show = () => nativeSet.call(inp, iso ? iso.slice(2) : "");
+    Object.defineProperty(inp, "value", { configurable: true, get: () => iso, set: (v) => { const n = typeof v === "string" ? v : ""; iso = /^\d{4}-\d{2}-\d{2}$/.test(n) ? n : ""; show(); } });
+    show();
+    const open = () => {
+      if (inp.disabled) return;
+      const p = picker(), r = inp.getBoundingClientRect();
+      p.style.left = r.left + "px"; p.style.top = r.bottom + "px"; p.value = iso;
+      p.onchange = () => { if (p.value) { iso = p.value; show(); inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); } };
+      try { p.showPicker(); } catch { p.focus(); p.click(); }
+    };
+    inp.addEventListener("click", open);
+    inp.addEventListener("keydown", (e) => { if (e.key === " ") { e.preventDefault(); open(); } else if ((e.key === "Delete" || e.key === "Backspace") && !inp.disabled) { e.preventDefault(); if (iso) { iso = ""; show(); inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); } } });
+  };
+  const scan = (root) => { if (root.querySelectorAll) root.querySelectorAll('input[type="date"]').forEach(enhance); };
+  new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach((n) => { if (n.nodeType !== 1) return; if (n.matches && n.matches('input[type="date"]')) enhance(n); else scan(n); }); }).observe(document.documentElement, { childList: true, subtree: true });
+  scan(document);
+})();
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
 const pad2 = (n) => String(n).padStart(2, "0");
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
@@ -35,6 +63,8 @@ const normDate = (v) => { const s = String(v ?? "").trim(); if (isDate(s)) retur
 const yearOf = (s) => +s.slice(0, 4), monthOf = (s) => +s.slice(5, 7);
 const addDays = (s, n) => { const d = new Date(s + "T00:00:00"); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
 const mmdd = (s) => s ? `${s.slice(5, 7)}/${s.slice(8, 10)}` : "";
+/* 날짜 표시 형식: yy-mm-dd (가입일·일자·납부일 등 조회·입력 화면 공통) */
+const fdate = (s) => { if (!s) return ""; const n = normDate(s); return n ? n.slice(2) : String(s); };
 const int = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : 0; };
 
 /* =====================================================================
@@ -230,7 +260,7 @@ const Svc = {
   findMember: (id) => S.members.find((m) => m.memberId === id) || null,
   isWithdrawn(m, ref = todayStr()) { if (!m || !m.withdrawalDate) return false; if (ref < m.withdrawalDate) return false; return !m.rejoinDate || ref < m.rejoinDate; },
   isShownInYear(m, y) { if (!m || m.deletedAt) return false; if (!m.withdrawalDate || yearOf(m.withdrawalDate) >= y) return true; return !!m.rejoinDate && yearOf(m.rejoinDate) <= y; },
-  statusText(m) { if (m.deletedAt) return "삭제"; if (this.isWithdrawn(m)) return `탈퇴(${mmdd(m.withdrawalDate)})`; return "정상"; },
+  statusText(m) { if (m.deletedAt) return "삭제"; if (this.isWithdrawn(m)) return `탈퇴(${fdate(m.withdrawalDate)})`; return "정상"; },
   activeInputMembers() { const r = todayStr(); return this.getMembers().filter((m) => !this.isWithdrawn(m, r)); },
   suggestNextMemberJoinDate() {
     const list = S.members.filter((m) => m.joinDate && yearOf(m.joinDate) === S.year).sort((a, b) => b.memberId - a.memberId);
@@ -601,7 +631,7 @@ TABS.members = {
       .sort((a, b) => (Svc.isWithdrawn(a) - Svc.isWithdrawn(b)) || a.memberId - b.memberId);
     view.append(pcTable([
       { t: "순번", get: (m, i) => i + 1, w: "8%" }, { t: "회원명", get: (m) => m.name }, { t: "연락처", get: (m) => m.phone }, { t: "등급", get: (m) => m.grade },
-      { t: "가입일", get: (m) => m.joinDate || "" }, { t: "기준에버", get: (m) => { const d = Svc.decisionAverage(m); return d == null ? Svc.effectiveBaseAverage(m) : d; } }, { t: "상태", get: (m) => Svc.statusText(m) },
+      { t: "가입일", get: (m) => fdate(m.joinDate) }, { t: "기준에버", get: (m) => { const d = Svc.decisionAverage(m); return d == null ? Svc.effectiveBaseAverage(m) : d; } }, { t: "상태", get: (m) => Svc.statusText(m) },
     ], rows, { onSelect: (m, i, dbl) => { selected = m; if (dbl) editMember(m); }, rowClass: (m) => Svc.isWithdrawn(m) ? "out" : "" }));
   },
 };
@@ -999,7 +1029,7 @@ const LC = {
 };
 const money = (n) => Number(n || 0).toLocaleString("ko-KR");
 const won = (n) => money(n) + "원";
-const yymmdd = (s) => s ? s.slice(2, 4) + "/" + s.slice(5, 7) + "/" + s.slice(8, 10) : "";
+const yymmdd = (s) => fdate(s);
 const cleanTitle = (t) => { let x = (t || "").trim(); if (!x) return "볼링클럽관리프로그램 v4"; const k = x.indexOf("[저장:"); if (k >= 0) x = x.slice(0, k).trim(); return x || "볼링클럽관리프로그램 v4"; };
 Object.assign(Svc, {
   ledgerSorted(rows) { return [...rows].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || a.ledgerId - b.ledgerId); },
@@ -1075,7 +1105,7 @@ TABS.ledger = {
     else { const rl = LV.from === LV.to ? `${LV.from}월` : `${LV.from}-${LV.to}월`; summary.textContent = `${rl} 수입: ${money(Svc.income(rows))}원   ${rl} 지출: ${money(Svc.expense(rows))}원   ${rl} 잔액: ${money(Svc.balance(rows))}원   총 잔액: ${money(Svc.balance(all))}원`; }
 
     const table = pcTable([
-      { t: "번호", get: (r, i) => i + 1, w: "56px" }, { t: "일자", get: (r) => r.date }, { t: "구분", get: (r) => r.type },
+      { t: "번호", get: (r, i) => i + 1, w: "56px" }, { t: "일자", get: (r) => fdate(r.date) }, { t: "구분", get: (r) => r.type },
       { t: "내역", get: (r) => r.category }, { t: "금액", cls: "r", get: (r) => money(r.amount) }, { t: "비고", cls: "l", get: (r) => r.note },
     ], rows, { onSelect: (r, i, dbl) => { LV.sel = r; if (LV.hi != null && LV.hi !== r.ledgerId) LV.hi = null; if (dbl) editLedger(r); }, rowClass: (r) => (LV.hi === r.ledgerId ? "hi" : "") + (r.fromFee ? " fee" : "") });
     if (LV.sel) { const k = rows.findIndex((r) => r.ledgerId === LV.sel.ledgerId); if (k >= 0) table.querySelectorAll("tbody tr")[k].classList.add("sel"); }
@@ -1233,7 +1263,7 @@ Object.assign(Svc, {
         const fp = this.findFee(S.year, m.memberId, mo), active = this.activeForFee(m, S.year, mo), ex = active && this.execExempt(m, mo);
         const isDue = mo <= due, curMonth = S.year === ny && mo === nm;
         if (active && !ex) { req++; if (!fp) allPaid = false; }
-        if (fp) { count++; total += fp.amount; disp.push(`${monthOf(fp.paidDate)}/${+fp.paidDate.slice(8, 10)}`); }
+        if (fp) { count++; total += fp.amount; disp.push(fdate(fp.paidDate)); }
         else if (!active) disp.push("");
         else if (ex) disp.push("면제");
         else if (mo <= dispMonth && isDue) { if (curMonth) { disp.push("예정"); curUnpaid = true; } else { disp.push("미납"); hasUnpaid = true; } }
@@ -1291,7 +1321,7 @@ function feeOps(memberId, year, desired) {
   return ops;
 }
 const feeCopy = (id, y) => S.fees.filter((f) => f.memberId === id && f.year === y).map((f) => ({ ...f }));
-const shortMD = (d) => d ? `${monthOf(d)}/${+d.slice(8, 10)}` : "";
+const shortMD = (d) => fdate(d); // 월별 납부일 칸에도 yy-mm-dd (입력은 smartDate 가 yy-mm-dd 도 해석)
 const FV = { memberId: null, prepay: false, start: 1, end: 1, date: null, month: null };
 
 TABS.fees = {
@@ -1541,7 +1571,7 @@ TABS.lockers = {
 };
 async function editLocker(r) {
   const mk = (v, cls = "pcin") => h("input", { class: cls, value: v ?? "" });
-  const main = mk(r.main), dep = mk(r.deposit ? String(r.deposit) : ""), fee = mk(r.yearFee ? String(r.yearFee) : ""), con = mk(r.contract || ""), exp = mk(r.expire || "");
+  const main = mk(r.main), dep = mk(r.deposit ? String(r.deposit) : ""), fee = mk(r.yearFee ? String(r.yearFee) : ""), con = mk(fdate(r.contract)), exp = mk(fdate(r.expire));
   const g = h("div", { class: "pcgrid" }, h("label", {}, "메인락커"), main, h("label", {}, "보증금"), dep, h("label", {}, "1년사용료"), fee, h("label", {}, "계약일"), con, h("label", {}, "만료일"), exp);
   const res = await modal(`락카 정보 수정 · ${r.name}`, g, canWrite() ? [["확인", "ok"], ["취소", "cancel"]] : [["닫기", "cancel"]]);
   if (res !== "ok") return;

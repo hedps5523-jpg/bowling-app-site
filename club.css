@@ -1144,3 +1144,6 @@ body.phmode .topbar .phtbar .phmenu{padding:0 8px}
 
 /* ===== 가로 화면 기록조회: 순위표·분기에버 상세 박스의 제목 행(○○○ · 상세내역) 고정 (2026-11-23) ===== */
 .tbdetail:not(.tbrecent)>.tbdh{position:sticky;top:-8px;z-index:3;background:#fff;margin:-8px -8px 6px;padding:8px 10px 6px;border-bottom:1px solid #DBE5F3;border-radius:7px 7px 0 0}
+
+/* ===== 날짜 표시 yy-mm-dd (2026-11-23) : 날짜 입력칸은 글자로 표시하고 눌러서 날짜 선택 ===== */
+input.dfmt{cursor:pointer;caret-color:transparent}

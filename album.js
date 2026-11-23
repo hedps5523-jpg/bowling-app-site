@@ -42,7 +42,7 @@
   const gradeRank = (m) => { const i = GRADE_ORDER.indexOf((m.grade || "").replace(/ /g, "")); return i >= 0 ? i : isExec(m) ? GRADE_ORDER.length : GRADE_ORDER.length + 1; };
   const genderRank = (g) => (g === "MALE" ? 0 : g === "FEMALE" ? 1 : 2);
   const sortedMembers = () => activeMembers().sort((a, b) => gradeRank(a) - gradeRank(b) || (isExec(a) ? 0 : genderRank(a.gender)) - (isExec(b) ? 0 : genderRank(b.gender)) || ko.compare(a.name, b.name));
-  const ymdShort = (d) => (d ? d.slice(2).replace(/-/g, ".") : "-");
+  const ymdShort = (d) => (d ? d.slice(2) : "-"); // yy-mm-dd
   const md = (d) => { const m = String(d || "").match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/); return m ? `${pad2(m[2])}-${pad2(m[3])}` : d || ""; };
 
   function qBase(m, date = today()) {

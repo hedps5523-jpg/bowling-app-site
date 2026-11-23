@@ -658,7 +658,7 @@
     const carry = from ? all.filter((e) => e.date < from).reduce((a, e) => a + signed(e), 0)
       : windowStart ? all.filter((e) => e.date < windowStart).reduce((a, e) => a + signed(e), 0)
       : (!firstOfMonth || LS.showAll) ? 0 : all.filter((e) => e.date < firstOfMonth).reduce((a, e) => a + signed(e), 0);
-    const tbl = table({ headers: ["번호", "일자", "구분", "내역", "금액", "비고"], rows: list.map((e, i) => [String(i + 1), PHONE() ? e.date.slice(2) : e.date, e.type, e.category, won(e.amount), e.note]),
+    const tbl = table({ headers: ["번호", "일자", "구분", "내역", "금액", "비고"], rows: list.map((e, i) => [String(i + 1), fdate(e.date), e.type, e.category, won(e.amount), e.note]),
       weights: [40, 100, 50, 85, 95, 430], aligns: [0, 0, 0, 0, 2, 1], selectedRow: list.findIndex((e) => LS.editing > 0 && e.ledgerId === LS.editing),
       cellColor: (r, c) => (c === 2 ? (list[r].type === "수입" ? "#0F9D45" : "#D93025") : 0),
       onClick: (i) => loadL(list[i]), onLong: (i) => delL(list[i]) }) || empty("해당 장부 내역이 없습니다.");
@@ -781,7 +781,7 @@
       onClick: (i) => { FS.member = sorted[i].m.memberId; renderFees(); }, onLong: (i) => cancelMonth(sorted[i].m, month) }) || empty("회원 자료가 없습니다.");
     const legend = h("div", { class: "tblegend" }, ...[["#0F9D45", "납부"], ["#E3A92B", "예정(현재월)"], ["#D93025", "미납(이전 달)"], ["#A79FC9", "운영진 면제"]].flatMap(([c, l]) => [h("i", { style: `color:${c}` }, "●"), h("span", {}, l)]), h("span", {}, "— 대상 아님"));
     const selM = members.find((m) => m.memberId === FS.member), sp = pays.filter((p) => p.memberId === FS.member).sort((a, b) => a.month - b.month);
-    const detail = [["회원명", selM ? selM.name : "-"], ["등급", (selM && selM.grade) || "-"], ...sp.map((p) => [`${p.month}월 납부일`, p.paidDate || "-"])];
+    const detail = [["회원명", selM ? selM.name : "-"], ["등급", (selM && selM.grade) || "-"], ...sp.map((p) => [`${p.month}월 납부일`, fdate(p.paidDate) || "-"])];
     if (!sp.length) detail.push(["납부일", "-"]); detail.push(["합계금액", won(sp.reduce((a, p) => a + p.amount, 0))]);
     FS_MODIFY = openModify;
     if (FS.noDraw) return;
@@ -824,7 +824,7 @@
       const groups = [...gmap.values()];
       let target = groups[0];
       if (groups.length > 1) {
-        const pick = await pickList(`${m.name} 회비 수정`, groups.map((g) => `${mmdd(g[0].paidDate)}  |  ${g.map((p) => p.month + "월").join(", ")}${g[0].note ? " / " + g[0].note : ""}`));
+        const pick = await pickList(`${m.name} 회비 수정`, groups.map((g) => `${fdate(g[0].paidDate)}  |  ${g.map((p) => p.month + "월").join(", ")}${g[0].note ? " / " + g[0].note : ""}`));
         if (pick == null) return; target = groups[pick];
       }
       const selSet = new Set(target.map((p) => p.month)), reserved = new Set(mine.map((p) => p.month).filter((x) => !selSet.has(x)));
@@ -864,15 +864,15 @@
     if (!list.some((m) => m.memberId === MS.sel)) MS.sel = list.length ? list[0].memberId : 0;
     const act = list.filter((m) => isActive(m)).length;
     const actions = inputMode() ? [btn("회원 등록", () => memberForm(null), "pri"), btn("회원수정", () => { const m = all.find((x) => x.memberId === MS.sel); m ? editMember(m) : toast("수정할 회원을 먼저 선택하세요."); }), btn("삭제", delMember)] : [];
-    const rows = list.map((m, i) => { const lk = lockerOf(m.memberId), b = qBase(m); return [String(i + 1), m.name, m.grade || "-", genderTxt(m.gender), m.phone || "-", m.joinDate || "-", b > 0 ? String(b) : "-", lk ? lk.locker_number : "-", isActive(m) ? "활동" : "탈퇴"]; });
+    const rows = list.map((m, i) => { const lk = lockerOf(m.memberId), b = qBase(m); return [String(i + 1), m.name, m.grade || "-", genderTxt(m.gender), m.phone || "-", fdate(m.joinDate) || "-", b > 0 ? String(b) : "-", lk ? lk.locker_number : "-", isActive(m) ? "활동" : "탈퇴"]; });
     const tbl = table({ headers: ["번호", "회원명", "등급", "성별", "연락처", "가입일", "에버", "락카", "상태"], rows, weights: [50, 150, 90, 50, 150, 110, 60, 60, 60],
       selectedRow: list.findIndex((m) => m.memberId === MS.sel), cellColor: (r, c) => (c === 8 && rows[r][8] === "탈퇴" ? "#D93025" : 0),
       onClick: (i) => { MS.sel = list[i].memberId; renderMembers(); }, onLong: (i) => { if (inputMode()) editMember(list[i]); } }) || empty("회원 자료가 없습니다.");
     const m = list.find((x) => x.memberId === MS.sel);
     const lk = m && lockerOf(m.memberId), b = m ? qBase(m) : 0;
-    const detail = m ? [["회원명", m.name], ["등급", m.grade || "-"], ["성별", genderTxt(m.gender)], ["연락처", m.phone || "-"], ["가입일", m.joinDate || "-"], ["기준 에버", b > 0 ? String(b) : "-"], ["락카", lk ? lk.locker_number : "-"],
+    const detail = m ? [["회원명", m.name], ["등급", m.grade || "-"], ["성별", genderTxt(m.gender)], ["연락처", m.phone || "-"], ["가입일", fdate(m.joinDate) || "-"], ["기준 에버", b > 0 ? String(b) : "-"], ["락카", lk ? lk.locker_number : "-"],
       ["회비 면제", m.feeExempt ? "예" : "아니오"], ["회비 시작", `${m.feeStartYear || "-"}년 ${m.feeStartMonth}월`], ["운영진 3개월 면제", m.executiveThreeMonthExempt ? "예" : "아니오"],
-      ["탈퇴일", m.withdrawalDate || "-"], ["재가입일", m.rejoinDate || "-"], ["상태", isActive(m) ? "활동" : "탈퇴"]] : [["회원명", "-"]];
+      ["탈퇴일", fdate(m.withdrawalDate) || "-"], ["재가입일", fdate(m.rejoinDate) || "-"], ["상태", isActive(m) ? "활동" : "탈퇴"]] : [["회원명", "-"]];
     root(card(lab("회원명 검색"), sel([["", "전체"], ...names.map((n) => [n, n])], MS.q, (v) => { MS.q = v; renderMembers(); }), h("span", { class: "tbsum" }, `전체 ${list.length}명 · 활동 ${act}명`), spacer(), ...actions),
       h("div", { class: "tbbody", style: "margin-top:10px" }, h("div", { style: "flex:2;min-width:0;display:flex" }, tbl), h("div", { class: "tbright", style: "flex:1" }, infoBox("회원 상세기록", detail))));
 
@@ -896,13 +896,13 @@
   const KS = { sel: 0 };
   function renderLockers() {
     const st = S.settings, dDep = int(st.key_locker_deposit), dFee = int(st.key_locker_yearly_fee), dCon = st.key_locker_contract_date || "", dExp = st.key_locker_expiry_date || "";
-    const md = (v) => { const s = String(v || ""); const m = s.match(/(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[2]}-${m[3]}` : s || "-"; };
+    const md = (v) => { const s = String(v || ""); const m = s.match(/(\d{4})-(\d{2})-(\d{2})/); return m ? fdate(m[0]) : s || "-"; };
     const no = (m) => { const l = lockerOf(m.memberId); return l ? String(l.locker_number) : "-"; };
     const ms = activeMembers().sort((a, b) => { const x = no(a) === "-" ? "9999" : no(a), y = no(b) === "-" ? "9999" : no(b); return (x < y ? -1 : x > y ? 1 : 0) || ko.compare(a.name, b.name); });
     if (!ms.some((m) => m.memberId === KS.sel)) KS.sel = (ms.find((m) => no(m) !== "-") || ms[0] || {}).memberId || 0;
     const used = ms.filter((m) => no(m) !== "-");
     const depSum = used.reduce((a, m) => a + (int((lockerOf(m.memberId) || {}).deposit) || dDep), 0);
-    const rows = ms.map((m, i) => { const l = lockerOf(m.memberId) || {}; return [String(i + 1), m.name, String(qBase(m)), m.phone || "-", no(m), won(int(l.deposit) || dDep), won(int(l.yearly_fee) || dFee), md(l.contract_date || dCon), md(l.expiry_date || dExp), m.joinDate || "-"]; });
+    const rows = ms.map((m, i) => { const l = lockerOf(m.memberId) || {}; return [String(i + 1), m.name, String(qBase(m)), m.phone || "-", no(m), won(int(l.deposit) || dDep), won(int(l.yearly_fee) || dFee), md(l.contract_date || dCon), md(l.expiry_date || dExp), fdate(m.joinDate) || "-"]; });
     const tbl = table({ headers: ["순번", "회원명", "에버", "연락처", "메인락커", "보증금", "1년사용료", "계약일", "만료일", "가입일"], rows, weights: [70, 130, 80, 200, 100, 100, 120, 150, 150, 150],
       selectedRow: ms.findIndex((m) => m.memberId === KS.sel), onClick: (i) => { KS.sel = ms[i].memberId; renderLockers(); }, onLong: (i) => { if (inputMode()) { KS.sel = ms[i].memberId; editL(); } } }) || empty("회원 자료가 없습니다.");
     root(h("div", { class: "tbhead" }, h("b", {}, "락카 사용 현황"), h("span", {}, `사용 ${used.length} / 전체 ${ms.length} · 보증금 합계 ${won(depSum)}`), spacer(), inputMode() ? btn("수정", editL) : null),
@@ -1098,7 +1098,7 @@
     const tiles = Array.from({ length: 12 }, (_, i) => {
       const mo = i + 1, fp = byMo.get(mo), active = m && isFeeTarget(m, year, mo, prior), exempt = active && m.executiveThreeMonthExempt && mo >= 10;
       let cls = "na", txt = "—";
-      if (fp) { cls = "ok"; txt = "✓ " + mmdd(fp.paidDate); paid++; }
+      if (fp) { cls = "ok"; txt = "✓ " + fdate(fp.paidDate); paid++; }
       else if (!active) { cls = "na"; txt = "—"; }
       else if (exempt) { cls = "ex"; txt = "면제"; }
       else if (mo < tm) { cls = "no"; txt = "미납"; miss++; }
@@ -1136,10 +1136,10 @@
   /* ---- 락카관리: 락카 현황 카드 목록 + 수정 창 ---- */
   function phLockers() {
     const st = S.settings, dDep = int(st.key_locker_deposit), dFee = int(st.key_locker_yearly_fee), dCon = st.key_locker_contract_date || "", dExp = st.key_locker_expiry_date || "";
-    const md = (v) => { const s = String(v || ""); const x = s.match(/(\d{4})-(\d{2})-(\d{2})/); return x ? `${x[2]}-${x[3]}` : s; };
+    const md = (v) => { const s = String(v || ""); const x = s.match(/(\d{4})-(\d{2})-(\d{2})/); return x ? fdate(x[0]) : s; };
     const no = (m) => { const l = lockerOf(m.memberId); return l ? String(l.locker_number) : "-"; };
     const ms = activeMembers().sort((a, b) => { const x = no(a) === "-" ? "9999" : no(a), y = no(b) === "-" ? "9999" : no(b); return (x < y ? -1 : x > y ? 1 : 0) || ko.compare(a.name, b.name); });
-    const rows = ms.map((m) => h("div", { class: "phlrow" + (m.memberId === KS.sel ? " sel" : ""), onclick: () => { KS.sel = m.memberId; edit(m); } }, h("span", {}, m.name), h("span", {}, no(m)), h("span", {}, m.joinDate ? m.joinDate.slice(2) : "-")));
+    const rows = ms.map((m) => h("div", { class: "phlrow" + (m.memberId === KS.sel ? " sel" : ""), onclick: () => { KS.sel = m.memberId; edit(m); } }, h("span", {}, m.name), h("span", {}, no(m)), h("span", {}, fdate(m.joinDate) || "-")));
     phRootF(2, h("section", { class: "phcard" }, h("b", { class: "phct big" }, "락카 현황")), h("div", { class: "phlhead" }, h("span", {}, "회원명"), h("span", {}, "번호"), h("span", {}, "가입일")), h("div", { class: "phllist" }, rows));
     async function edit(m) {
       if (!canIn()) return;
@@ -1288,7 +1288,7 @@
     const total = all.filter((e) => !end || e.date <= end).reduce((a, e) => a + signed(e), 0);
     const selE = list.find((e) => e.ledgerId === QS.lsel);
     const items = list.map((e) => h("div", { class: "phle" + (e.ledgerId === QS.lsel ? " sel" : ""), onclick: () => { QS.lsel = e.ledgerId; phqLedger(); } },
-      h("div", { class: "l1" }, h("b", {}, QS.all ? e.date.slice(2) : e.date.slice(5)), h("span", { class: "tag " + (e.type === "수입" ? "in" : "out") }, e.type), h("b", { class: "amt" }, won(e.amount) + "원")),
+      h("div", { class: "l1" }, h("b", {}, fdate(e.date)), h("span", { class: "tag " + (e.type === "수입" ? "in" : "out") }, e.type), h("b", { class: "amt" }, won(e.amount) + "원")),
       h("div", { class: "l2" }, `${e.category}${e.note ? " – " + e.note : ""}`)));
     const tile = (ic, cls, lb, v, big) => h("div", { class: "phti" + (big ? " big" : "") }, h("i", { class: cls }, ic), h("div", {}, h("small", {}, lb), h("b", { class: cls }, v)));
     phRootF(2, h("div", { class: "phlbar" }, fsel(mk.map((k) => [k, ynum(k + "-01") === ynum(today()) ? `${+k.slice(5)}월` : k]), LS.month, (v) => { LS.month = v; QS.all = false; phqLedger(); }),
@@ -1319,7 +1319,7 @@
       const cp = r.by.get(tm), lastPaid = r.pays.reduce((a, p) => (p.paidDate > a ? p.paidDate : a), "");
       det = h("section", { class: "phdet" }, h("div", { class: "top" }, h("b", { class: "big" }, r.m.name), h("span", { class: "dot " + ST[r.status] }, "● " + r.status)),
         h("b", { class: "sec" }, "회원 정보"), kv([["회원명", r.m.name], ["회원구분", r.m.grade || "-"], ["연락처", r.m.phone || "-"], ["가입일", yy(r.m.joinDate)]]),
-        h("b", { class: "sec" }, "납부 정보"), kv([[`${tm}월 회비`, won(cp ? cp.amount : S.monthlyFee) + "원"], ["납부상태", r.status], ["납부일", cp ? yy(cp.paidDate) : "-"], ["누적 미납", won(r.unpaid * S.monthlyFee) + "원"], ["완납 납부일", r.status === "완납" && lastPaid ? lastPaid.slice(2).replace(/-/g, "/") : "-"], ["누적 납부", won(r.total) + "원"]]),
+        h("b", { class: "sec" }, "납부 정보"), kv([[`${tm}월 회비`, won(cp ? cp.amount : S.monthlyFee) + "원"], ["납부상태", r.status], ["납부일", cp ? yy(cp.paidDate) : "-"], ["누적 미납", won(r.unpaid * S.monthlyFee) + "원"], ["완납 납부일", r.status === "완납" && lastPaid ? fdate(lastPaid) : "-"], ["누적 납부", won(r.total) + "원"]]),
         h("b", { class: "sec" }, "메모"), h("div", { class: "memo" }, (cp && cp.note) || (r.pays.length ? r.pays[r.pays.length - 1].note : "") || "-"));
     }
     phRootF(1, h("div", { class: "phqt center" }, h("b", {}, "회비 현황")), h("div", { class: "phflist" }, items.length ? items : h("div", { class: "phempty" }, "회원 자료가 없습니다.")), det);
@@ -1334,7 +1334,7 @@
     const tiles = ms.map((x) => h("div", { class: "phlk" + (x.m.memberId === QS.ksel ? " sel" : ""), onclick: () => { QS.ksel = x.m.memberId; PH_KEEP = true; phqLockers(); } }, h("b", {}, String(x.l.locker_number)), h("span", { class: "use" }, "● 사용중"), h("span", {}, x.m.name)));
     const det = s0 ? h("section", { class: "phdet white" }, h("div", { class: "top" }, h("b", { class: "big" }, String(s0.l.locker_number)), h("span", { class: "dot ok" }, "● 사용중")), h("div", { class: "who" }, s0.m.name),
       h("b", { class: "sec" }, "회원 정보"), kv([["회원명", s0.m.name], ["회원구분", s0.m.grade || "-"], ["연락처", s0.m.phone || "-"], ["성별", s0.m.gender === "MALE" ? "남자" : s0.m.gender === "FEMALE" ? "여자" : "-"], ["가입일", yy(s0.m.joinDate)], ["", ""]]),
-      h("b", { class: "sec" }, "락카 정보"), kv([["락카번호", String(s0.l.locker_number)], ["상태", "사용중"], ["보증금", won(int(s0.l.deposit) || dDep) + "원"], ["1년사용료", won(int(s0.l.yearly_fee) || dFee) + "원"], ["계약일", s0.l.contract_date || st.key_locker_contract_date || "-"], ["만료일", s0.l.expiry_date || st.key_locker_expiry_date || "-"], ["비고", s0.l.note || "-"], ["", ""]])) : null;
+      h("b", { class: "sec" }, "락카 정보"), kv([["락카번호", String(s0.l.locker_number)], ["상태", "사용중"], ["보증금", won(int(s0.l.deposit) || dDep) + "원"], ["1년사용료", won(int(s0.l.yearly_fee) || dFee) + "원"], ["계약일", fdate(s0.l.contract_date) || fdate(st.key_locker_contract_date) || "-"], ["만료일", fdate(s0.l.expiry_date) || fdate(st.key_locker_expiry_date) || "-"], ["비고", s0.l.note || "-"], ["", ""]])) : null;
     phRootF(1, h("div", { class: "phqt center" }, h("b", {}, "락카 현황")), h("div", { class: "phlkgrid" }, tiles.length ? tiles : h("div", { class: "phempty" }, "사용 중인 락카가 없습니다.")), det);
   }
   const phQ = () => PHONE() && !inputMode();
@@ -1370,7 +1370,7 @@
     const nIn = h("input", { class: "phin", placeholder: "비고", value: LS.note }); nIn.oninput = () => (LS.note = nIn.value);
     const list = all.filter((e) => e.date.startsWith(mk)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.ledgerId - b.ledgerId));
     const items = list.map((e) => h("div", { class: "phle" + (e.ledgerId === LS.editing ? " sel" : ""), onclick: () => { LS.editing = e.ledgerId; LS.date = e.date; LS.type = e.type === "지출" ? "지출" : "수입"; LS.cat = e.category; LS.amount = String(e.amount); LS.note = e.note || ""; phLedger(); } },
-      h("div", { class: "l1" }, h("b", {}, e.date.slice(5)), h("span", { class: "tag " + (e.type === "수입" ? "in" : "out") }, e.type), h("b", { class: "amt" }, won(e.amount) + "원")),
+      h("div", { class: "l1" }, h("b", {}, fdate(e.date)), h("span", { class: "tag " + (e.type === "수입" ? "in" : "out") }, e.type), h("b", { class: "amt" }, won(e.amount) + "원")),
       h("div", { class: "l2" }, `${e.category}${e.note ? " – " + e.note : ""}`)));
     const clear = () => { LS.editing = 0; LS.amount = ""; LS.note = ""; };
     async function saveP(update) {
@@ -1395,7 +1395,7 @@
     mc.font = `400 16px ${ff}`; aIn.style.setProperty("width", Math.ceil(mc.measureText("1000000").width) + 18 + "px", "important");
     const svL = pbtn("저장", () => saveP(false), "pri");
     phRootF(2, h("section", { class: "phcard phcompact" }, h("div", { class: "phttl" }, h("b", { class: "phct" }, "장부 입력"), h("span", { class: "phlinks" }, LS.editing > 0 ? plink("삭제", delP) : plink("초기화", () => { clear(); phLedger(); }), plink("수정", () => saveP(true)))),
-      h("div", { class: "phflds led" }, fm("일자", h("div", { class: "phdate" }, h("span", {}, LS.date.slice(2, 4) + "." + LS.date.slice(5, 7) + "." + LS.date.slice(8, 10)), h("i", {}, "▾"), dIn), "m-d"), fm("구분", tSel, "m-t"), fm("내역", cSel, "m-c"), fm("금액", aIn, "m-a"), fm("비고", nIn, "m-n"), svL)),
+      h("div", { class: "phflds led" }, fm("일자", h("div", { class: "phdate" }, h("span", {}, fdate(LS.date)), h("i", {}, "▾"), dIn), "m-d"), fm("구분", tSel, "m-t"), fm("내역", cSel, "m-c"), fm("금액", aIn, "m-a"), fm("비고", nIn, "m-n"), svL)),
       h("div", { class: "phpreview" }, `입력 중 월별 미리보기: ${+mk.slice(5)}월 / ${list.length}건`),
       h("div", { class: "phllist2" }, items.length ? items : h("div", { class: "phempty" }, "해당 월 장부 내역이 없습니다.")));
   }
