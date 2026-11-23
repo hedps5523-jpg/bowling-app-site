@@ -237,14 +237,15 @@ function albumCard() {
   const wrap = h("div", { class: "albwrap" }); // 가로: 박스 안에 그림이 나타나는 자리
   const msg = h("p", { class: "tag albmsg" }, "기록앨범을 불러오는 중…");
   if (wide) card.append(msg, wrap); else card.append(msg);
-  let pop = null, popBody = null, popTitle = null, popSel = null;
+  let pop = null, popBody = null, popTitle = null, popSel = null, popZoom = null, zoomed = false, redraw = null;
   const run = async () => {
     try {
       let host = wrap;
       if (!wide) { // 세로: 팝업 안에 (처음엔 숨김) 그림 틀을 미리 준비해 두면 선택할 때 바로 떠요
-        popTitle = h("b", {}); popSel = h("select", { class: "albsel albpopsel", "aria-label": "기록앨범 선택" }); // 팝업 제목줄 가운데 드롭메뉴: 팝업을 닫지 않고 바로 다른 화면으로
+        popTitle = h("b", {}); popSel = h("select", { class: "albsel albpopsel", "aria-label": "기록앨범 선택" }); // 팝업 제목줄 드롭메뉴: 팝업을 닫지 않고 바로 다른 화면으로
+        popZoom = h("button", { type: "button", class: "albzoom", "aria-label": "확대해서 보기", "aria-pressed": "false", onclick: () => toggleZoom() }, "🔍"); // 돋보기: 폭을 최대로 넓혀 크게 보기(세로 스크롤)
         popBody = h("div", { class: "albpopbody" });
-        pop = h("div", { class: "albpop", hidden: true }, h("div", { class: "albpanel", role: "dialog", "aria-modal": "true" }, h("div", { class: "albpophead" }, popSel, h("button", { type: "button", class: "albclose", onclick: closePop }, "닫기")), popBody));
+        pop = h("div", { class: "albpop", hidden: true }, h("div", { class: "albpanel", role: "dialog", "aria-modal": "true" }, h("div", { class: "albpophead" }, popSel, popZoom, h("button", { type: "button", class: "albclose", onclick: closePop }, "닫기")), popBody));
         pop.addEventListener("click", (e) => { if (e.target === pop) closePop(); });
         document.body.append(pop); host = popBody;
       }
@@ -257,17 +258,20 @@ function albumCard() {
       if (sel.options.length <= (wide ? 0 : 1)) { sel.disabled = true; sel.append(h("option", { value: "" }, "표시할 기록 없음")); return; }
       // 기기 화면 크기(해상도)를 재서 스크롤 없이 한 화면에 들어오도록 폭·높이에 모두 맞춰 그려요
       const draw = async (k) => {
-        const W = Math.max(200, Math.floor((wide ? wrap : popBody).clientWidth));
+        let W = Math.max(200, Math.floor((wide ? wrap : popBody).clientWidth));
         let H;
         if (wide) { // 가로: 박스 위쪽부터 하단 메뉴 위까지 남은 높이 (필요하면 박스가 화면 맨 위에 오도록 스크롤)
           const nav = document.querySelector(".bnav"), navH = nav && getComputedStyle(nav).display !== "none" ? nav.offsetHeight : 0;
           const top = wrap.getBoundingClientRect().top;
           H = Math.floor(window.innerHeight - top - navH - 14);
           if (H < 300) { card.scrollIntoView({ block: "start" }); const t2 = wrap.getBoundingClientRect().top; H = Math.floor(window.innerHeight - t2 - navH - 14); }
-        } else H = Math.floor(popBody.clientHeight); // 세로: 팝업 안 가능한 높이 전부
-        H = Math.max(200, H);
-        const r = await A.show(k, W, H); f.style.width = r.width + "px"; f.style.height = r.height + "px";
+        } else H = zoomed ? 0 : Math.floor(popBody.clientHeight); // 세로: 보통은 팝업 안 한 화면에 전부, 돋보기를 켜면 폭 최대·높이는 폭에 비례(넘치면 위·아래 스크롤)
+        H = zoomed ? 0 : Math.max(200, H);
+        let r = await A.show(k, W, H);
+        if (zoomed && popBody.clientWidth + 1 < W) { W = Math.max(200, popBody.clientWidth); r = await A.show(k, W, 0); } // 스크롤바가 생겨 폭이 줄면 그 폭에 맞춰 다시
+        f.style.width = r.width + "px"; f.style.height = r.height + "px";
       };
+      redraw = () => { const k = popSel && popSel.value; if (k) draw(k).catch(() => {}); }; // 돋보기 전환 때 지금 보는 한 장을 다시 그림
       // 창 크기가 바뀌면(회전·분할 화면 등) 지금 보는 한 장을 새 크기에 맞춰 다시 그려요
       if (window.__albResize) window.removeEventListener("resize", window.__albResize);
       let rt = 0; window.__albResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (!document.body.contains(card)) return; const k = sel.value; if (!k || (!wide && pop.hidden)) return; draw(k).catch(() => {}); }, 250); };
@@ -277,7 +281,7 @@ function albumCard() {
         // 팝업 제목줄 드롭메뉴에도 같은 분류별 목록을 채움
         groups.forEach(([g, items]) => { const og = h("optgroup", { label: g }); items.forEach(([k, l]) => og.append(h("option", { value: k }, l))); popSel.append(og); });
         const showK = async (k) => {
-          const opt = [...popSel.options].find((o) => o.value === k); popSel.value = k; sel.value = k; popTitle.textContent = opt ? opt.textContent : "";
+          const opt = [...popSel.options].find((o) => o.value === k); popSel.value = k; sel.value = k; popBody.scrollTop = 0; popTitle.textContent = opt ? opt.textContent : "";
           pop.hidden = false; document.body.classList.add("albopen");
           try { await draw(k); } catch { popBody.append(h("p", { class: "tag" }, "기록앨범을 그리지 못했어요.")); }
         };
@@ -288,7 +292,8 @@ function albumCard() {
       msg.textContent = "기록앨범을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."; sel.remove();
     }
   };
-  function closePop() { if (pop) pop.hidden = true; document.body.classList.remove("albopen"); sel.value = ""; }
+  function toggleZoom() { zoomed = !zoomed; if (pop) pop.classList.toggle("zoom", zoomed); if (popZoom) { popZoom.classList.toggle("on", zoomed); popZoom.setAttribute("aria-pressed", String(zoomed)); } if (popBody) popBody.scrollTop = 0; if (redraw) redraw(); }
+  function closePop() { if (pop) pop.hidden = true; document.body.classList.remove("albopen"); sel.value = ""; if (zoomed) { zoomed = false; pop.classList.remove("zoom"); popZoom.classList.remove("on"); popZoom.setAttribute("aria-pressed", "false"); } }
   setTimeout(run, 0);
   return card;
 }
