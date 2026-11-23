@@ -348,8 +348,8 @@ html[data-dev="mobile"] #view.r-home{display:block}
 .albpopbody .albframe{margin:0 auto}
 .albpophead .albclose{margin-left:auto}
 body.albopen{overflow:hidden}
-/* 태블릿(터치 기기, data-dev=mobile)도 가로 폭 1000px 이상이면 홈을 2단(왼쪽 모임·공지 / 오른쪽 기록앨범)으로 */
-@media (orientation: landscape) and (min-width: 1000px) {
+/* 태블릿·Z 폴드 메인(터치 기기, data-dev=mobile)도 가로 폭 760px 이상·높이 560px 이상이면 홈을 2단(왼쪽 모임·공지 / 오른쪽 기록앨범)으로 */
+@media (orientation: landscape) and (min-width: 760px) and (min-height: 560px) {
   html[data-dev="mobile"] #view.r-home{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
   html[data-dev="mobile"] #view.r-home>.pagehead,html[data-dev="mobile"] #view.r-home>button{grid-column:1/-1}
   html[data-dev="mobile"] #view.r-home>.pagehead{display:flex;justify-content:center;align-items:center;gap:12px}

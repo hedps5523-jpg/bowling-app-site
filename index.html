@@ -216,7 +216,7 @@ async function vHome() {
 /* ---------- 홈: 기록앨범 박스 ----------
    기록앨범 한 장(최근 모임 · 이번 달 월별 장부 · 회비 납부 현황)을 홈에서 바로 보여 줘요.
    그림은 albumbox.html(기록 조회와 같은 조회 전용 자료)을 같은 출처 iframe(srcdoc)으로 끼워 넣어 그려요. */
-const WIDE_HOME = "(orientation: landscape) and (min-width: 900px)";
+const WIDE_HOME = "(orientation: landscape) and (min-width: 760px) and (min-height: 560px)"; // 노트북·PC·태블릿 가로·갤럭시 Z 폴드 메인(펼침) 가로. 폰을 가로로 돌린 낮은 화면(높이 560 미만)은 제외
 if (!window.__albumMq) { window.__albumMq = matchMedia(WIDE_HOME); window.__albumMq.addEventListener("change", () => { if (view.classList.contains("r-home")) route(); }); }
 async function albumFrame(parent) {
   const html = await (await fetch("/albumbox", { cache: "no-store" })).text();
@@ -230,7 +230,7 @@ async function albumFrame(parent) {
   return { f, A };
 }
 function albumCard() {
-  const wide = window.__albumMq.matches && (document.documentElement.dataset.dev === "desktop" || window.innerWidth >= 1000); // 노트북·PC·태블릿 가로(폭 1000 이상)만 2단 박스, 휴대폰은 팝업
+  const wide = window.__albumMq.matches; // 가로 2단(왼쪽 모임·공지 / 오른쪽 기록앨범 박스)
   const sel = h("select", { class: "albsel", "aria-label": "기록앨범 선택", disabled: true }, h("option", { value: "" }, "불러오는 중…"));
   const head = h("div", { class: "albhead" }, h("h2", {}, "📒 기록앨범"), sel);
   const card = h("section", { class: "card albumcard" }, head);
