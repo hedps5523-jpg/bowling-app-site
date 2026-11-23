@@ -447,7 +447,7 @@
         if (ynum(g.gameDate) === year) { if (!yearGames.has(g.memberId)) yearGames.set(g.memberId, []); yearGames.get(g.memberId).push(g); }
         if (inWin(g.gameDate)) { if (!winGames.has(g.memberId)) winGames.set(g.memberId, []); winGames.get(g.memberId).push(g); }
       });
-      const ids = [...yearGames.keys()].sort((a, b) => a - b);
+      const ids = [...yearGames.keys()].sort((a, b) => recAvg(winGames.get(b) || []) - recAvg(winGames.get(a) || []) || recAvg(yearGames.get(b)) - recAvg(yearGames.get(a)) || a - b); // 선택한 기간의 에버 높은 순
       if (!ids.includes(GS.recMember)) GS.recMember = ids.length ? ids[0] : null;
       const lcount = (l) => l.reduce((a, g) => a + cnt(g), 0);
       const btbl = table({ headers: ["순번", "회원명(에버)", "누적에버", "출석일수", "최근에버", "최근게임"],
@@ -576,8 +576,8 @@
       const pv = S.sq[`${m.memberId}|${py}|${pq}`];
       const base = exact != null ? exact : pv != null ? pv : m.currentBaseAverage;
       const recs = stat.filter((g) => g.memberId === m.memberId && ynum(g.gameDate) === y && months.includes(mnum(g.gameDate)));
-      return { id: m.memberId, cells: ["", m.name, m.grade || "-", base > 0 ? String(base) : "-", fmt1(recAvg(recs)), inProgress ? "진행중" : exact != null ? String(exact) : ""] };
-    });
+      return { id: m.memberId, base: base > 0 ? base : 0, cells: ["", m.name, m.grade || "-", base > 0 ? String(base) : "-", fmt1(recAvg(recs)), inProgress ? "진행중" : exact != null ? String(exact) : ""] };
+    }).sort((a, b) => b.base - a.base || ko.compare(a.cells[1], b.cells[1])); // 해당 분기 책정 기준에버 높은 순
     const editable = inputMode(), open = QA.isOpen(dates, y, q);
     let title = `분기 기준에버 · ${label}`;
     if (editable && !open) { const lk = QA.openFrom(dates, y, q); title += ` · 조정에버는 ${mnum(lk)}/${dnum(lk)}부터 입력`; }
@@ -1218,7 +1218,7 @@
     } else if (rep === "모임기록") {
       const g0 = groups.find((g) => g.key === GS.linked), list = games.filter((g) => g0 && g0.dates.includes(g.gameDate)).sort((a, b) => gavg(b) - gavg(a));
       body.push(pTitle("모임 기록", g0 ? `${g0.label} / ${[...new Set(list.map(gtype))].join("·")}` : ""));
-      list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("span", { class: "mmain" }, h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : "")), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role]) : null], scoreDetail(g), (r ? "r-" + r.role.toLowerCase() : "") + " mcard")); });
+      list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("span", { class: "mmain" }, h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : "")), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role] + (r.role === "EVER" ? ` ${r.diff >= 0 ? "+" : ""}${r.diff}` : "")) : null], scoreDetail(g), (r ? "r-" + r.role.toLowerCase() : "") + " mcard")); });
     } else if (rep === "최근 기록") {
       // A: 기간(전체·1주~n주 드롭메뉴) / B: 회원 목록(최근에버·최근게임) / C: 회원을 누르면 기록 팝업(상·하 드래그)
       const RW = recWin(groups, GS.linked), { gs, inWin, perLabel, range, year } = RW;
@@ -1229,7 +1229,7 @@
         if (inWin(g.gameDate)) { if (!wg.has(g.memberId)) wg.set(g.memberId, []); wg.get(g.memberId).push(g); }
       });
       const lc = (l) => l.reduce((a, g) => a + cnt(g), 0);
-      const rows = [...yg.entries()].map(([id, l]) => ({ id, l, acc: recAvg(l), w: wg.get(id) || [] })).sort((a, b) => b.acc - a.acc);
+      const rows = [...yg.entries()].map(([id, l]) => { const w = wg.get(id) || []; return { id, l, acc: recAvg(l), w, wa: recAvg(w) }; }).sort((a, b) => b.wa - a.wa || b.acc - a.acc); // 선택한 기간의 에버 높은 순(기간 기록 없는 회원은 아래)
       const openRec = (r) => {
         const m = mm.get(r.id), mine = stat.filter((g) => g.memberId === r.id && inWin(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : b.recordId - a.recordId));
         const wkOf = (d) => { const gr = gs.find((x) => x.dates.includes(d)); return gr ? gr.label : ""; };
@@ -1249,7 +1249,7 @@
       body.push(h("div", { class: "phqcap" }, h("b", {}, "전회원"), h("span", {}, `${months[0]}~${months[2]}월`)));
       const qProg = y === y0 && q === Math.floor((mnum(today()) - 1) / 3) + 1 && !QA.isOpen(games.map((g) => g.gameDate), y, q); // 입력 화면과 같은 '진행중' 기준
       activeMembers().map((m) => { const ex = S.sq[`${m.memberId}|${y}|${q}`], pv = S.sq[`${m.memberId}|${py}|${pq}`], base = ex != null ? ex : pv != null ? pv : m.currentBaseAverage; const recs = stat.filter((g) => g.memberId === m.memberId && ynum(g.gameDate) === y && months.includes(mnum(g.gameDate))); return { m, base, ex, recs, avg: recAvg(recs) }; })
-        .sort((a, b) => b.avg - a.avg || b.base - a.base).forEach((r) => {
+        .sort((a, b) => b.base - a.base || ko.compare(a.m.name, b.m.name)).forEach((r) => { // 해당 분기 책정 기준에버 높은 순
           const row = (lbl, rs) => { const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "—", "—", "—", "—", null]; const av = recAvg(rs), bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return [lbl, String(c), av.toFixed(1), String(Math.max(...rs.map(smax))), bw > 0 ? sgn1(av - bw) : "—", bw > 0 ? av - bw : null]; };
           body.push(card("q" + r.m.memberId, [h("b", { class: "nm" }, `${r.m.name}(${r.base || "-"})`), h("span", { class: "lb" }, "에버"), h("span", { class: "pill" + (qProg || r.ex == null ? " dim" : "") }, qProg ? "진행중" : r.ex != null ? String(r.ex) : "-"), h("span", { class: "acc" }, h("small", {}, "총 누적에버"), h("b", {}, r.recs.some((g) => cnt(g) > 0) ? r.avg.toFixed(1) : "-"))],
             () => h("div", { class: "phrd" }, h("table", { class: "phst" }, h("tbody", {}, h("tr", { class: "hd" }, ["구분", "게임수", "총에버", "최고게임", "편차"].map((x) => h("td", {}, x))),

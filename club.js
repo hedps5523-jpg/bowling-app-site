@@ -1539,7 +1539,7 @@ Object.assign(Svc, {
       if (this.isWithdrawn(m)) continue;
       rows.push({ memberId: m.memberId, name: m.name, grade: m.grade, base: this.quarterBaseAverage(m, S.year, q), cum: this.cumulativeAverage(m.memberId, S.year, q), adj: this.displayedAdjustment(m, S.year, q) });
     }
-    return rows;
+    return rows.sort((a, b) => (b.base || 0) - (a.base || 0) || a.name.localeCompare(b.name, "ko")); // 해당 분기 책정 기준에버 높은 순
   },
 });
 const QV = { q: null, edits: new Map() };
