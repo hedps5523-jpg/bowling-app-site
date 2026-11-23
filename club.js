@@ -829,7 +829,8 @@ Object.assign(Svc, {
     return [...map.values()];
   },
   aggregateAverage(rows) { let s = 0, c = 0; for (const g of rows) { s += gsum(g); c += gcnt(g); } return c ? s / c : 0; },
-  cumulativeAverage(id, y, q) { const st = (Math.max(1, q) - 1) * 3 + 1, en = st + 2; if (!this.findMember(id)) return 0; return this.aggregateAverage(this.canonicalRankingGames(y).filter((g) => g.memberId === id && monthOf(g.gameDate) >= st && monthOf(g.gameDate) <= en)); },
+  everIncludePrevYear() { return String(S.settings.key_ever_include_prev_year || "0") === "1"; }, // 환경설정 '에버 설정': 누적에버에 전년도 기록 포함
+  cumulativeAverage(id, y, q) { const st = (Math.max(1, q) - 1) * 3 + 1, en = st + 2; if (!this.findMember(id)) return 0; const cur = this.canonicalRankingGames(y).filter((g) => g.memberId === id && monthOf(g.gameDate) >= st && monthOf(g.gameDate) <= en); const prev = this.everIncludePrevYear() ? this.canonicalRankingGames(y - 1).filter((g) => g.memberId === id) : []; return this.aggregateAverage([...prev, ...cur]); },
   recent4WeekLabels() { const l = [...new Set(S.games.filter((g) => yearOf(g.gameDate) === S.year).map((g) => this.resolveWeekLabel(g.gameDate)))].sort((a, b) => this.weekSortKey(a) - this.weekSortKey(b)); return l.length <= 4 ? l : l.slice(l.length - 4); },
   cumulativeRows(target) {
     const labels = [...target]; while (labels.length < 4) labels.push("");
@@ -1704,6 +1705,7 @@ function validateSetting(key, raw) {
   }
   if (key === "key_meeting_types") { const t = uniqLines(v); if (!t.length) t.push("정모", "비모"); if (t.length > 10) throw new Error("모임구분은 최대 10개까지 입력할 수 있습니다."); return t.join("\n"); }
   if (key === "key_ledger_categories") return LC.validate(v);
+  if (key === "key_ever_include_prev_year") return v === "1" ? "1" : "0";
   throw new Error("지원하지 않는 공용 환경설정 키입니다: " + key);
 }
 const fmtThousands = (raw) => { if (raw == null) return ""; const d = String(raw).replace(/,/g, "").trim(); return /^\d{1,15}$/.test(d) ? Number(d).toLocaleString("en-US") : String(raw).trim(); };
@@ -1717,7 +1719,7 @@ const lockerParse = (text) => { const t = String(text || "").trim(); if (!t) ret
 const envWeek = (l) => { const m = /^(\d+)월\s*(\d+)주차$/.exec(l || ""); return m ? `${pad2(+m[1])}월${pad2(+m[2])}주` : l; };
 const effShared = (key) => {
   if (Object.prototype.hasOwnProperty.call(S.settings, key)) return String(S.settings[key]);
-  return { key_management_name: S.programTitle, key_grade_list: S.gradeTypes.join("\n"), key_fee_amount: String(S.monthlyFee), key_locker_deposit: "0", key_locker_yearly_fee: "0", key_locker_contract_date: "01-01", key_locker_expiry_date: "12-31", key_meeting_types: S.meetingTypes.join("\n") }[key];
+  return { key_management_name: S.programTitle, key_grade_list: S.gradeTypes.join("\n"), key_fee_amount: String(S.monthlyFee), key_locker_deposit: "0", key_locker_yearly_fee: "0", key_locker_contract_date: "01-01", key_locker_expiry_date: "12-31", key_meeting_types: S.meetingTypes.join("\n"), key_ever_include_prev_year: "0" }[key];
 };
 
 /* ----- 승인관리 (모바일 볼링클럽 12.4인치 환경설정 승인관리 이식) -----
@@ -1865,6 +1867,11 @@ TABS.settings = {
     const ledger = h("div", { class: "enved envpanel" }, h("div", {}, h("div", { class: "rsec", style: "font-size:17px" }, "대분류"), typeBox,
       h("p", { class: "pcnote" }, "대분류를 선택하면 해당 중분류 목록이 표시됩니다.", h("br"), "※ 대분류(수입/지출)는 고정이며 중분류만 추가·수정·삭제합니다.", h("br"), "※ 장부 입력의 '내역'은 구분(수입/지출) 선택에 따라 이 목록이 표시되고, 목록에 없는 내역도 직접 입력할 수 있습니다.", h("br"), "※ 이 목록은 서버 공용 설정으로 PC·모바일이 함께 사용합니다.")), edBody, btns);
     drawE();
+    /* ---- 에버 설정 ---- */
+    const evChk = h("input", { type: "checkbox", id: "evprev", disabled: ro }); evChk.checked = effShared("key_ever_include_prev_year") === "1";
+    const ever = h("div", { class: "envpanel envever" }, secBox("누적에버 측정",
+      h("label", { class: "evrow", for: "evprev", style: "display:flex;gap:10px;align-items:center;font-size:16px;font-weight:700;cursor:pointer" }, evChk, "누적에버 측정 시 전년도 에버 포함"),
+      h("p", { class: "pcnote" }, "체크하면 기록조회·분기에버의 누적에버를 계산할 때 전년도 게임 기록도 함께 합산합니다. (체크 해제: 해당 연도·분기 기록만)", h("br"), "※ 전년도 기록은 서버에 계속 보관되며, 기록조회에서 연도를 바꿔 언제든 볼 수 있습니다.", h("br"), "※ 이 설정은 서버 공용으로 저장되어 모든 기기에 같이 적용됩니다.")));
     /* ---- 서버관리 ---- */
     const statusV = h("b", { style: "color:#566070" }, "●  상태 확인 전"), logBody = h("tbody");
     const drawLog = () => { logBody.textContent = ""; ST.logs.slice(0, 30).forEach(([t, w]) => logBody.append(h("tr", {}, h("td", {}, t), h("td", { class: "l" }, w)))); };
@@ -1896,14 +1903,14 @@ TABS.settings = {
     /* 좁은 세로 화면: 기본DATA·서버관리·수입/지출 모두 탭 줄까지 고정(스크롤해도 안 움직임) */
     const stick = () => { const r = document.querySelector(".envroot"); if (!r) return; const ab = document.querySelector(".appbar"); r.style.setProperty("--abh", (ab ? ab.offsetHeight : 0) + "px"); r.classList.toggle("envstick", narrowPortrait()); };
     window.addEventListener("resize", stick);
-    const panels = { basic, server, ledger }, tabsRow = h("div", { class: "envtabs" });
-    const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; nameRow.hidden = ST.sub !== "basic"; stick(); };
+    const panels = { basic, server, ledger, ever }, tabsRow = h("div", { class: "envtabs" });
+    const showSub = () => { tabsRow.textContent = ""; for (const [k, t] of [["basic", "기본 DATA"], ["server", "서버관리"], ["ledger", "수입/지출"], ["ever", "에버 설정"]]) tabsRow.append(h("button", { type: "button", class: "pcbtn" + (ST.sub === k ? " on" : ""), onclick: () => { ST.sub = k; showSub(); } }, t)); for (const k in panels) panels[k].hidden = k !== ST.sub; nameRow.hidden = ST.sub !== "basic"; stick(); };
     showSub();
     const okBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", disabled: ro }, "확인"), cancelBtn = h("button", { class: "pcbtn", type: "button", style: "min-width:90px", onclick: () => go(ST.back || "games") }, "취소");
     okBtn.onclick = async () => {
       const lines = (fs) => fs.map((f) => f.value.trim()).filter(Boolean);
       const meet = [...new Set(lines(mFields))]; if (!meet.length) meet.push("정모", "비모");
-      const proposed = { key_management_name: nameF.value, key_fee_amount: feeF.value.replace(/[, ]/g, "").trim(), key_locker_deposit: depF.value.replace(/[, ]/g, "").trim(), key_locker_yearly_fee: yfF.value.replace(/[, ]/g, "").trim(), key_locker_contract_date: lockerParse(cdF.value), key_locker_expiry_date: lockerParse(edF.value), key_grade_list: lines(gFields).join("\n") };
+      const proposed = { key_management_name: nameF.value, key_fee_amount: feeF.value.replace(/[, ]/g, "").trim(), key_locker_deposit: depF.value.replace(/[, ]/g, "").trim(), key_locker_yearly_fee: yfF.value.replace(/[, ]/g, "").trim(), key_locker_contract_date: lockerParse(cdF.value), key_locker_expiry_date: lockerParse(edF.value), key_grade_list: lines(gFields).join("\n"), key_ever_include_prev_year: evChk.checked ? "1" : "0" };
       try {
         const catRaw = LC.validate(LC.serialize(["수입", "지출"].flatMap((t) => E.rows[t].filter((r) => r.name.trim()).map((r) => ({ type: t, name: r.name.trim(), group: r.group, link: r.link, use: r.locked || r.use })))));
         const curCat = Object.prototype.hasOwnProperty.call(S.settings, "key_ledger_categories") ? S.settings.key_ledger_categories : null;
@@ -1922,7 +1929,7 @@ TABS.settings = {
         if (await save(ops, `환경설정이 저장되었습니다. (서버 공용 변경 ${ops.length}건)`)) { work(`환경설정 저장 ${ops.length}건`); go(ST.back || "games"); } else okBtn.disabled = false;
       } catch (e) { toast("환경설정을 저장하지 못했습니다.\n" + e.message, 4200); }
     };
-    const root = h("section", { class: "pcbox envroot" }, h("div", { class: "pcform envtop", style: "justify-content:space-between" }, tabsRow, nameRow, roBadge()), basic, server, ledger,
+    const root = h("section", { class: "pcbox envroot" }, h("div", { class: "pcform envtop", style: "justify-content:space-between" }, tabsRow, nameRow, roBadge()), basic, server, ledger, ever,
       h("div", { class: "envfoot", style: "text-align:center;margin-top:6px" }, okBtn, " ", cancelBtn));
     view.append(root);
     showSub();

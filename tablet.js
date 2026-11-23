@@ -65,7 +65,19 @@
   };
   const recSum = (list) => { const g = list.reduce((a, x) => a + cnt(x), 0); const hi = list.length ? Math.max(...list.map(smax)) : 0; const ev = list.length ? Math.max(...list.map((x) => recAvg([x]))) : 0; return h("div", { class: "recsum" }, "총 게임 : ", h("em", {}, `${g}G`), h("i", {}, "/"), "최고하이 : ", h("em", {}, `${hi}점`), h("i", {}, "/"), "최고에버 : ", h("em", {}, `${fmt1(ev)}점`)); };
   const recAvg = (list) => { const c = list.reduce((a, g) => a + cnt(g), 0); return c ? list.reduce((a, g) => a + tot(g), 0) / c : 0; };
-  const weekLabel = (d) => `${mnum(d)}월${Math.floor((dnum(d) - 1) / 7) + 1}주`;
+  /* 전년도 이전 기록도 보관·조회: 올해가 아닌 주차에는 연도(yy년)를 붙여 같은 월·주차를 구분 */
+  const weekLabel = (d) => `${ynum(d) !== ynum(today()) ? pad2(ynum(d) % 100) + "년 " : ""}${mnum(d)}월${Math.floor((dnum(d) - 1) / 7) + 1}주`;
+  /* 누적에버 측정 시 전년도 에버 포함 (환경설정 '에버 설정', 서버 공용 key_ever_include_prev_year) */
+  const evPrev = () => String((S.settings || {}).key_ever_include_prev_year || "0") === "1";
+  const inCumYear = (d, y) => ynum(d) === y || (evPrev() && ynum(d) === y - 1);
+  const quarterCum = (id, y, stat, recs) => (evPrev() ? recAvg([...recs, ...stat.filter((g) => g.memberId === id && ynum(g.gameDate) === y - 1)]) : recAvg(recs));
+  /* 분기 선택 목록: 기록이 있는 모든 연도의 1~4분기 (올해는 'n분기', 이전 연도는 'yy_n분기') */
+  const quarterOpts = (games) => {
+    const y0 = ynum(today()), ys = games.map((g) => ynum(g.gameDate)).filter((y) => y > 0 && y <= y0), y1 = Math.min(y0 - 1, ...ys), out = [];
+    for (let y = y1; y <= y0; y++) for (let q = 1; q <= 4; q++) out.push([y === y0 ? `${q}분기` : `${pad2(y % 100)}_${q}분기`, y, q]);
+    return out;
+  };
+  const defQuarter = (opts) => { const y0 = ynum(today()), q = Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4); return (opts.find((o) => o[1] === y0 && o[2] === q) || opts[opts.length - 1])[0]; };
   const weekKey = (d) => `${ynum(d)}|${mnum(d)}|${Math.floor((dnum(d) - 1) / 7)}`;
   const gtype = (g) => (g.meetingType || "").trim() || "정모";
   /* 탈퇴 회원의 기록은 조회에서 제외 */
@@ -390,13 +402,13 @@
     if (!reports.includes(GS.report)) GS.report = reports[0];
     const report = quarterOnly ? "분기에버" : GS.report;
     let linkedOpts = [], linkedLabel = "";
-    const qOpts = (() => { const y = ynum(today()); return [[`${pad2((y - 1) % 100)}_4분기`, y - 1, 4], ...[1, 2, 3, 4].map((q) => [`${q}분기`, y, q])]; })();
+    const qOpts = quarterOpts(games);
     if (report === "개인기록") { linkedLabel = "회원명"; linkedOpts = activeMembers().map((m) => [String(m.memberId), m.name]); }
     else if (report === "모임기록") { linkedLabel = "주차"; linkedOpts = groups.slice().reverse().map((g) => [g.key, g.label]); }
     else if (report === "최근 기록") { linkedLabel = "기간"; linkedOpts = [["전체", "전체"], ...Array.from({ length: Math.max(1, recWin(groups, "전체").count) }, (_, i) => [`${i + 1}개월`, `${i + 1}개월`])]; }
     else if (report === "순위표") { linkedLabel = "기준"; linkedOpts = [...new Set([...games.map((g) => ynum(g.gameDate)), ynum(today())])].sort((a, b) => b - a).map((y) => [String(y), `${y}년`]); }
     else { linkedLabel = "분기"; linkedOpts = qOpts.map((o) => [o[0], o[0]]); }
-    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "3개월") ? "3개월" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0] : (linkedOpts[0] || [""])[0];
+    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "3개월") ? "3개월" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? defQuarter(qOpts) : (linkedOpts[0] || [""])[0];
     if (!inMode || quarterOnly) {
       const rSel = quarterOnly ? null : sel(reports, report, (v) => { GS.report = v; GS.linked = null; draw(); });
       // 최근 기록: 기간 칸을 누르면 5줄 목록(전체·1주~n주)이 열리고, 위·아래로 드래그해서 고른다
@@ -441,17 +453,18 @@
     } else if (report === "최근 기록") {
       // 기간(전체 / 최근 n주): 가장 최근 주차부터 거꾸로 n주
       const RW = recWin(groups, GS.linked), { gs, inWin, perLabel, range, year } = RW;
-      title = `모임 누적 현황 · ${year}년 기준 · ${perLabel}`;
-      const yearGames = new Map(), winGames = new Map();
+      title = `모임 누적 현황 · ${year}년 기준${evPrev() ? "(전년도 에버 포함)" : ""} · ${perLabel}`;
+      const yearGames = new Map(), winGames = new Map(), cumGames = new Map();
       stat.forEach((g) => {
+        if (inCumYear(g.gameDate, year)) { if (!cumGames.has(g.memberId)) cumGames.set(g.memberId, []); cumGames.get(g.memberId).push(g); }
         if (ynum(g.gameDate) === year) { if (!yearGames.has(g.memberId)) yearGames.set(g.memberId, []); yearGames.get(g.memberId).push(g); }
         if (inWin(g.gameDate)) { if (!winGames.has(g.memberId)) winGames.set(g.memberId, []); winGames.get(g.memberId).push(g); }
       });
-      const ids = [...yearGames.keys()].sort((a, b) => recAvg(winGames.get(b) || []) - recAvg(winGames.get(a) || []) || recAvg(yearGames.get(b)) - recAvg(yearGames.get(a)) || a - b); // 선택한 기간의 에버 높은 순
+      const ids = [...yearGames.keys()].sort((a, b) => recAvg(winGames.get(b) || []) - recAvg(winGames.get(a) || []) || recAvg(cumGames.get(b)) - recAvg(cumGames.get(a)) || a - b); // 선택한 기간의 에버 높은 순
       if (!ids.includes(GS.recMember)) GS.recMember = ids.length ? ids[0] : null;
       const lcount = (l) => l.reduce((a, g) => a + cnt(g), 0);
       const btbl = table({ headers: ["순번", "회원명(에버)", "누적에버", "출석일수", "최근에버", "최근게임"],
-        rows: ids.map((id, i) => { const l = yearGames.get(id), w = winGames.get(id) || []; return [String(i + 1), nameWithAvg(mm.get(id), yearEndRef(year)), fmt1(recAvg(l)), String(new Set(l.map((g) => g.gameDate)).size), w.length ? fmt1(recAvg(w)) : "-", w.length ? String(lcount(w)) : "-"]; }),
+        rows: ids.map((id, i) => { const l = yearGames.get(id), w = winGames.get(id) || []; return [String(i + 1), nameWithAvg(mm.get(id), yearEndRef(year)), fmt1(recAvg(cumGames.get(id) || l)), String(new Set(l.map((g) => g.gameDate)).size), w.length ? fmt1(recAvg(w)) : "-", w.length ? String(lcount(w)) : "-"]; }),
         weights: [60, 170, 100, 100, 110, 110], selectedRow: ids.indexOf(GS.recMember), cellBg: (r, c) => (c >= 4 ? "#FFF4D6" : null),
         onClick: (i) => { GS.recMember = ids[i]; RENDER[current](); } }) || empty("조회된 자료가 없습니다.");
       // 선택한 회원의 기록: 게임일별 1줄씩, 최근 주차부터 (위·아래로 드래그)
@@ -576,7 +589,8 @@
       const pv = S.sq[`${m.memberId}|${py}|${pq}`];
       const base = exact != null ? exact : pv != null ? pv : m.currentBaseAverage;
       const recs = stat.filter((g) => g.memberId === m.memberId && ynum(g.gameDate) === y && months.includes(mnum(g.gameDate)));
-      return { id: m.memberId, base: base > 0 ? base : 0, avg: recAvg(recs), cells: ["", m.name, m.grade || "-", base > 0 ? String(base) : "-", fmt1(recAvg(recs)), inProgress ? "진행중" : exact != null ? String(exact) : ""] };
+      const cavg = quarterCum(m.memberId, y, stat, recs);
+      return { id: m.memberId, base: base > 0 ? base : 0, avg: cavg, cells: ["", m.name, m.grade || "-", base > 0 ? String(base) : "-", fmt1(cavg), inProgress ? "진행중" : exact != null ? String(exact) : ""] };
     }).sort((a, b) => b.base - a.base || b.avg - a.avg || ko.compare(a.cells[1], b.cells[1])); // 1차 책정 기준에버, 2차 분기 누적에버
     const editable = inputMode(), open = QA.isOpen(dates, y, q);
     let title = `분기 기준에버 · ${label}`;
@@ -1026,8 +1040,8 @@
   const QP = { open: new Set() };
   function phQuarter() {
     const games = tbGames(), stat = statGames(), mm = byId(), y0 = ynum(today());
-    const qOpts = [[`${pad2((y0 - 1) % 100)}_4분기`, y0 - 1, 4], ...[1, 2, 3, 4].map((q) => [`${q}분기`, y0, q])];
-    if (!qOpts.some((o) => o[0] === GS.linked)) GS.linked = qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, qOpts.length - 1)][0];
+    const qOpts = quarterOpts(games);
+    if (!qOpts.some((o) => o[0] === GS.linked)) GS.linked = defQuarter(qOpts);
     const [label, y, q] = qOpts.find((o) => o[0] === GS.linked);
     const [py, pq] = q === 1 ? [y - 1, 4] : [y, q - 1];
     const dates = games.map((g) => g.gameDate), months = [q * 3 - 2, q * 3 - 1, q * 3];
@@ -1037,7 +1051,7 @@
       const exact = S.sq[`${m.memberId}|${y}|${q}`], pv = S.sq[`${m.memberId}|${py}|${pq}`];
       const base = exact != null ? exact : pv != null ? pv : m.currentBaseAverage;
       const recs = stat.filter((g) => g.memberId === m.memberId && ynum(g.gameDate) === y && months.includes(mnum(g.gameDate)));
-      return { m, base, exact, recs, avg: recAvg(recs) };
+      return { m, base, exact, recs, avg: quarterCum(m.memberId, y, stat, recs) };
     }).sort((a, b) => b.base - a.base || b.avg - a.avg || ko.compare(a.m.name, b.m.name)); // 1차 책정 기준에버, 2차 분기 누적에버
     const list = h("div", { class: "phqlist" });
     rows.forEach((r) => {
@@ -1196,13 +1210,13 @@
     const reports = ["개인기록", "모임기록", "최근 기록", "순위표", "분기에버"];
     if (!reports.includes(GS.report)) GS.report = "개인기록";
     const rep = GS.report;
-    const y0 = ynum(today()), qOpts = [[`${pad2((y0 - 1) % 100)}_4분기`, y0 - 1, 4], ...[1, 2, 3, 4].map((q) => [`${q}분기`, y0, q])];
+    const y0 = ynum(today()), qOpts = quarterOpts(games);
     let lopts = [];
     if (rep === "개인기록") lopts = activeMembers().slice().sort((a, b) => ko.compare(a.name, b.name)).map((m) => [String(m.memberId), m.name]);
     else if (rep === "모임기록") lopts = groups.slice().reverse().map((g) => [g.key, g.label]);
     else if (rep === "최근 기록") lopts = [["전체", "전체"], ...Array.from({ length: Math.max(1, recWin(groups, "전체").count) }, (_, i) => [`${i + 1}개월`, `${i + 1}개월`])];
     else if (rep === "분기에버") lopts = qOpts.map((o) => [o[0], o[0]]);
-    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "3개월") ? "3개월" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? qOpts[Math.min(Math.floor((mnum(today()) - 1) / 3) + 2, 4)][0] : (lopts[0] || [""])[0];
+    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "3개월") ? "3개월" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? defQuarter(qOpts) : (lopts[0] || [""])[0];
     const repSel = fsel(reports, rep, (v) => { GS.report = v; GS.linked = null; QS.open.clear(); phqGames(); });
     const bar = rep === "순위표"
       ? fbar(repSel, fsel(["전회원", "남자", "여자"], QS.rk, (v) => { QS.rk = v; phqGames(); }), fsel(["전분기", "1분기", "2분기", "3분기", "4분기", "상반기", "하반기"], QS.period, (v) => { QS.period = v; phqGames(); }), refreshBtn())
@@ -1223,13 +1237,14 @@
       // A: 기간(전체·1주~n주 드롭메뉴) / B: 회원 목록(최근에버·최근게임) / C: 회원을 누르면 기록 팝업(상·하 드래그)
       const RW = recWin(groups, GS.linked), { gs, inWin, perLabel, range, year } = RW;
       body.push(pTitle("최근 기록", `${perLabel}${range ? ` (${range})` : ""}`));
-      const yg = new Map(), wg = new Map();
+      const yg = new Map(), wg = new Map(), cg = new Map();
       stat.forEach((g) => {
+        if (inCumYear(g.gameDate, year)) { if (!cg.has(g.memberId)) cg.set(g.memberId, []); cg.get(g.memberId).push(g); }
         if (ynum(g.gameDate) === year) { if (!yg.has(g.memberId)) yg.set(g.memberId, []); yg.get(g.memberId).push(g); }
         if (inWin(g.gameDate)) { if (!wg.has(g.memberId)) wg.set(g.memberId, []); wg.get(g.memberId).push(g); }
       });
       const lc = (l) => l.reduce((a, g) => a + cnt(g), 0);
-      const rows = [...yg.entries()].map(([id, l]) => { const w = wg.get(id) || []; return { id, l, acc: recAvg(l), w, wa: recAvg(w) }; }).sort((a, b) => b.wa - a.wa || b.acc - a.acc); // 선택한 기간의 에버 높은 순(기간 기록 없는 회원은 아래)
+      const rows = [...yg.entries()].map(([id, l]) => { const w = wg.get(id) || []; return { id, l, acc: recAvg(cg.get(id) || l), w, wa: recAvg(w) }; }).sort((a, b) => b.wa - a.wa || b.acc - a.acc); // 선택한 기간의 에버 높은 순(기간 기록 없는 회원은 아래)
       const openRec = (r) => {
         const m = mm.get(r.id), mine = stat.filter((g) => g.memberId === r.id && inWin(g.gameDate)).sort((a, b) => (a.gameDate < b.gameDate ? 1 : a.gameDate > b.gameDate ? -1 : b.recordId - a.recordId));
         const wkOf = (d) => { const gr = gs.find((x) => x.dates.includes(d)); return gr ? gr.label : ""; };
@@ -1248,7 +1263,7 @@
       const [lb, y, q] = qOpts.find((o) => o[0] === GS.linked), [py, pq] = q === 1 ? [y - 1, 4] : [y, q - 1], months = [q * 3 - 2, q * 3 - 1, q * 3];
       body.push(h("div", { class: "phqcap" }, h("b", {}, "전회원"), h("span", {}, `${months[0]}~${months[2]}월`)));
       const qProg = y === y0 && q === Math.floor((mnum(today()) - 1) / 3) + 1 && !QA.isOpen(games.map((g) => g.gameDate), y, q); // 입력 화면과 같은 '진행중' 기준
-      activeMembers().map((m) => { const ex = S.sq[`${m.memberId}|${y}|${q}`], pv = S.sq[`${m.memberId}|${py}|${pq}`], base = ex != null ? ex : pv != null ? pv : m.currentBaseAverage; const recs = stat.filter((g) => g.memberId === m.memberId && ynum(g.gameDate) === y && months.includes(mnum(g.gameDate))); return { m, base, ex, recs, avg: recAvg(recs) }; })
+      activeMembers().map((m) => { const ex = S.sq[`${m.memberId}|${y}|${q}`], pv = S.sq[`${m.memberId}|${py}|${pq}`], base = ex != null ? ex : pv != null ? pv : m.currentBaseAverage; const recs = stat.filter((g) => g.memberId === m.memberId && ynum(g.gameDate) === y && months.includes(mnum(g.gameDate))); return { m, base, ex, recs, avg: quarterCum(m.memberId, y, stat, recs) }; })
         .sort((a, b) => b.base - a.base || b.avg - a.avg || ko.compare(a.m.name, b.m.name)).forEach((r) => { // 1차 책정 기준에버, 2차 분기 누적에버
           const row = (lbl, rs) => { const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "—", "—", "—", "—", null]; const av = recAvg(rs), bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return [lbl, String(c), av.toFixed(1), String(Math.max(...rs.map(smax))), bw > 0 ? sgn1(av - bw) : "—", bw > 0 ? av - bw : null]; };
           body.push(card("q" + r.m.memberId, [h("b", { class: "nm" }, `${r.m.name}(${r.base || "-"})`), h("span", { class: "lb" }, "에버"), h("span", { class: "pill" + (qProg || r.ex == null ? " dim" : "") }, qProg ? "진행중" : r.ex != null ? String(r.ex) : "-"), h("span", { class: "acc" }, h("small", {}, "총 누적에버"), h("b", {}, r.recs.some((g) => cnt(g) > 0) ? r.avg.toFixed(1) : "-"))],
@@ -1257,9 +1272,12 @@
         });
     } else {
       const P = { 전분기: [1, 12], "1분기": [1, 3], "2분기": [4, 6], "3분기": [7, 9], "4분기": [10, 12], 상반기: [1, 6], 하반기: [7, 12] }[QS.period];
-      const year = y0, curQ = Math.floor((mnum(today()) - 1) / 3) + 1;
-      const label = QS.period === "전분기" ? `${year}년 전체` : `${year}년 ${QS.period}`;
-      body.push(pTitle("랭킹 현황", QS.rk, label));
+      const year = QS.year || y0, curQ = Math.floor((mnum(today()) - 1) / 3) + 1;
+      const pl = QS.period === "전분기" ? "전체" : QS.period;
+      // 연도: 오른쪽 '2026년 전체'를 눌러 전년도 이전 기록으로 바꿔 조회 (기록은 연도별로 계속 보관)
+      const yrSel = h("select", { class: "phyr", style: "border:0;background:transparent;font:inherit;color:inherit;text-align:right;text-align-last:right;padding:0 2px;max-width:100%", onchange: (e) => { QS.year = +e.target.value; QS.open.clear(); phqGames(); } },
+        [...new Set([...games.map((g) => ynum(g.gameDate)), y0])].filter((y) => y > 0).sort((a, b) => b - a).map((y) => { const o = h("option", { value: String(y) }, `${y}년 ${pl}`); if (y === year) o.selected = true; return o; }));
+      body.push(pTitle("랭킹 현황", QS.rk, yrSel));
       body.push(h("div", { class: "phrkhead" }, h("span", {}), h("span", { class: "hn" }, "회원명"), ["게임수", "총에버", "최고게임", "편차"].map((x) => h("span", { class: "hv" }, x)))); // 필드명 줄 (고정)
       const agg = new Map();
       stat.filter((g) => ynum(g.gameDate) === year && mnum(g.gameDate) >= P[0] && mnum(g.gameDate) <= P[1]).forEach((g) => { const m = mm.get(g.memberId); if (!m) return; if (QS.rk === "남자" && m.gender !== "MALE") return; if (QS.rk === "여자" && m.gender !== "FEMALE") return; if (!agg.has(g.memberId)) agg.set(g.memberId, []); agg.get(g.memberId).push(g); });
