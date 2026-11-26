@@ -392,3 +392,12 @@ body.albopen{overflow:hidden}
 #view.hwide>.homeleft>.alblist{flex:1 1 auto;min-height:120px;overflow:auto;-webkit-overflow-scrolling:touch}
 #view.hwide>.homeleft>.card:not(.alblist){padding:10px 12px;margin-top:8px}
 #view.hwide>.homeleft>.card:not(.alblist) h2{font-size:15px;margin-bottom:4px}
+/* 세로 홈(2026-11-27): 인사 줄 → 기록앨범 전체 목록(남는 높이 안에서 스크롤) → 최근 공지 → 다음 모임 → 로그아웃 줄 */
+#view.r-home.hport,html[data-dev="mobile"] #view.r-home.hport{display:flex!important;flex-direction:column;align-items:stretch!important;overflow:hidden}
+#view.hport>.pagehead{flex:none;margin:6px 0 0}
+#view.hport>.alblist{flex:1 1 auto;min-height:160px;overflow:auto;-webkit-overflow-scrolling:touch;margin-top:8px}
+#view.hport>.card:not(.alblist){flex:none;padding:9px 12px;margin-top:7px}
+#view.hport>.card:not(.alblist) h2{font-size:15px;margin-bottom:2px}
+#view.hport>.clubfoot{flex:none;margin-top:8px;padding-top:4px;display:flex;flex-direction:column;align-items:stretch;gap:2px;text-align:center}
+#view.hport>.clubfoot .btn{padding:8px 12px;font-size:14px}
+#view.hport>.clubfoot div{line-height:1.4;font-size:12px;color:var(--sub)}
