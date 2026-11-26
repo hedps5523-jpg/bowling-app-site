@@ -213,9 +213,10 @@ async function vHome() {
   // 넓은 가로 화면: 왼쪽 = 모임·공지(최근 공지 + 다음 모임) / 오른쪽 = 기록앨범 박스. 세로 화면: 위에서 아래로 쌓고 기록앨범은 드롭메뉴 → 팝업
   if (window.__albumMq.matches) { // 가로: 인사 줄은 왼쪽 맨 위, 로그아웃·저작권 줄은 왼쪽 맨 아래로 옮기고 기록앨범 박스를 위아래로 넓게
     const ft = window.__clubfoot || (window.__clubfoot = document.querySelector(".clubfoot"));
-    view.classList.add("hwide"); view.append(h("div", { class: "homeleft" }, ph, r, c, ft), albumCard());
+    const lh = h("section", { class: "card alblist" }, h("p", { class: "tag" }, "기록앨범 목록을 불러오는 중…")); // 왼쪽 기록앨범 목록(접힘·펼침)
+    view.classList.add("hwide"); view.append(h("div", { class: "homeleft" }, ph, lh, r, c, ft), albumCard(lh));
     const nv = document.querySelector(".bnav"), navH = nv && getComputedStyle(nv).display !== "none" ? nv.offsetHeight : 0;
-    view.style.minHeight = Math.max(300, window.innerHeight - view.getBoundingClientRect().top - navH - 12) + "px";
+    view.style.minHeight = view.style.height = Math.max(300, window.innerHeight - view.getBoundingClientRect().top - navH - 12) + "px"; // 한 화면 높이로 고정: 왼쪽은 기록앨범 목록만 안에서 스크롤
   } else view.append(ph, h("div", { class: "homeleft" }, r, c), albumCard());
 }
 
@@ -235,10 +236,33 @@ async function albumFrame(parent) {
   if (!A) throw new Error("album");
   return { f, A };
 }
-function albumCard() {
+/* 가로 홈 왼쪽 '기록앨범 목록': 분류(기록현황·장부현황·회비현황·락카현황·회원현황)를 눌러 펼침·접힘,
+   모임기록(일자별)·월별 상세는 한 번 더 접힘. 펼침 상태는 이 기기에 기억(localStorage albTreeOpen). */
+function renderAlbumTree(host, tree, pick) {
+  let open = {}; try { open = JSON.parse(localStorage.getItem("albTreeOpen") || "{}"); } catch {}
+  if (!Object.keys(open).length) open = { "기록현황": true };
+  const save = () => { try { localStorage.setItem("albTreeOpen", JSON.stringify(open)); } catch {} };
+  const item = ([k, l]) => h("button", { type: "button", class: "albit", "data-k": k, onclick: (e) => pick(k, l, e.currentTarget) }, l);
+  const fold = (key, label, count, cls, kids) => {
+    const body = h("div", { class: cls + "b", hidden: !open[key] }, kids);
+    const ic = h("span", { class: "albchev", "aria-hidden": "true" }, open[key] ? "▾" : "▸");
+    const btn = h("button", { type: "button", class: cls, "aria-expanded": String(!!open[key]), onclick: () => { open[key] = body.hidden; body.hidden = !open[key]; ic.textContent = open[key] ? "▾" : "▸"; btn.setAttribute("aria-expanded", String(!!open[key])); save(); } }, ic, h("span", {}, label), count ? h("small", {}, count) : null);
+    return [btn, body];
+  };
+  host.textContent = "";
+  host.append(h("h2", { class: "albtreeh" }, "📒 기록앨범 목록", h("small", {}, "눌러서 펼치기·접기")));
+  tree.forEach((g) => {
+    const n = g.items.length + g.subs.reduce((a, s) => a + s.items.length, 0);
+    const kids = [...g.items.map(item), ...g.subs.flatMap((s) => fold(g.g + "/" + s.name, s.name, `${s.items.length}${s.unit}`, "albsh", s.items.map(item)))];
+    host.append(...fold(g.g, g.g, `${n}개`, "albgh", kids));
+  });
+}
+function albumCard(listHost) {
   const wide = window.__albumMq.matches; // 가로 2단(왼쪽 모임·공지 / 오른쪽 기록앨범 박스)
   const sel = h("select", { class: "albsel", "aria-label": "기록앨범 선택", disabled: true }, h("option", { value: "" }, "불러오는 중…"));
-  const head = h("div", { class: "albhead" }, h("h2", {}, "📒 기록앨범"), sel);
+  const subEl = h("span", { class: "albsub" }); // 가로: 왼쪽 목록에서 고른 항목 이름
+  const head = h("div", { class: "albhead" }, h("h2", {}, "📒 기록앨범"), wide && listHost ? subEl : sel);
+  let curK = "";
   const card = h("section", { class: "card albumcard" + (wide ? " albwide" : "") }, head);
   const wrap = h("div", { class: "albwrap" }); // 가로: 박스 안에 그림이 나타나는 자리
   const msg = h("p", { class: "tag albmsg" }, "기록앨범을 불러오는 중…");
@@ -255,6 +279,26 @@ function albumCard() {
         document.body.append(pop); host = popBody;
       }
       const { f, A } = await albumFrame(host);
+      if (wide && listHost) { // 가로: 왼쪽 '기록앨범 목록'(접힘·펼침)에서 고르면 오른쪽 박스에 표시
+        const tree = await A.tree(); msg.remove();
+        const drawW = async (k) => {
+          const nav = document.querySelector(".bnav"), navH = nav && getComputedStyle(nav).display !== "none" ? nav.offsetHeight : 0;
+          const W = Math.max(200, Math.floor(wrap.clientWidth)), H = Math.max(200, Math.floor(window.innerHeight - wrap.getBoundingClientRect().top - navH - 18));
+          const r = await A.show(k, W, H, true); f.style.width = r.width + "px"; f.style.height = r.height + "px";
+        };
+        const pick = (k, label, btn) => {
+          curK = k; subEl.textContent = label;
+          listHost.querySelectorAll(".albit.on").forEach((x) => x.classList.remove("on")); if (btn) btn.classList.add("on");
+          drawW(k).catch(() => {});
+        };
+        renderAlbumTree(listHost, tree, pick);
+        const first = listHost.querySelector(".albit");
+        if (first) pick(first.dataset.k, first.textContent, first); else wrap.append(h("p", { class: "tag" }, "표시할 기록이 없어요."));
+        if (window.__albResize) window.removeEventListener("resize", window.__albResize);
+        let rt0 = 0; window.__albResize = () => { clearTimeout(rt0); rt0 = setTimeout(() => { if (document.body.contains(card) && curK) drawW(curK).catch(() => {}); }, 250); };
+        window.addEventListener("resize", window.__albResize);
+        return;
+      }
       const groups = await A.groups(); // 분류별: [[분류, [[kind, 라벨], …]], …]
       msg.remove();
       sel.textContent = ""; sel.disabled = false;
@@ -766,7 +810,7 @@ async function vLessonEdit(id) {
 /* ---------- 라우터 ---------- */
 let gErr = null;
 async function route() {
-  if (window.__clubfoot) document.querySelector(".wrap").append(window.__clubfoot); view.style.minHeight = ""; // 가로 홈에서 왼쪽 아래로 옮겨 둔 로그아웃·저작권 줄을 원래 자리(맨 아래)로 되돌림
+  if (window.__clubfoot) document.querySelector(".wrap").append(window.__clubfoot); view.style.minHeight = view.style.height = ""; // 가로 홈에서 왼쪽 아래로 옮겨 둔 로그아웃·저작권 줄을 원래 자리(맨 아래)로 되돌림
   document.querySelectorAll(".albpop").forEach((e) => e.remove()); document.body.classList.remove("albopen"); // 기록앨범 팝업 정리
   { const k = (location.hash.replace(/^#/, "") || "/").split("/")[1] || "home"; view.className = token ? "r-" + k : "r-guest"; }
   if (!token) return guest(gErr);

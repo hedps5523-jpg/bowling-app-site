@@ -372,3 +372,23 @@ body.albopen{overflow:hidden}
 #view.hwide>.homeleft>.clubfoot .btn{padding:9px 12px;font-size:14px}
 #view.hwide>.homeleft>.clubfoot div{line-height:1.4;font-size:12px;color:var(--sub)}
 #view.hwide>.albumcard{margin-top:8px}
+/* 가로 홈 왼쪽 '기록앨범 목록' (접힘·펼침) */
+.alblist{padding:8px 10px;margin-top:8px}
+.alblist .albtreeh{font-size:15px;margin:0 0 4px;display:flex;align-items:baseline;gap:8px}
+.alblist .albtreeh small{font-size:11px;font-weight:400;color:var(--sub)}
+.albgh,.albsh{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;font:inherit;cursor:pointer;color:var(--text);text-align:left}
+.albgh{font-weight:700;font-size:14px;padding:7px 2px;border-top:1px solid var(--line)}
+.albsh{font-size:13px;color:var(--sub);padding:4px 2px}
+.albgh small,.albsh small{margin-left:auto;font-weight:400;font-size:12px;color:var(--sub)}
+.albchev{width:14px;text-align:center;color:var(--sub)}
+.albghb{padding:0 0 6px 10px}
+.albshb{padding-left:10px;max-height:32vh;overflow:auto;-webkit-overflow-scrolling:touch}
+.albit{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:8px;padding:5px 9px;margin:0 0 4px;background:#fff;font:inherit;font-size:13px;color:var(--text);cursor:pointer}
+.albit:hover{background:#f5f8ff}
+.albit.on{background:#eaf0ff;border-color:#9db8f5;color:var(--brand-d);font-weight:700}
+.albumcard .albsub{font-size:13px;font-weight:700;color:var(--brand-d);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#view.hwide>.homeleft{min-height:0;overflow:hidden}
+#view.hwide>.homeleft>.card{flex:none}
+#view.hwide>.homeleft>.alblist{flex:1 1 auto;min-height:120px;overflow:auto;-webkit-overflow-scrolling:touch}
+#view.hwide>.homeleft>.card:not(.alblist){padding:10px 12px;margin-top:8px}
+#view.hwide>.homeleft>.card:not(.alblist) h2{font-size:15px;margin-bottom:4px}

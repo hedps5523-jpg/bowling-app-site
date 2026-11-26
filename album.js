@@ -570,9 +570,16 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
      분류(기록현황·장부현황·회비현황·락카현황·회원현황)별로 항목을 묶어 드롭메뉴에 보여 줘요.
        meet 최근 모임 / quarter 분기에버(분기가 끝나 책정에버가 결정된 뒤에만) / annual 1년결산 / summary 월별 요약 / month 이번 달 월별 장부 상세
        fee 회비 납부 현황 / locker 락카 현황 / member 회원 목록(연락처 가운데 4자리 가림) */
+  // 환경설정 '주차별' 목록(매주 수요일 게임일)에서 그 기록이 속한 주의 일자 → 'M/DD일' (예: 11/26 기록 → 11월 4주차 11/25일)
+  const wkDay = (d) => { const ws = Svc.basicWeeks(yearOf(d)).filter((w) => w.date <= d), wd = ws.length ? ws[ws.length - 1].date : d; return `${mn(wd)}/${pad2(dn(wd))}일`; };
+  const masked = (fn) => { const old = AL.maskPhone; AL.maskPhone = true; try { return fn(); } finally { AL.maskPhone = old; } }; // 홈에서는 연락처 가운데 4자리를 항상 가림
   const boxPick = (kind) => {
     const curMonth = () => { const months = [...new Set(ledgerAll().map((l) => mn(l.date)))].sort((a, b) => a - b); return months.length ? (months.includes(mn(today())) ? mn(today()) : months[months.length - 1]) : 0; };
-    if (kind === "meet") { const ms = meetings(); const mt = ms[ms.length - 1]; return mt ? { label: `최근 모임 (${mn(mt.date)}/${dn(mt.date)} ${mt.type})`, make: () => pageMeeting(mt) } : null; }
+    if (kind === "meet") { const ms = meetings(); const mt = ms[ms.length - 1]; return mt ? { label: `최근 모임 (${wkDay(mt.date)} ${mt.type})`, make: () => pageMeeting(mt) } : null; }
+    if (kind.startsWith("meet@")) { const [, d, t] = kind.split("@"), mt = meetings().find((x) => x.date === d && x.type === t); return mt ? { label: `${wkDay(mt.date)} ${mt.type} 모임 결과`, make: () => pageMeeting(mt) } : null; }
+    if (kind.startsWith("lm@")) { const m = +kind.slice(3); return ledgerAll().some((l) => mn(l.date) === m) ? { label: `${m}월 장부 상세`, make: () => pageLedgerMonth(m) } : null; }
+    if (kind === "rank") return S.games.some((g) => g.gameDate && yearOf(g.gameDate) === S.year) ? { label: `순위표 (${S.year}년 누적)`, make: () => pageRank() } : null;
+    if (kind === "contact") return { label: "연락처(뷰)", make: () => masked(() => pageMembers(true)) };
     if (kind === "quarter") {
       const y = Y(), q = Math.floor((mn(today()) - 1) / 3) + 1;
       if (!activeMembers().some((m) => S.sq[`${m.memberId}|${y}|${q}`] != null)) return null; // 이번 분기 책정에버가 아직 결정되지 않았으면 표시하지 않음
@@ -584,7 +591,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     if (kind === "month") { const m = curMonth(); return m ? { label: `${m}월 장부 상세`, make: () => pageLedgerMonth(m) } : null; }
     if (kind === "fee") return { label: "회비 납부 현황", make: () => pageFee() };
     if (kind === "locker") return lockersShown().length ? { label: "락카 현황", make: () => pageLocker() } : null;
-    if (kind === "member") return { label: "회원목록", make: () => { const old = AL.maskPhone; AL.maskPhone = true; try { return pageMembers(false); } finally { AL.maskPhone = old; } } };
+    if (kind === "member") return { label: "회원목록", make: () => masked(() => pageMembers(false)) };
     return null;
   };
   const BOX_GROUPS = [["기록현황", ["meet", "quarter"]], ["장부현황", ["annual", "summary", "month"]], ["회비현황", ["fee"]], ["락카현황", ["locker"]], ["회원현황", ["member"]]];
@@ -675,6 +682,20 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     return { width: W, height: Math.ceil(wrap.getBoundingClientRect().height), zoom: Math.round((1080 / Wd) * 100) / 100, hA: hAs };
   }
   window.AlbumBox = {
+    // 가로 홈 왼쪽 접힘·펼침 목록: 기록앨범에서 고를 수 있는 전체 목록을 분류별로. [{g, items:[[kind,라벨]], subs:[{name, unit, items}]}]
+    async tree() {
+      await window.__albumData;
+      const L = (k) => { const p = boxPick(k); return p ? [k, p.label] : null; };
+      const ms = meetings().slice().reverse().map((mt) => [`meet@${mt.date}@${mt.type}`, `${wkDay(mt.date)} ${mt.type} · ${new Set(mt.records.map((r) => r.memberId)).size}명`]);
+      const months = [...new Set(ledgerAll().map((l) => mn(l.date)))].sort((a, b) => b - a).map((m) => [`lm@${m}`, `${m}월 상세`]);
+      return [
+        { g: "기록현황", items: [L("meet"), L("rank"), L("quarter")].filter(Boolean), subs: ms.length ? [{ name: "모임기록 (일자별)", unit: "회", items: ms }] : [] },
+        { g: "장부현황", items: [L("annual"), L("summary")].filter(Boolean), subs: months.length ? [{ name: "월별 상세", unit: "개월", items: months }] : [] },
+        { g: "회비현황", items: [L("fee")].filter(Boolean), subs: [] },
+        { g: "락카현황", items: [L("locker")].filter(Boolean), subs: [] },
+        { g: "회원현황", items: [L("member"), L("contact")].filter(Boolean), subs: [] },
+      ].filter((x) => x.items.length || x.subs.length);
+    },
     // [[분류, [[kind, 라벨], …]], …] — 표시할 수 있는 항목만
     async groups() { await window.__albumData; return BOX_GROUPS.map(([g, ks]) => [g, ks.map((k) => { const p = boxPick(k); return p ? [k, p.label] : null; }).filter(Boolean)]).filter(([, l]) => l.length); },
     // W·H: 쓸 수 있는 폭·높이(px). 1080×1920 한 장을 폭과 높이에 모두 맞춰 스크롤 없이 한 화면에 보이게 줄여서 그려요. 반환: {width, height}
