@@ -594,9 +594,11 @@ body.tbon .tbin.num{width:50px!important}
 .alp-bcol u,.alp-bcol s{display:block;width:26px;border-radius:6px 6px 0 0;text-decoration:none}.alp-bcol u{background:#2d6f9f}.alp-bcol s{background:#d9534f}
 .alp-bar span{font-size:25px;color:#6b7f93;height:40px;line-height:40px}
 .alp-two{display:flex;gap:26px;margin-top:20px}.alp-half{flex:1;min-width:0}
-.alp-pod{display:flex;justify-content:center;align-items:flex-end;gap:24px;height:360px;margin-bottom:34px}
-.alp-pcol{width:250px;border-radius:22px 22px 0 0;color:#fff;text-align:center;display:flex;flex-direction:column;justify-content:flex-start;padding-top:14px}
-.alp-pcol b{font-size:58px}.alp-pcol strong{font-size:36px}.alp-pcol span{font-size:29px}
+.alp-pod{display:flex;justify-content:center;align-items:flex-end;gap:18px;margin:0 0 22px;border-bottom:4px solid #1F3A5A} /* 낮은 금·은·동 시상식 단상 */
+.alp-pst{flex:0 1 250px;min-width:0;text-align:center;display:flex;flex-direction:column;align-items:stretch}
+.alp-pst strong{font-size:31px;line-height:1.2;color:#1F3A5A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.alp-pst span{font-size:26px;line-height:1.25;color:#4A5F75;margin-bottom:6px}
+.alp-pcol{border-radius:14px 14px 0 0;color:#fff;display:flex;align-items:center;justify-content:center}
+.alp-pcol b{font-size:38px;line-height:1}
 .alp-idx{display:flex;flex-direction:column;gap:6px;font-size:32px}
 .alp-imaj{display:flex;justify-content:space-between;font-size:40px;font-weight:800;color:#14304f;margin-top:26px;border-bottom:3px solid #14304f;padding-bottom:6px}
 .alp-imid{display:flex;justify-content:space-between;padding:6px 20px;font-size:33px}.alp-imin{display:flex;justify-content:space-between;padding:2px 60px;font-size:28px;color:#475467}

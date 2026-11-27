@@ -151,8 +151,9 @@
   }
   function podium(top) {
     if (!top.length) return null;
-    const cols = ["#D9A021", "#8DA2B6", "#B57A4F"], hs = [1, 0.8, 0.66];
-    return h("div", { class: "alp-pod" }, [1, 0, 2].filter((r) => r < top.length).map((r) => h("div", { class: "alp-pcol", style: `height:${330 * hs[r]}px;background:${cols[r]}` }, h("b", {}, r + 1), h("strong", {}, top[r][0]), h("span", {}, top[r][1]))));
+    // 낮은 시상식 단상(2위 왼쪽 · 1위 가운데 가장 높게 · 3위 오른쪽): 단상 위에 이름·평균, 단상 안에 순위 — 표(순위표)가 더 많이 보이게 높이를 줄임
+    const cols = ["#D9A021", "#8DA2B6", "#B57A4F"], hs = [96, 68, 46];
+    return h("div", { class: "alp-pod" }, [1, 0, 2].filter((r) => r < top.length).map((r) => h("div", { class: "alp-pst" }, h("strong", {}, top[r][0]), h("span", {}, top[r][1]), h("div", { class: "alp-pcol", style: `height:${hs[r]}px;background:${cols[r]}` }, h("b", {}, r + 1)))));
   }
   const PILL = { green: "alp-pg", red: "alp-pr", blue: "alp-pb", gray: "alp-pgr", yellow: "alp-py" };
   /* cols: [{t, w, align, wrap}], rows: [[cell]], cell = 문자열 | {t, color, bold, pill, dot, small} */
