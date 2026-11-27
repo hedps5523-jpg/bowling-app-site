@@ -288,6 +288,8 @@
     pg.body.append(table([C("번호", 0.9), C("회원명", 2), C("보증금", 1.1), C("1년 사용료", 1.2), C("계약일", 1), C("만료일", 1), C("가입일", 1.1)], rows, { fs: 29 }));
     pg.foot(`1년 사용료 합계 ${won(fee)}원`); return pg;
   };
+  // 환경설정 '주차별' 목록(매주 수요일 게임일)에서 그 기록이 속한 주의 게임일 'YYYY-MM-DD' (목록이 없으면 기록일 그대로)
+  const wkDate = (d) => { let ws = []; try { ws = Svc.basicWeeks(yearOf(d)).filter((w) => w.date <= d); } catch {} return ws.length ? ws[ws.length - 1].date : d; };
   const pageMeeting = (mt) => {
     const mm = mById(), recs = mt.records, roles = roleMap(recs);
     const byM = new Map(); recs.forEach((g) => { if (!byM.has(g.memberId)) byM.set(g.memberId, g); });
@@ -295,7 +297,8 @@
     const gc = [0, 1, 2, 3].filter((i) => rows.some((r) => r.sc[i] > 0)), all = rows.flatMap((r) => r.sc.filter((v) => v > 0));
     const nm = (id) => maskNm((mm.get(id) || {}).name || "#" + id);
     const top = rows.find((r) => r.role && r.role.role === "HIGH"), ever = rows.find((r) => r.role && r.role.role === "EVER"), ac = rows.filter((r) => r.role && r.role.role === "ALL");
-    const pg = newPage("모임 결과", `${mt.date.replace(/-/g, ".")} (${dowOf(mt.date)}) ${mt.type} · ${gc.length}게임`);
+    const wd = wkDate(mt.date); // 환경설정 '주차별' 게임일(수요일) 기준으로 표시 (기록 입력일이 목요일 등이어도 그 주의 게임일)
+    const pg = newPage("모임 결과", `${wd.replace(/-/g, ".")} (${dowOf(wd)}) ${mt.type} · ${gc.length}게임`);
     pg.body.append(kpis([{ label: "참가", value: `${rows.length}명` }, { label: "최고하이", value: top ? nm(top.g.memberId) : "-", tone: "warn", sub: top ? `${top.role.score}점` : null }, { label: "에버하이", value: ever ? nm(ever.g.memberId) : "-", tone: "warn", sub: ever ? `${ever.role.score}점 · ${ever.role.diff >= 0 ? "+" : ""}${ever.role.diff}` : null }, { label: "전체 평균", value: all.length ? (all.reduce((a, b) => a + b, 0) / all.length).toFixed(1) : "-" }]));
     pg.body.append(table([C("순위", 0.8), C("회원", 1.4), ...gc.map((i) => C(`${i + 1}G`, 0.9)), C("합계", 1), C("평균", 1)],
       rows.map((r, i) => [{ t: i + 1, bold: true }, { t: nm(r.g.memberId), bold: !!(r.role && r.role.role === "ALL") }, ...gc.map((k) => { const v = r.sc[k], pill = v > 0 && r.role && v === r.role.score ? (r.role.role === "HIGH" ? "yellow" : r.role.role === "EVER" ? "blue" : null) : null; return { t: v > 0 ? String(v) : "-", pill }; }), { t: r.total, bold: true }, r.avg.toFixed(1)]),
@@ -335,6 +338,19 @@
       rows.map((r) => { const d = dl(r); return [{ t: maskNm(r.m.name), bold: (d || 0) > 0 }, r.prev != null ? String(r.prev) : "-", r.act != null ? r.act.toFixed(1) : "-", { t: r.cur != null ? String(r.cur) : "-", bold: true, color: (d || 0) > 0 ? GRN : null }, d == null ? { t: "-", color: MUT } : d > 0 ? { t: `▲ ${d}`, bold: true, pill: "green" } : d < 0 ? { t: `▼ ${-d}`, bold: true, color: RED } : { t: "유지", color: MUT }]; }),
       { highlightRows: new Set(rows.map((r, i) => ((dl(r) || 0) > 0 ? i : -1)).filter((i) => i >= 0)) }));
     pg.foot("에버 상승 회원 강조 · 하락 없음(유지/상승) · 관리자 책정값 우선 · 활동 회원 전체"); return pg;
+  };
+  /* 진행중인 분기 에버: 입력화면-분기에버와 같은 값(기준에버·누적에버·조정에버), 1차 기준에버 · 2차 누적에버 순 */
+  const curQ = () => Math.floor((mn(today()) - 1) / 3) + 1;
+  const pageQuarterNow = () => {
+    const q = curQ(), rows = Svc.quarterRows(q);
+    const diff = (r) => (r.base > 0 && r.cum > 0 ? r.cum - r.base : null);
+    const up = rows.filter((r) => (diff(r) || 0) > 0).length, played = rows.filter((r) => r.cum > 0), bs = rows.map((r) => r.base).filter((v) => v > 0);
+    const pg = newPage("분기 에버 (진행중)", `${S.year}년 ${q}분기 · ${today().slice(5).replace("-", "/")} 현재`);
+    pg.body.append(kpis([{ label: "회원", value: `${rows.length}명` }, { label: "기록 있음", value: `${played.length}명` }, { label: "기준 초과", value: `${up}명`, tone: "ok" }, { label: `${q}분기 기준 평균`, value: bs.length ? (bs.reduce((a, b) => a + b, 0) / bs.length).toFixed(1) : "-" }]),
+      table([C("순번", 0.7), C("회원", 1.4), C("기준에버", 1.1), C("누적에버", 1.1), C("차이", 1), C("조정에버", 1.1)],
+        rows.map((r, i) => { const d = diff(r); return [{ t: i + 1, bold: true }, { t: maskNm(r.name), bold: (d || 0) > 0 }, r.base > 0 ? String(r.base) : "-", { t: r.cum > 0 ? r.cum.toFixed(1) : "-", bold: true }, d == null ? { t: "-", color: MUT } : d > 0 ? { t: `+${d.toFixed(1)}`, bold: true, color: GRN } : { t: d.toFixed(1), color: d < 0 ? RED : MUT }, r.adj != null ? String(r.adj) : "-"]; }),
+        { highlightRows: new Set(rows.map((r, i) => ((diff(r) || 0) > 0 ? i : -1)).filter((i) => i >= 0)) }));
+    pg.foot("진행중 분기 · 1차 기준에버 · 2차 누적에버 순 · 분기가 끝나면 책정에버가 결정돼요"); return pg;
   };
 
   /* 항목 → 페이지 목록 (분기에버는 선택한 분기마다 한 장) */
@@ -571,7 +587,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
        meet 최근 모임 / quarter 분기에버(분기가 끝나 책정에버가 결정된 뒤에만) / annual 1년결산 / summary 월별 요약 / month 이번 달 월별 장부 상세
        fee 회비 납부 현황 / locker 락카 현황 / member 회원 목록(연락처 가운데 4자리 가림) */
   // 환경설정 '주차별' 목록(매주 수요일 게임일)에서 그 기록이 속한 주의 일자 → 'M/DD일' (예: 11/26 기록 → 11월 4주차 11/25일)
-  const wkDay = (d) => { const ws = Svc.basicWeeks(yearOf(d)).filter((w) => w.date <= d), wd = ws.length ? ws[ws.length - 1].date : d; return `${mn(wd)}/${pad2(dn(wd))}일`; };
+  const wkDay = (d) => { const wd = wkDate(d); return `${mn(wd)}/${pad2(dn(wd))}일`; };
   const masked = (fn) => { const old = AL.maskPhone; AL.maskPhone = true; try { return fn(); } finally { AL.maskPhone = old; } }; // 홈에서는 연락처 가운데 4자리를 항상 가림
   const boxPick = (kind) => {
     const curMonth = () => { const months = [...new Set(ledgerAll().map((l) => mn(l.date)))].sort((a, b) => a - b); return months.length ? (months.includes(mn(today())) ? mn(today()) : months[months.length - 1]) : 0; };
@@ -581,11 +597,10 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     if (kind === "rank") return S.games.some((g) => g.gameDate && yearOf(g.gameDate) === S.year) ? { label: `순위표 (${S.year}년 누적)`, make: () => pageRank() } : null;
     if (kind === "contact") return { label: "연락처(뷰)", make: () => masked(() => pageMembers(true)) };
     if (kind === "quarter") {
-      const y = Y(), q = Math.floor((mn(today()) - 1) / 3) + 1;
-      if (!activeMembers().some((m) => S.sq[`${m.memberId}|${y}|${q}`] != null)) return null; // 이번 분기 책정에버가 아직 결정되지 않았으면 표시하지 않음
-      const [sy, sq, ty, tq] = spanOf(0);
-      return { label: `분기에버 (${sy !== ty ? pad2(sy % 100) + "년 " : ""}${sq}→${tq}분기)`, make: () => pageQuarter(0) };
+      const [sy, sq, ty, tq] = spanOf(0); // 지난 분기(책정에버가 결정된 가장 최근 구간)
+      return { label: `지난 분기에버 (${sy !== ty ? pad2(sy % 100) + "년 " : ""}${sq}→${tq}분기)`, make: () => pageQuarter(0) };
     }
+    if (kind === "qnow") return Svc.quarterRows ? { label: `진행중 분기에버 (${curQ()}분기)`, make: () => pageQuarterNow() } : null;
     if (kind === "annual") return ledgerAll().length ? { label: `1년결산 (${S.year}년)`, make: () => pageLedgerAnnual() } : null;
     if (kind === "summary") { const m = curMonth(); return m ? { label: `월별 요약 (${m}월 기준)`, make: () => pageLedgerSummary() } : null; }
     if (kind === "month") { const m = curMonth(); return m ? { label: `${m}월 장부 상세`, make: () => pageLedgerMonth(m) } : null; }
@@ -594,7 +609,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
     if (kind === "member") return { label: "회원목록", make: () => masked(() => pageMembers(false)) };
     return null;
   };
-  const BOX_GROUPS = [["기록현황", ["meet", "quarter"]], ["장부현황", ["annual", "summary", "month"]], ["회비현황", ["fee"]], ["락카현황", ["locker"]], ["회원현황", ["member"]]];
+  const BOX_GROUPS = [["기록현황", ["meet", "quarter", "qnow"]], ["장부현황", ["annual", "summary", "month"]], ["회비현황", ["fee"]], ["락카현황", ["locker"]], ["회원현황", ["member"]]];
   /* 두 손가락 확대(핀치): 팝업 제목줄·박스 크기는 그대로 두고 그림(결과물)만 같은 비율로 키워요. 확대하면 그림 화면 안에서 손가락으로 밀어 이동하고, 다시 오므리면(1배) 원래대로.
      한 화면 맞춤(fit)에서는 그림 화면을 팝업 본문 크기로 넓히고, 돋보기(pin)에서는 확대 배율만 곱해요. 브라우저 자체 확대는 touch-action 으로 막아 두었어요(albumbox.html). */
   const UZ = {
@@ -689,7 +704,7 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       const ms = meetings().slice().reverse().map((mt) => [`meet@${mt.date}@${mt.type}`, `${wkDay(mt.date)} ${mt.type} · ${new Set(mt.records.map((r) => r.memberId)).size}명`]);
       const months = [...new Set(ledgerAll().map((l) => mn(l.date)))].sort((a, b) => b - a).map((m) => [`lm@${m}`, `${m}월 상세`]);
       return [
-        { g: "기록현황", items: [L("meet"), L("rank"), L("quarter")].filter(Boolean), subs: ms.length ? [{ name: "모임기록 (일자별)", unit: "회", items: ms }] : [] },
+        { g: "기록현황", items: [L("meet"), L("rank"), L("quarter"), L("qnow")].filter(Boolean), subs: ms.length ? [{ name: "모임기록 (일자별)", unit: "회", items: ms }] : [] },
         { g: "장부현황", items: [L("annual"), L("summary")].filter(Boolean), subs: months.length ? [{ name: "월별 상세", unit: "개월", items: months }] : [] },
         { g: "회비현황", items: [L("fee")].filter(Boolean), subs: [] },
         { g: "락카현황", items: [L("locker")].filter(Boolean), subs: [] },
