@@ -213,13 +213,13 @@ async function vHome() {
   // 넓은 가로 화면: 왼쪽 = 모임·공지(최근 공지 + 다음 모임) / 오른쪽 = 기록앨범 박스. 세로 화면: 위에서 아래로 쌓고 기록앨범은 드롭메뉴 → 팝업
   if (window.__albumMq.matches) { // 가로: 인사 줄은 왼쪽 맨 위, 로그아웃·저작권 줄은 왼쪽 맨 아래로 옮기고 기록앨범 박스를 위아래로 넓게
     const ft = window.__clubfoot || (window.__clubfoot = document.querySelector(".clubfoot"));
-    const lh = h("section", { class: "card alblist" }, h("p", { class: "tag" }, "기록앨범 목록을 불러오는 중…")); // 왼쪽 기록앨범 목록(접힘·펼침)
-    view.classList.add("hwide"); view.append(h("div", { class: "homeleft" }, ph, lh, r, c, ft), albumCard(lh));
+
+    view.classList.add("hwide"); view.append(h("div", { class: "homeleft" }, ph, r, c, ft), albumCard()); // 기록앨범 목록은 오른쪽 박스 제목 옆 드롭메뉴로
     const nv = document.querySelector(".bnav"), navH = nv && getComputedStyle(nv).display !== "none" ? nv.offsetHeight : 0;
     view.style.minHeight = view.style.height = Math.max(300, window.innerHeight - view.getBoundingClientRect().top - navH - 12) + "px"; // 한 화면 높이로 고정: 왼쪽은 기록앨범 목록만 안에서 스크롤
   } else { // 세로: 인사 줄 → 기록앨범 전체 목록(남는 높이 안에서 스크롤) → 최근 공지 → 다음 모임 → 로그아웃 줄, 한 화면 높이
     const ft = window.__clubfoot || (window.__clubfoot = document.querySelector(".clubfoot"));
-    const lh = h("section", { class: "card alblist" }, h("p", { class: "tag" }, "기록앨범 목록을 불러오는 중…"));
+    const lh = h("section", { class: "card albpick" }, h("p", { class: "tag" }, "기록앨범을 불러오는 중…"));
     view.classList.add("hport"); view.append(ph, lh, r, c, ft, albumCard(lh));
     const nv = document.querySelector(".bnav"), navH = nv && getComputedStyle(nv).display !== "none" ? nv.offsetHeight : 0;
     view.style.minHeight = view.style.height = Math.max(420, window.innerHeight - view.getBoundingClientRect().top - navH - 8) + "px";
@@ -263,11 +263,33 @@ function renderAlbumTree(host, tree, pick) {
     host.append(...fold(g.g, g.g, `${n}개`, "albgh", kids));
   });
 }
+/* 가로 홈 기록앨범 제목 옆 드롭메뉴: 대분류(기록현황·장부현황·회비현황·락카현황·회원현황) → 중분류(항목, ▸ 가 붙은 것은 하위 목록 있음)
+   → 소분류(모임기록 일자별·월별 상세처럼 하위 목록이 있을 때만 나타남) 순서로 골라요. 고른 위치는 이 기기에 기억(localStorage albCascade). */
+function renderAlbumCascade(box, tree, pick, opts = {}) { // opts.noInit: 처음에는 표시하지 않음(세로 홈: 고르거나 보기를 눌러야 팝업)
+  const s1 = h("select", { class: "c1", "aria-label": "대분류" }), s2 = h("select", { class: "c2", "aria-label": "중분류" }), s3 = h("select", { class: "c3", "aria-label": "소분류" });
+  box.textContent = ""; box.append(s1, s2, s3);
+  tree.forEach((g, i) => s1.append(h("option", { value: String(i) }, g.g)));
+  const fill2 = () => { const g = tree[+s1.value]; s2.textContent = ""; g.items.forEach(([k, l]) => s2.append(h("option", { value: "k:" + k }, l))); g.subs.forEach((s, j) => s2.append(h("option", { value: "s:" + j }, `${s.name} ▸ ${s.items.length}${s.unit}`))); };
+  const fill3 = () => { const v = s2.value, g = tree[+s1.value]; s3.textContent = ""; if (v.startsWith("s:")) { g.subs[+v.slice(2)].items.forEach(([k, l]) => s3.append(h("option", { value: k }, l))); s3.hidden = false; } else s3.hidden = true; };
+  const save = () => { try { localStorage.setItem("albCascade", JSON.stringify([s1.value, s2.value, s3.hidden ? "" : s3.value])); } catch {} };
+  const fire = () => { const v = s2.value, k = v.startsWith("k:") ? v.slice(2) : s3.value; save(); if (k) pick(k); };
+  s1.onchange = () => { fill2(); fill3(); fire(); }; s2.onchange = () => { fill3(); fire(); }; s3.onchange = fire;
+  const set = (saved) => { // 주어진 위치로 맞춤(표시는 하지 않음)
+    if (saved && tree[+saved[0]]) s1.value = saved[0];
+    fill2(); if (saved && [...s2.options].some((o) => o.value === saved[1])) s2.value = saved[1];
+    fill3(); if (saved && saved[2] && [...s3.options].some((o) => o.value === saved[2])) s3.value = saved[2];
+  };
+  const get = () => [s1.value, s2.value, s3.hidden ? "" : s3.value];
+  const load = () => { let saved = null; try { saved = JSON.parse(localStorage.getItem("albCascade") || "null"); } catch {} set(saved); }; // 이 기기에 기억해 둔 위치
+  const cur = () => { const v = s2.value; return v.startsWith("k:") ? v.slice(2) : s3.value; };
+  load(); if (!opts.noInit) fire();
+  return { load, set, get, cur, fire };
+}
 function albumCard(listHost) {
   const wide = window.__albumMq.matches; // 가로 2단(왼쪽 모임·공지 / 오른쪽 기록앨범 박스)
   const sel = h("select", { class: "albsel", "aria-label": "기록앨범 선택", disabled: true }, h("option", { value: "" }, "불러오는 중…"));
-  const subEl = h("span", { class: "albsub" }); // 가로: 왼쪽 목록에서 고른 항목 이름
-  const head = h("div", { class: "albhead" }, h("h2", {}, "📒 기록앨범"), wide && listHost ? subEl : sel);
+  const casBox = h("div", { class: "albcas" }); // 가로: 대분류·중분류·소분류 드롭메뉴(기록앨범 제목 옆)
+  const head = h("div", { class: "albhead" }, h("h2", {}, "📒 기록앨범"), wide ? casBox : sel);
   let curK = "";
   const card = h("section", { class: "card albumcard" + (wide ? " albwide" : "") }, head);
   const wrap = h("div", { class: "albwrap" }); // 가로: 박스 안에 그림이 나타나는 자리
@@ -286,21 +308,15 @@ function albumCard(listHost) {
         document.body.append(pop); host = popBody;
       }
       const { f, A } = await albumFrame(host);
-      if (wide && listHost) { // 가로: 왼쪽 '기록앨범 목록'(접힘·펼침)에서 고르면 오른쪽 박스에 표시
+      if (wide) { // 가로: 제목 옆 대분류 → 중분류 → 소분류 드롭메뉴로 고르면 아래 박스에 표시
         const tree = await A.tree(); msg.remove();
         const drawW = async (k) => {
           const nav = document.querySelector(".bnav"), navH = nav && getComputedStyle(nav).display !== "none" ? nav.offsetHeight : 0;
           const W = Math.max(200, Math.floor(wrap.clientWidth)), H = Math.max(200, Math.floor(window.innerHeight - wrap.getBoundingClientRect().top - navH - 18));
           const r = await A.show(k, W, H, true); f.style.width = r.width + "px"; f.style.height = r.height + "px";
         };
-        const pick = (k, label, btn) => {
-          curK = k; subEl.textContent = label;
-          listHost.querySelectorAll(".albit.on").forEach((x) => x.classList.remove("on")); if (btn) btn.classList.add("on");
-          drawW(k).catch(() => {});
-        };
-        renderAlbumTree(listHost, tree, pick);
-        const first = listHost.querySelector(".albit");
-        if (first) pick(first.dataset.k, first.textContent, first); else wrap.append(h("p", { class: "tag" }, "표시할 기록이 없어요."));
+        const pick = (k) => { curK = k; drawW(k).catch(() => {}); };
+        if (tree.length) renderAlbumCascade(casBox, tree, pick); else wrap.append(h("p", { class: "tag" }, "표시할 기록이 없어요."));
         if (window.__albResize) window.removeEventListener("resize", window.__albResize);
         let rt0 = 0; window.__albResize = () => { clearTimeout(rt0); rt0 = setTimeout(() => { if (document.body.contains(card) && curK) drawW(curK).catch(() => {}); }, 250); };
         window.addEventListener("resize", window.__albResize);
@@ -330,7 +346,7 @@ function albumCard(listHost) {
       };
       // 창 크기가 바뀌면(회전·분할 화면 등) 지금 보는 한 장을 새 크기에 맞춰 다시 그려요
       if (window.__albResize) window.removeEventListener("resize", window.__albResize);
-      let rt = 0; window.__albResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (!document.body.contains(card)) return; const k = sel.value; if (!k || (!wide && pop.hidden)) return; draw(k).catch(() => {}); }, 250); };
+      let rt = 0; window.__albResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (!document.body.contains(card)) return; const k = curK || sel.value; if (!k || (!wide && pop.hidden)) return; draw(k).catch(() => {}); }, 250); };
       window.addEventListener("resize", window.__albResize);
       if (wide) { await draw(sel.value); sel.onchange = () => draw(sel.value).catch(() => {}); }
       else {
@@ -342,8 +358,18 @@ function albumCard(listHost) {
           try { await draw(k); } catch { popBody.append(h("p", { class: "tag" }, "기록앨범을 그리지 못했어요.")); }
         };
         sel.onchange = () => { const k = sel.value; if (k) showK(k); };      // 본문 드롭메뉴로 고르면 팝업이 열림
-        if (tree) renderAlbumTree(listHost, tree, (k, l, btn) => { listHost.querySelectorAll(".albit.on").forEach((x) => x.classList.remove("on")); if (btn) btn.classList.add("on"); showK(k); }); // 목록에서 고르면 팝업
         popSel.onchange = () => { if (popSel.value) showK(popSel.value); };  // 팝업 안에서 고르면 바로 다른 화면으로 바뀜
+        if (tree) { // 세로 홈: 대분류 → 중분류 → 소분류 드롭메뉴(가로와 같은 방식). 고르거나 '보기'를 누르면 팝업, 팝업 제목줄에도 같은 드롭메뉴
+          const openK = async (k) => { curK = k; popBody.scrollTop = 0; pop.hidden = false; document.body.classList.add("albopen"); try { await draw(k); } catch { popBody.append(h("p", { class: "tag" }, "기록앨범을 그리지 못했어요.")); } };
+          const popCasBox = h("div", { class: "albcas" }); popSel.replaceWith(popCasBox);
+          const homeBox = h("div", { class: "albcas" });
+          let popCas = null;
+          const homeCas = renderAlbumCascade(homeBox, tree, (k) => { if (popCas) popCas.set(homeCas.get()); openK(k); }, { noInit: true });
+          popCas = renderAlbumCascade(popCasBox, tree, (k) => { homeCas.set(popCas.get()); openK(k); }, { noInit: true }); // 홈·팝업 드롭메뉴는 서로 같은 위치로 맞춤
+          listHost.textContent = "";
+          listHost.append(h("h2", { class: "albtreeh" }, "📒 기록앨범", h("small", {}, "대분류 → 중분류 → 소분류")), homeBox,
+            h("button", { type: "button", class: "btn albgo", onclick: () => { const k = homeCas.cur(); if (k) { popCas.set(homeCas.get()); openK(k); } } }, "선택한 기록앨범 보기"));
+        }
       }
     } catch (e) {
       msg.textContent = "기록앨범을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."; sel.remove();

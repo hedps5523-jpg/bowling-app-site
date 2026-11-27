@@ -401,3 +401,22 @@ body.albopen{overflow:hidden}
 #view.hport>.clubfoot{flex:none;margin-top:8px;padding-top:4px;display:flex;flex-direction:column;align-items:stretch;gap:2px;text-align:center}
 #view.hport>.clubfoot .btn{padding:8px 12px;font-size:14px}
 #view.hport>.clubfoot div{line-height:1.4;font-size:12px;color:var(--sub)}
+/* 가로 홈(2026-11-27): 기록앨범 제목 옆 대분류·중분류·소분류 드롭메뉴 */
+.albumcard.albwide .albhead{flex-wrap:wrap;row-gap:6px}
+.albcas{display:flex;gap:6px;flex:1 1 300px;min-width:0;justify-content:flex-end;flex-wrap:wrap}
+.albcas select{width:auto;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;font-weight:600;background:#fff;color:var(--text);min-width:0;max-width:100%}
+.albcas .c1{flex:0 0 auto}
+.albcas .c2{flex:1 1 150px;max-width:240px}
+.albcas .c3{flex:1 1 130px;max-width:200px}
+.albcas select[hidden]{display:none}
+/* 세로 홈(2026-11-27): 기록앨범 대분류·중분류·소분류 드롭메뉴 카드 + 팝업 제목줄 드롭메뉴 */
+#view.hport>.albpick{flex:none;margin-top:8px;padding:10px 12px}
+#view.hport>.clubfoot{margin-top:auto}
+.albpick .albtreeh{font-size:16px;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+.albpick .albtreeh small{font-size:11px;font-weight:400;color:var(--sub)}
+.albpick .albcas{justify-content:flex-start}
+.albpick .albcas .c2,.albpick .albcas .c3{flex:1 1 140px;max-width:none}
+.albpick .albgo{margin-top:8px;padding:9px 12px;font-size:14px}
+.albpophead .albcas{flex:1;justify-content:flex-start;gap:5px}
+.albpophead .albcas select{padding:6px 6px;font-size:13px}
+.albpophead .albcas .c2,.albpophead .albcas .c3{flex:1 1 110px;max-width:none}
