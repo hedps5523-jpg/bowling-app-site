@@ -1769,7 +1769,8 @@ function approvalPanel() {
     if (!AP.rows.some((r) => r.user_id === AP.sel)) AP.sel = AP.rows[0].user_id;
     for (const r of AP.rows) {
       const t = tier(r), status = ["관리자", "입력 승인", "조회 승인", "승인 대기"][t], color = ["#6B3FB3", "#1A5BA8", "#0F9D45", "#AA7418"][t];
-      listHost.append(h("div", { class: "aprow" + (r.user_id === AP.sel ? " on" : ""), onclick: () => { if (!AP.busy) { AP.sel = r.user_id; rebuild(); } } }, h("b", {}, `${String(r.requested_member_name || "").trim() || "이름 없음"} (${r.login_id || "-"})`), h("b", { style: `color:${color}` }, status)));
+      const nm = String(r.requested_member_name || "").trim(), notMember = !!nm && !S.members.some((m) => m.name.trim().toLowerCase() === nm.toLowerCase()); // 클럽 회원관리에 없는 이름(예: 홍길동) → 승인 대상 아님 표시
+      listHost.append(h("div", { class: "aprow" + (r.user_id === AP.sel ? " on" : ""), onclick: () => { if (!AP.busy) { AP.sel = r.user_id; rebuild(); } } }, h("b", {}, `${nm || "이름 없음"} (${r.login_id || "-"})`), notMember ? h("b", { style: "color:#c83237", title: "클럽 회원 목록에 없는 이름이에요. 승인할 수 없고, 필요 없으면 계정 삭제를 눌러 정리하세요." }, `${status} · 회원 아님`) : h("b", { style: `color:${color}` }, status)));
     }
     bind();
   };
