@@ -281,7 +281,7 @@
      게임기록 / 분기에버 (LargeGameFragment)
      ===================================================================== */
   // 로그인한 회원(홈페이지 이름 또는 클럽 계정 이름)과 같은 이름의 회원 id — 목록(opts)에 있을 때만
-  const myId = () => { try { const nm = String((Conn.me && (Conn.me.siteName || Conn.me.name)) || "").trim(); if (!nm) return null; const m = activeMembers().find((x) => x.name.trim() === nm); return m ? m.memberId : null; } catch { return null; } };
+  const myId = () => { if (!VIEWONLY) return null; /* 클럽관리 화면은 입력 관리만: 로그인 회원 기본 선택·자동 팝업·강조는 기록조회에서만 */ try { const nm = String((Conn.me && (Conn.me.siteName || Conn.me.name)) || "").trim(); if (!nm) return null; const m = activeMembers().find((x) => x.name.trim() === nm); return m ? m.memberId : null; } catch { return null; } };
   const meDef = (ids) => (!inputMode() && ids.includes(myId()) ? myId() : null); // 조회 화면에서 본인이 목록에 있으면 본인을 기본 선택
   const myMid = (opts) => { const id = myId(); return id != null && opts.some((o) => o[0] === String(id)) ? String(id) : null; };
   const GS = { report: "개인기록", linked: null, sort: "평균점수", date: null, type: null, member: null, editing: 0, lockedType: null, lockedWeek: null, scores: ["", "", "", ""], note: "", qOpt: null, qMember: null, draft: {}, inited: false };
@@ -750,7 +750,8 @@
     return true;
   }
   function renderFees() {
-    const inMode = inputMode(), year = ynum(today()), tm = mnum(today());
+    const cy = ynum(today()), inMode = inputMode(), year = inMode ? cy : (FS.year || cy), tm = mnum(today()); // 조회 화면은 연도를 바꿔 전년도 회비도 볼 수 있음
+    const fYears = [...new Set([cy, ...S.fees.map((p) => p.year).filter((y) => y > 0 && y <= cy)])].sort((a, b) => b - a);
     const members = activeMembers().filter((m) => !m.feeExempt);
     const allPays = S.fees, pays = allPays.filter((p) => p.year === year);
     if (!members.some((m) => m.memberId === FS.member)) FS.member = meDef(members.map((m) => m.memberId)) || (members.length ? members[0].memberId : null);
@@ -766,7 +767,7 @@
       inputCard = card(lab("회원명"), sel(members.map((m) => [m.memberId, m.name]), FS.member, (v) => { FS.member = +v; renderFees(); }), lab("선납"), pre, lab("시작월"), sSel, lab("종료월"), eSel,
         lab("납부일"), dIn, lab("비고"), nIn, btn("회비 등록", savePay, "pri"), btn("수정", openModify));
     } else {
-      queryCard = card(lab("조회월"), sel(months, String(FS.month), (v) => { FS.month = +v; renderFees(); }), btn("회비 현황 조회", renderFees), h("span", { class: "tbsum", id: "tbFsum" }));
+      queryCard = card(fYears.length > 1 ? lab("연도") : null, fYears.length > 1 ? sel(fYears.map((y) => [String(y), `${y}년`]), String(year), (v) => { FS.year = +v; FS.month = +v < cy ? 12 : tm; renderFees(); }) : null, lab("조회월"), sel(months, String(FS.month), (v) => { FS.month = +v; renderFees(); }), btn("회비 현황 조회", renderFees), h("span", { class: "tbsum", id: "tbFsum" }));
     }
     const month = inMode ? tm : FS.month;
     const dueMonth = year < ynum(today()) ? 12 : year === ynum(today()) ? tm : 0, displayMonth = Math.max(month, dueMonth);
@@ -1326,12 +1327,12 @@
 
   /* ---- 회비 ---- */
   function phqFees() {
-    const year = ynum(today()), tm = mnum(today()), members = activeMembers().filter((m) => !m.feeExempt);
+    const cy = ynum(today()), year = QS.fyear || cy, past = year < cy, tm = past ? 12 : mnum(today()), members = activeMembers().filter((m) => !m.feeExempt); // 전년도는 12월까지 모두 지난 달로 봄
     const ST = { 완납: "ok", 정상: "ok", 예정: "soon", 미납: "no" };
     const rows = members.map((m) => {
       const prior = S.fees.filter((p) => p.memberId === m.memberId), pays = prior.filter((p) => p.year === year), by = new Map(pays.map((p) => [p.month, p]));
       let req = 0, allPaid = true, unpaid = 0, cur = false;
-      for (let mo = 1; mo <= 12; mo++) { const active = isFeeTarget(m, year, mo, prior), ex = active && m.executiveThreeMonthExempt && mo >= 10; if (active && !ex) { req++; if (!by.get(mo)) { allPaid = false; if (mo < tm) unpaid++; else if (mo === tm) cur = true; } } }
+      for (let mo = 1; mo <= 12; mo++) { const active = isFeeTarget(m, year, mo, prior), ex = active && m.executiveThreeMonthExempt && mo >= 10; if (active && !ex) { req++; if (!by.get(mo)) { allPaid = false; if (mo < tm || past) unpaid++; else if (mo === tm) cur = true; } } }
       const status = req > 0 && allPaid ? "완납" : unpaid ? "미납" : cur ? "예정" : "정상";
       return { m, status, pays, by, unpaid, total: pays.reduce((a, p) => a + p.amount, 0) };
     });
@@ -1346,7 +1347,9 @@
         h("b", { class: "sec" }, "납부 정보"), kv([[`${tm}월 회비`, won(cp ? cp.amount : S.monthlyFee) + "원"], ["납부상태", r.status], ["납부일", cp ? yy(cp.paidDate) : "-"], ["누적 미납", won(r.unpaid * S.monthlyFee) + "원"], ["완납 납부일", r.status === "완납" && lastPaid ? fdate(lastPaid) : "-"], ["누적 납부", won(r.total) + "원"]]),
         h("b", { class: "sec" }, "메모"), h("div", { class: "memo" }, (cp && cp.note) || (r.pays.length ? r.pays[r.pays.length - 1].note : "") || "-"));
     }
-    phRootF(1, h("div", { class: "phqt center" }, h("b", {}, "회비 현황")), h("div", { class: "phflist" }, items.length ? items : h("div", { class: "phempty" }, "회원 자료가 없습니다.")), det);
+    const fYears = [...new Set([cy, ...S.fees.map((p) => p.year).filter((y) => y > 0 && y <= cy)])].sort((a, b) => b - a);
+    const ySel = fYears.length > 1 ? h("select", { class: "phyr", style: "border:1px solid #cfd8e3;border-radius:8px;background:#fff;font:inherit;font-size:14px;padding:3px 6px;margin-left:8px", onchange: (e) => { QS.fyear = +e.target.value; QS.fsel = 0; phqFees(); } }, fYears.map((y) => { const o = h("option", { value: String(y) }, `${y}년`); if (y === year) o.selected = true; return o; })) : null;
+    phRootF(1, h("div", { class: "phqt center" }, h("b", {}, past ? `${year}년 회비 현황` : "회비 현황"), ySel), h("div", { class: "phflist" }, items.length ? items : h("div", { class: "phempty" }, "회원 자료가 없습니다.")), det);
   }
 
   /* ---- 락카 ---- */

@@ -578,6 +578,17 @@ function openFileMenu(btn) {
 }
 /* FILE 메뉴 바깥을 누르면 닫기 (문서에 한 번만 등록: 열 때마다 등록하면 다음 FILE 클릭이 바로 닫혀버림) */
 document.addEventListener("click", (e) => { const m = $("fileMenu"); if (m && !m.hidden && !m.contains(e.target) && !e.target.closest(".pcbtn.file")) m.hidden = true; });
+/* 새해 자동 전환: 화면을 열어 둔 채 1월 1일이 되면 해당년도(S.year·환경설정 '해당년도')를 +1 해서 다시 그림.
+   전년도 자료는 서버에 그대로 남아 있고(새해 00:05 KST 서버가 전년도 전체를 비공개 보관함에 자동 백업), 기록조회에서 연도를 바꿔 볼 수 있음.
+   입력 중(입력칸에 커서·창이 열려 있음)이면 끝날 때까지 미뤘다가 바꿈 */
+function checkNewYear() {
+  const y = new Date().getFullYear(); if (y === S.year || window.ALBUM_BOX) return;
+  const a = document.activeElement, busy = (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || ($("modal") && !$("modal").hidden);
+  if (busy) return;
+  const old = S.year; S.year = y; Svc._seeded = new Set(); Svc._weeks = {};
+  try { render(); } catch {} try { toast(`${y}년이 시작되어 해당년도를 ${y}년으로 바꿨어요. ${old}년 자료는 기록조회에서 연도를 바꿔 볼 수 있어요.`, 4200); } catch {}
+}
+setInterval(checkNewYear, 60000); document.addEventListener("visibilitychange", () => { if (!document.hidden) checkNewYear(); });
 function go(k) { if (k === "settings" && current !== "settings") { ST.back = current; ST.sub = "basic"; } current = k; try { history.replaceState(null, "", "#" + k); } catch {} render(); }
 function render() {
   Presence.start(); Presence.ping(false);
