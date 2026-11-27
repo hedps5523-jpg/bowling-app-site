@@ -1195,3 +1195,4 @@ body.phmode .alroot.alsubfix>.alcols>.alcol:last-child{flex:1;min-height:0}
 body.phmode .alroot.alsubfix>.alcols>.alcol:last-child>.alcard.alscroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 body.phmode .alroot:not(.alph){height:auto!important;overflow:visible;display:flex;flex-direction:column}
 body.phmode .alroot:not(.alph) .alcols{flex-direction:column;flex:none;gap:10px}
+.phrctab tr.me td{font-weight:800;background:#e8f1ff}

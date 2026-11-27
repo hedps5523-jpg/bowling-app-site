@@ -281,7 +281,8 @@
      게임기록 / 분기에버 (LargeGameFragment)
      ===================================================================== */
   // 로그인한 회원(홈페이지 이름 또는 클럽 계정 이름)과 같은 이름의 회원 id — 목록(opts)에 있을 때만
-  const myMid = (opts) => { try { const nm = String((Conn.me && (Conn.me.siteName || Conn.me.name)) || "").trim(); if (!nm) return null; const m = activeMembers().find((x) => x.name.trim() === nm); return m && opts.some((o) => o[0] === String(m.memberId)) ? String(m.memberId) : null; } catch { return null; } };
+  const myId = () => { try { const nm = String((Conn.me && (Conn.me.siteName || Conn.me.name)) || "").trim(); if (!nm) return null; const m = activeMembers().find((x) => x.name.trim() === nm); return m ? m.memberId : null; } catch { return null; } };
+  const myMid = (opts) => { const id = myId(); return id != null && opts.some((o) => o[0] === String(id)) ? String(id) : null; };
   const GS = { report: "개인기록", linked: null, sort: "평균점수", date: null, type: null, member: null, editing: 0, lockedType: null, lockedWeek: null, scores: ["", "", "", ""], note: "", qOpt: null, qMember: null, draft: {}, inited: false };
   const typeList = () => (S.meetingTypes && S.meetingTypes.length ? S.meetingTypes : ["정모", "비모"]);
 
@@ -463,7 +464,7 @@
         if (inWin(g.gameDate)) { if (!winGames.has(g.memberId)) winGames.set(g.memberId, []); winGames.get(g.memberId).push(g); }
       });
       const ids = [...yearGames.keys()].sort((a, b) => recAvg(winGames.get(b) || []) - recAvg(winGames.get(a) || []) || recAvg(cumGames.get(b)) - recAvg(cumGames.get(a)) || a - b); // 선택한 기간의 에버 높은 순
-      if (!ids.includes(GS.recMember)) GS.recMember = ids.length ? ids[0] : null;
+      if (!ids.includes(GS.recMember)) GS.recMember = ids.includes(myId()) ? myId() : ids.length ? ids[0] : null; // 처음에는 로그인한 회원 본인의 기록
       const lcount = (l) => l.reduce((a, g) => a + cnt(g), 0);
       const btbl = table({ headers: ["순번", "회원명(에버)", "누적에버", "출석일수", "최근에버", "최근게임"],
         rows: ids.map((id, i) => { const l = yearGames.get(id), w = winGames.get(id) || []; return [String(i + 1), nameWithAvg(mm.get(id), yearEndRef(year)), fmt1(recAvg(cumGames.get(id) || l)), String(new Set(l.map((g) => g.gameDate)).size), w.length ? fmt1(recAvg(w)) : "-", w.length ? String(lcount(w)) : "-"]; }),
@@ -1219,7 +1220,7 @@
     else if (rep === "최근 기록") lopts = [["전체", "전체"], ...Array.from({ length: Math.max(1, recWin(groups, "전체").count) }, (_, i) => [`${i + 1}개월`, `${i + 1}개월`])];
     else if (rep === "분기에버") lopts = qOpts.map((o) => [o[0], o[0]]);
     if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "3개월") ? "3개월" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? defQuarter(qOpts) : (rep === "개인기록" && myMid(lopts)) || (lopts[0] || [""])[0]; // 개인기록 첫 화면: 로그인한 회원 본인
-    const repSel = fsel(reports, rep, (v) => { GS.report = v; GS.linked = null; QS.open.clear(); phqGames(); });
+    const repSel = fsel(reports, rep, (v) => { GS.report = v; GS.linked = null; GS.recShown = false; QS.open.clear(); phqGames(); });
     const bar = rep === "순위표"
       ? fbar(repSel, fsel(["전회원", "남자", "여자"], QS.rk, (v) => { QS.rk = v; phqGames(); }), fsel(["전분기", "1분기", "2분기", "3분기", "4분기", "상반기", "하반기"], QS.period, (v) => { QS.period = v; phqGames(); }), refreshBtn())
       : fbar(repSel, rep === "최근 기록" ? h("button", { type: "button", class: "phfsel phdd", onclick: (ev) => { ev.stopPropagation(); openDrop(ev.currentTarget, lopts, GS.linked, (v) => { GS.linked = v; QS.open.clear(); phqGames(); }); } }, `기간 ${GS.linked}`) : fsel(lopts, GS.linked, (v) => { GS.linked = v; QS.open.clear(); phqGames(); }), refreshBtn());
@@ -1259,8 +1260,9 @@
         $("modalTitle").append(h("span", { class: "rcper" }, `${perLabel} 기록${range ? ` (${range})` : ""}`)); return mp;
       };
       const th = (x) => h("td", {}, x);
+      if (!GS.recShown) { GS.recShown = true; const mr = rows.find((r) => r.id === myId()); if (mr) setTimeout(() => { if (GS.report === "최근 기록" && !document.querySelector("#modal:not([hidden])")) openRec(mr); }, 0); } // 처음 들어오면 로그인한 회원 본인의 기록을 바로 보여 줌
       body.push(h("div", { class: "phrctab" }, h("table", { class: "tbmini rkb" }, h("thead", {}, h("tr", { class: "hd" }, ["회원명(에버)", "누적에버", "출석", "최근에버", "최근게임"].map(th))),
-        h("tbody", {}, ...rows.map((r, k) => h("tr", { class: k % 2 ? "alt" : "", onclick: () => openRec(r) }, h("td", { class: "nm" }, nameWithAvg(mm.get(r.id), yearEndRef(year))), h("td", {}, fmt1(r.acc)), h("td", {}, String(new Set(r.l.map((g) => g.gameDate)).size)), h("td", { class: "hl" }, r.w.length ? fmt1(recAvg(r.w)) : "-"), h("td", { class: "hl" }, r.w.length ? String(lc(r.w)) : "-")))))));
+        h("tbody", {}, ...rows.map((r, k) => h("tr", { class: (k % 2 ? "alt" : "") + (r.id === myId() ? " me" : ""), onclick: () => openRec(r) }, h("td", { class: "nm" }, nameWithAvg(mm.get(r.id), yearEndRef(year))), h("td", {}, fmt1(r.acc)), h("td", {}, String(new Set(r.l.map((g) => g.gameDate)).size)), h("td", { class: "hl" }, r.w.length ? fmt1(recAvg(r.w)) : "-"), h("td", { class: "hl" }, r.w.length ? String(lc(r.w)) : "-")))))));
     } else if (rep === "분기에버") {
       const [lb, y, q] = qOpts.find((o) => o[0] === GS.linked), [py, pq] = q === 1 ? [y - 1, 4] : [y, q - 1], months = [q * 3 - 2, q * 3 - 1, q * 3];
       body.push(h("div", { class: "phqcap" }, h("b", {}, "전회원"), h("span", {}, `${months[0]}~${months[2]}월`)));
