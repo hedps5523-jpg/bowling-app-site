@@ -280,6 +280,8 @@
   /* =====================================================================
      게임기록 / 분기에버 (LargeGameFragment)
      ===================================================================== */
+  // 로그인한 회원(홈페이지 이름 또는 클럽 계정 이름)과 같은 이름의 회원 id — 목록(opts)에 있을 때만
+  const myMid = (opts) => { try { const nm = String((Conn.me && (Conn.me.siteName || Conn.me.name)) || "").trim(); if (!nm) return null; const m = activeMembers().find((x) => x.name.trim() === nm); return m && opts.some((o) => o[0] === String(m.memberId)) ? String(m.memberId) : null; } catch { return null; } };
   const GS = { report: "개인기록", linked: null, sort: "평균점수", date: null, type: null, member: null, editing: 0, lockedType: null, lockedWeek: null, scores: ["", "", "", ""], note: "", qOpt: null, qMember: null, draft: {}, inited: false };
   const typeList = () => (S.meetingTypes && S.meetingTypes.length ? S.meetingTypes : ["정모", "비모"]);
 
@@ -408,7 +410,7 @@
     else if (report === "최근 기록") { linkedLabel = "기간"; linkedOpts = [["전체", "전체"], ...Array.from({ length: Math.max(1, recWin(groups, "전체").count) }, (_, i) => [`${i + 1}개월`, `${i + 1}개월`])]; }
     else if (report === "순위표") { linkedLabel = "기준"; linkedOpts = [...new Set([...games.map((g) => ynum(g.gameDate)), ynum(today())])].sort((a, b) => b - a).map((y) => [String(y), `${y}년`]); }
     else { linkedLabel = "분기"; linkedOpts = qOpts.map((o) => [o[0], o[0]]); }
-    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "3개월") ? "3개월" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? defQuarter(qOpts) : (linkedOpts[0] || [""])[0];
+    if (!linkedOpts.some((o) => o[0] === GS.linked)) GS.linked = report === "최근 기록" ? (linkedOpts.some((o) => o[0] === "3개월") ? "3개월" : linkedOpts[linkedOpts.length - 1][0]) : report === "분기에버" ? defQuarter(qOpts) : (report === "개인기록" && myMid(linkedOpts)) || (linkedOpts[0] || [""])[0]; // 개인기록 첫 화면: 로그인한 회원 본인
     if (!inMode || quarterOnly) {
       const rSel = quarterOnly ? null : sel(reports, report, (v) => { GS.report = v; GS.linked = null; draw(); });
       // 최근 기록: 기간 칸을 누르면 5줄 목록(전체·1주~n주)이 열리고, 위·아래로 드래그해서 고른다
@@ -1216,7 +1218,7 @@
     else if (rep === "모임기록") lopts = groups.slice().reverse().map((g) => [g.key, g.label]);
     else if (rep === "최근 기록") lopts = [["전체", "전체"], ...Array.from({ length: Math.max(1, recWin(groups, "전체").count) }, (_, i) => [`${i + 1}개월`, `${i + 1}개월`])];
     else if (rep === "분기에버") lopts = qOpts.map((o) => [o[0], o[0]]);
-    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "3개월") ? "3개월" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? defQuarter(qOpts) : (lopts[0] || [""])[0];
+    if (rep !== "순위표" && !lopts.some((o) => o[0] === GS.linked)) GS.linked = rep === "최근 기록" ? (lopts.some((o) => o[0] === "3개월") ? "3개월" : lopts[lopts.length - 1][0]) : rep === "분기에버" ? defQuarter(qOpts) : (rep === "개인기록" && myMid(lopts)) || (lopts[0] || [""])[0]; // 개인기록 첫 화면: 로그인한 회원 본인
     const repSel = fsel(reports, rep, (v) => { GS.report = v; GS.linked = null; QS.open.clear(); phqGames(); });
     const bar = rep === "순위표"
       ? fbar(repSel, fsel(["전회원", "남자", "여자"], QS.rk, (v) => { QS.rk = v; phqGames(); }), fsel(["전분기", "1분기", "2분기", "3분기", "4분기", "상반기", "하반기"], QS.period, (v) => { QS.period = v; phqGames(); }), refreshBtn())
