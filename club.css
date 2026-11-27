@@ -1196,3 +1196,10 @@ body.phmode .alroot.alsubfix>.alcols>.alcol:last-child>.alcard.alscroll{flex:1;m
 body.phmode .alroot:not(.alph){height:auto!important;overflow:visible;display:flex;flex-direction:column}
 body.phmode .alroot:not(.alph) .alcols{flex-direction:column;flex:none;gap:10px}
 .phrctab tr.me td{font-weight:800;background:#e8f1ff}
+/* 로그인한 회원 본인 줄·카드 강조 (기록 조회: 회비·락카·회원·모임기록·최근 기록·순위표·분기에버, 세로·가로) */
+#view table tr.me>td{font-weight:800;box-shadow:inset 0 0 0 999px rgba(26,115,232,.11)}
+#view table tr.me>td:first-child{box-shadow:inset 4px 0 0 #1a73e8,inset 0 0 0 999px rgba(26,115,232,.11)}
+#view .phrc.me{box-shadow:inset 0 0 0 2px #1a73e8;background-color:#eef5ff}
+#view .phrc.me .nm{color:#1a56c4}
+#view .phfi.me,#view .phlk.me{box-shadow:inset 0 0 0 2px #1a73e8}
+#view .phfi.me>b:first-child,#view .phlk.me>span:last-child{color:#1a56c4;font-weight:800}

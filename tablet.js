@@ -199,14 +199,14 @@
     const esc = (e) => { if (e.key === "Escape") close(); };
     document.addEventListener("pointerdown", away, true); window.addEventListener("resize", close); document.addEventListener("keydown", esc);
   }
-  function table({ headers, rows, weights, aligns = [], selectedRow = -1, cellColor, cellBg, custom, onClick, onLong, cls = "" }) {
+  function table({ headers, rows, weights, aligns = [], selectedRow = -1, cellColor, cellBg, custom, onClick, onLong, cls = "", isMe }) {
     if (!rows.length) return null;
     const sum = weights.reduce((a, b) => a + b, 0);
     const t = h("table", { style: PHONE() ? `min-width:${Math.round(Math.max(330, headers.length * 60, weights.reduce((a, b) => a + b, 0) * 0.7))}px` : "" }, h("colgroup", {}, weights.map((w) => h("col", { style: `width:${(w / sum * 100).toFixed(3)}%` }))),
       h("thead", {}, h("tr", {}, headers.map((x) => h("th", {}, x)))));
     const tb = h("tbody");
     rows.forEach((r, i) => {
-      const tr = h("tr", { class: i === selectedRow ? "sel" : "" });
+      const tr = h("tr", { class: (i === selectedRow ? "sel" : "") + (isMe && isMe(i) ? " me" : "") }); // me: 로그인한 회원 본인 줄 강조
       r.forEach((v, c) => {
         const own = custom && custom(i, c);
         const td = h("td", { class: aligns[c] === 1 ? "l" : aligns[c] === 2 ? "r" : "" }, own || String(v ?? ""));
@@ -282,6 +282,7 @@
      ===================================================================== */
   // 로그인한 회원(홈페이지 이름 또는 클럽 계정 이름)과 같은 이름의 회원 id — 목록(opts)에 있을 때만
   const myId = () => { try { const nm = String((Conn.me && (Conn.me.siteName || Conn.me.name)) || "").trim(); if (!nm) return null; const m = activeMembers().find((x) => x.name.trim() === nm); return m ? m.memberId : null; } catch { return null; } };
+  const meDef = (ids) => (!inputMode() && ids.includes(myId()) ? myId() : null); // 조회 화면에서 본인이 목록에 있으면 본인을 기본 선택
   const myMid = (opts) => { const id = myId(); return id != null && opts.some((o) => o[0] === String(id)) ? String(id) : null; };
   const GS = { report: "개인기록", linked: null, sort: "평균점수", date: null, type: null, member: null, editing: 0, lockedType: null, lockedWeek: null, scores: ["", "", "", ""], note: "", qOpt: null, qMember: null, draft: {}, inited: false };
   const typeList = () => (S.meetingTypes && S.meetingTypes.length ? S.meetingTypes : ["정모", "비모"]);
@@ -451,7 +452,7 @@
       const roles = roleMap(list), refs = meetingHighRefs(list, roles);
       body = table({ headers: ["회원명(에버)", "1G", "2G", "3G", "4G", "평균", "에버편차", "비고"],
         rows: list.map((g) => [nameWithAvg(mm.get(g.memberId), g.gameDate), "", "", "", "", fmt1(gavg(g)), deviation(gavg(g), qBase(mm.get(g.memberId), g.gameDate)), noteOf(g, roles)]),
-        weights: [256, 118, 118, 118, 118, 140, 152, 236],
+        weights: [256, 118, 118, 118, 118, 140, 152, 236], isMe: (r) => list[r].memberId === myId(),
         cellBg: (r) => ROW_BG[(roles.get(list[r].recordId) || {}).role], custom: (r, c) => (c >= 1 && c <= 4 ? scoreCell(list[r], c, refs, roles) : null) }) || empty("조회된 자료가 없습니다.");
     } else if (report === "최근 기록") {
       // 기간(전체 / 최근 n주): 가장 최근 주차부터 거꾸로 n주
@@ -468,7 +469,7 @@
       const lcount = (l) => l.reduce((a, g) => a + cnt(g), 0);
       const btbl = table({ headers: ["순번", "회원명(에버)", "누적에버", "출석일수", "최근에버", "최근게임"],
         rows: ids.map((id, i) => { const l = yearGames.get(id), w = winGames.get(id) || []; return [String(i + 1), nameWithAvg(mm.get(id), yearEndRef(year)), fmt1(recAvg(cumGames.get(id) || l)), String(new Set(l.map((g) => g.gameDate)).size), w.length ? fmt1(recAvg(w)) : "-", w.length ? String(lcount(w)) : "-"]; }),
-        weights: [60, 170, 100, 100, 110, 110], selectedRow: ids.indexOf(GS.recMember), cellBg: (r, c) => (c >= 4 ? "#FFF4D6" : null),
+        weights: [60, 170, 100, 100, 110, 110], selectedRow: ids.indexOf(GS.recMember), isMe: (r) => ids[r] === myId(), cellBg: (r, c) => (c >= 4 ? "#FFF4D6" : null),
         onClick: (i) => { GS.recMember = ids[i]; RENDER[current](); } }) || empty("조회된 자료가 없습니다.");
       // 선택한 회원의 기록: 게임일별 1줄씩, 최근 주차부터 (위·아래로 드래그)
       const sm = mm.get(GS.recMember);
@@ -488,10 +489,10 @@
       const agg = new Map(); stat.filter((g) => ynum(g.gameDate) === year).forEach((g) => { if (!agg.has(g.memberId)) agg.set(g.memberId, []); agg.get(g.memberId).push(g); });
       let rows = [...agg.entries()].map(([id, l]) => ({ m: mm.get(id), cnt: l.reduce((a, g) => a + cnt(g), 0), avg: recAvg(l), best: Math.max(...l.map(smax)) })).filter((r) => r.cnt > 0);
       rows.sort(GS.sort === "최고점수" ? (a, b) => b.best - a.best : GS.sort === "게임수" ? (a, b) => b.cnt - a.cnt : (a, b) => b.avg - a.avg);
-      if (!rows.some((r) => r.m && r.m.memberId === GS.rankMember)) GS.rankMember = rows.length && rows[0].m ? rows[0].m.memberId : null;
+      if (!rows.some((r) => r.m && r.m.memberId === GS.rankMember)) GS.rankMember = meDef(rows.map((r) => r.m && r.m.memberId)) || (rows.length && rows[0].m ? rows[0].m.memberId : null);
       const rtbl = table({ headers: ["순위", "회원명(기준에버)", "등급", "게임수", "평균점수", "최고점수", "에버편차"],
         rows: rows.map((r, i) => [String(i + 1), nameWithAvg(r.m, yearEndRef(year)), (r.m && r.m.grade) || "-", String(r.cnt), fmt1(r.avg), String(r.best), deviation(r.avg, qBase(r.m, yearEndRef(year)))]),
-        weights: [90, 250, 140, 110, 140, 140, 140], selectedRow: rows.findIndex((r) => r.m && r.m.memberId === GS.rankMember),
+        weights: [90, 250, 140, 110, 140, 140, 140], selectedRow: rows.findIndex((r) => r.m && r.m.memberId === GS.rankMember), isMe: (i) => !!rows[i].m && rows[i].m.memberId === myId(),
         onClick: (i) => { GS.rankMember = rows[i].m.memberId; RENDER[current](); } }) || empty("조회된 자료가 없습니다.");
       const wm = mm.get(GS.rankMember);
       const rdet = h("div", { class: "tbdetail" }, h("b", { class: "tbdh" }, wm ? `${wm.name} · ${year}년 상세내역` : "회원을 선택하세요"));
@@ -598,9 +599,9 @@
     const editable = inputMode(), open = QA.isOpen(dates, y, q);
     let title = `분기 기준에버 · ${label}`;
     if (editable && !open) { const lk = QA.openFrom(dates, y, q); title += ` · 조정에버는 ${mnum(lk)}/${dnum(lk)}부터 입력`; }
-    if (!rows.some((r) => r.id === GS.qMember)) GS.qMember = rows.length ? rows[0].id : null;
+    if (!rows.some((r) => r.id === GS.qMember)) GS.qMember = meDef(rows.map((r) => r.id)) || (rows.length ? rows[0].id : null);
     const tbl = table({ headers: ["순번", "회원명", "등급", "기준에버", "누적에버", "조정에버"], rows: rows.map((r, i) => [String(i + 1), ...r.cells.slice(1)]),
-      weights: [135, 271, 203, 203, 203, 237], selectedRow: rows.findIndex((r) => r.id === GS.qMember),
+      weights: [135, 271, 203, 203, 203, 237], selectedRow: rows.findIndex((r) => r.id === GS.qMember), isMe: (i) => rows[i].id === myId(),
       onClick: (i) => { document.querySelectorAll(".tbadj").forEach((e) => { GS.draft[`${y}-${q}-${e.dataset.id}`] = e.value; }); GS.qMember = rows[i].id; RENDER[current](); },
       custom: (r, c) => {
         if (c !== 5 || !editable) return null;
@@ -752,7 +753,7 @@
     const inMode = inputMode(), year = ynum(today()), tm = mnum(today());
     const members = activeMembers().filter((m) => !m.feeExempt);
     const allPays = S.fees, pays = allPays.filter((p) => p.year === year);
-    if (!members.some((m) => m.memberId === FS.member)) FS.member = members.length ? members[0].memberId : null;
+    if (!members.some((m) => m.memberId === FS.member)) FS.member = meDef(members.map((m) => m.memberId)) || (members.length ? members[0].memberId : null);
     if (FS.start == null) FS.start = tm; if (FS.end == null) FS.end = tm; if (!FS.date) FS.date = today(); if (!FS.month) FS.month = tm;
     const months = Array.from({ length: 12 }, (_, i) => [String(i + 1), `${i + 1}월`]);
     let inputCard = null, queryCard = null;
@@ -792,7 +793,7 @@
     const tbl = table({ headers: ["순번", "회원명", "등급", "상태", ...Array.from({ length: 12 }, (_, i) => `${i + 1}월`), "합계금액"],
       rows: sorted.map((b, i) => [String(i + 1), b.m.name, b.m.grade || "-", b.status, ...b.cells, won(b.total)]),
       weights: [44, 86, 100, 74, ...Array(12).fill(50), 104], aligns: [...Array(16).fill(0), 2],
-      selectedRow: sorted.findIndex((b) => b.m.memberId === FS.member),
+      selectedRow: sorted.findIndex((b) => b.m.memberId === FS.member), isMe: (i) => sorted[i].m.memberId === myId(),
       cellColor: (r, c) => (c === 3 ? ST_FG[sorted[r].status] : 0), cellBg: (r, c) => (c === 3 ? ST_BG[sorted[r].status] : 0),
       custom: (r, c) => { if (c < 4 || c > 15) return null; const k = sorted[r].cells[c - 4]; return DOT[k] ? h("span", { class: "tbdot", style: `color:${DOT[k]}` }, "●") : h("span", { style: "color:#C3CBD8" }, "—"); },
       onClick: (i) => { FS.member = sorted[i].m.memberId; renderFees(); }, onLong: (i) => cancelMonth(sorted[i].m, month) }) || empty("회원 자료가 없습니다.");
@@ -878,12 +879,12 @@
   function renderMembers() {
     const all = allMembers(), names = [...new Set(all.map((m) => m.name.trim()).filter(Boolean))].sort(ko.compare);
     const list = MS.q ? all.filter((m) => m.name.includes(MS.q)) : all;
-    if (!list.some((m) => m.memberId === MS.sel)) MS.sel = list.length ? list[0].memberId : 0;
+    if (!list.some((m) => m.memberId === MS.sel)) MS.sel = meDef(list.map((m) => m.memberId)) || (list.length ? list[0].memberId : 0);
     const act = list.filter((m) => isActive(m)).length;
     const actions = inputMode() ? [btn("회원 등록", () => memberForm(null), "pri"), btn("회원수정", () => { const m = all.find((x) => x.memberId === MS.sel); m ? editMember(m) : toast("수정할 회원을 먼저 선택하세요."); }), btn("삭제", delMember)] : [];
     const rows = list.map((m, i) => { const lk = lockerOf(m.memberId), b = qBase(m); return [String(i + 1), m.name, m.grade || "-", genderTxt(m.gender), m.phone || "-", fdate(m.joinDate) || "-", b > 0 ? String(b) : "-", lk ? lk.locker_number : "-", isActive(m) ? "활동" : "탈퇴"]; });
     const tbl = table({ headers: ["번호", "회원명", "등급", "성별", "연락처", "가입일", "에버", "락카", "상태"], rows, weights: [50, 150, 90, 50, 150, 110, 60, 60, 60],
-      selectedRow: list.findIndex((m) => m.memberId === MS.sel), cellColor: (r, c) => (c === 8 && rows[r][8] === "탈퇴" ? "#D93025" : 0),
+      selectedRow: list.findIndex((m) => m.memberId === MS.sel), isMe: (i) => list[i].memberId === myId(), cellColor: (r, c) => (c === 8 && rows[r][8] === "탈퇴" ? "#D93025" : 0),
       onClick: (i) => { MS.sel = list[i].memberId; renderMembers(); }, onLong: (i) => { if (inputMode()) editMember(list[i]); } }) || empty("회원 자료가 없습니다.");
     const m = list.find((x) => x.memberId === MS.sel);
     const lk = m && lockerOf(m.memberId), b = m ? qBase(m) : 0;
@@ -916,12 +917,12 @@
     const md = (v) => { const s = String(v || ""); const m = s.match(/(\d{4})-(\d{2})-(\d{2})/); return m ? fdate(m[0]) : s || "-"; };
     const no = (m) => { const l = lockerOf(m.memberId); return l ? String(l.locker_number) : "-"; };
     const ms = activeMembers().sort((a, b) => { const x = no(a) === "-" ? "9999" : no(a), y = no(b) === "-" ? "9999" : no(b); return (x < y ? -1 : x > y ? 1 : 0) || ko.compare(a.name, b.name); });
-    if (!ms.some((m) => m.memberId === KS.sel)) KS.sel = (ms.find((m) => no(m) !== "-") || ms[0] || {}).memberId || 0;
+    if (!ms.some((m) => m.memberId === KS.sel)) KS.sel = meDef(ms.map((m) => m.memberId)) || (ms.find((m) => no(m) !== "-") || ms[0] || {}).memberId || 0;
     const used = ms.filter((m) => no(m) !== "-");
     const depSum = used.reduce((a, m) => a + (int((lockerOf(m.memberId) || {}).deposit) || dDep), 0);
     const rows = ms.map((m, i) => { const l = lockerOf(m.memberId) || {}; return [String(i + 1), m.name, String(qBase(m)), m.phone || "-", no(m), won(int(l.deposit) || dDep), won(int(l.yearly_fee) || dFee), md(l.contract_date || dCon), md(l.expiry_date || dExp), fdate(m.joinDate) || "-"]; });
     const tbl = table({ headers: ["순번", "회원명", "에버", "연락처", "메인락커", "보증금", "1년사용료", "계약일", "만료일", "가입일"], rows, weights: [70, 130, 80, 200, 100, 100, 120, 150, 150, 150],
-      selectedRow: ms.findIndex((m) => m.memberId === KS.sel), onClick: (i) => { KS.sel = ms[i].memberId; renderLockers(); }, onLong: (i) => { if (inputMode()) { KS.sel = ms[i].memberId; editL(); } } }) || empty("회원 자료가 없습니다.");
+      selectedRow: ms.findIndex((m) => m.memberId === KS.sel), isMe: (i) => ms[i].memberId === myId(), onClick: (i) => { KS.sel = ms[i].memberId; renderLockers(); }, onLong: (i) => { if (inputMode()) { KS.sel = ms[i].memberId; editL(); } } }) || empty("회원 자료가 없습니다.");
     root(h("div", { class: "tbhead" }, h("b", {}, "락카 사용 현황"), h("span", {}, `사용 ${used.length} / 전체 ${ms.length} · 보증금 합계 ${won(depSum)}`), spacer(), inputMode() ? btn("수정", editL) : null),
       h("div", { class: "tbbody" }, tbl));
     async function editL() {
@@ -1095,7 +1096,7 @@
   function phFees() {
     const year = ynum(today()), tm = mnum(today());
     const members = activeMembers().filter((m) => !m.feeExempt);
-    if (!members.some((m) => m.memberId === FS.member)) FS.member = members.length ? members[0].memberId : null;
+    if (!members.some((m) => m.memberId === FS.member)) FS.member = meDef(members.map((m) => m.memberId)) || (members.length ? members[0].memberId : null);
     if (FS.start == null) FS.start = tm; if (FS.end == null) FS.end = tm; if (!FS.date) FS.date = today();
     const m = members.find((x) => x.memberId === FS.member);
     const months = Array.from({ length: 12 }, (_, i) => [String(i + 1), `${i + 1}월`]);
@@ -1200,7 +1201,7 @@
     const gi = (g) => { const i = grades.indexOf(g); return i < 0 ? 99 : i; };
     let list = all.filter((m) => (!QS.mq || m.memberId === +QS.mq) && (!QS.grade || m.grade === QS.grade));
     list.sort((a, b) => gi(a.grade) - gi(b.grade) || ko.compare(a.name, b.name));
-    const rows = list.map((m) => { const lk = lockerOf(m.memberId), b = qBase(m); return h("tr", {}, h("td", {}, m.name), h("td", { class: "tel" }, m.phone ? [h("span", {}, m.phone), VIEWONLY ? null : h("a", { href: "tel:" + m.phone.replace(/[^\d+]/g, ""), class: "call", title: "전화 걸기" }, "📞")] : "-"), h("td", {}, m.grade || "-"), h("td", {}, b > 0 ? String(b) : "-"), h("td", {}, lk ? String(lk.locker_number) : "-")); });
+    const rows = list.map((m) => { const lk = lockerOf(m.memberId), b = qBase(m); return h("tr", { class: m.memberId === myId() ? "me" : "" }, h("td", {}, m.name), h("td", { class: "tel" }, m.phone ? [h("span", {}, m.phone), VIEWONLY ? null : h("a", { href: "tel:" + m.phone.replace(/[^\d+]/g, ""), class: "call", title: "전화 걸기" }, "📞")] : "-"), h("td", {}, m.grade || "-"), h("td", {}, b > 0 ? String(b) : "-"), h("td", {}, lk ? String(lk.locker_number) : "-")); });
     phRootF(1, fbar(fsel([["", "회원ALL"], ...all.slice().sort((a, b) => ko.compare(a.name, b.name)).map((m) => [String(m.memberId), m.name])], QS.mq, (v) => { QS.mq = v; phqMembers(); }),
       fsel([["", "등급ALL"], ...[...new Set(all.map((m) => m.grade).filter(Boolean))].sort((a, b) => gi(a) - gi(b)).map((g) => [g, g])], QS.grade, (v) => { QS.grade = v; phqMembers(); })),
       h("div", { class: "phmtable" }, h("table", {}, h("thead", {}, h("tr", {}, ["회원명", "연락처", "구분", "기준에버", "락카번호"].map((x) => h("th", {}, x)))), h("tbody", {}, rows))));
@@ -1224,6 +1225,7 @@
     const bar = rep === "순위표"
       ? fbar(repSel, fsel(["전회원", "남자", "여자"], QS.rk, (v) => { QS.rk = v; phqGames(); }), fsel(["전분기", "1분기", "2분기", "3분기", "4분기", "상반기", "하반기"], QS.period, (v) => { QS.period = v; phqGames(); }), refreshBtn())
       : fbar(repSel, rep === "최근 기록" ? h("button", { type: "button", class: "phfsel phdd", onclick: (ev) => { ev.stopPropagation(); openDrop(ev.currentTarget, lopts, GS.linked, (v) => { GS.linked = v; QS.open.clear(); phqGames(); }); } }, `기간 ${GS.linked}`) : fsel(lopts, GS.linked, (v) => { GS.linked = v; QS.open.clear(); phqGames(); }), refreshBtn());
+    const meKey = { 순위표: "r", 분기에버: "q" }[rep]; if (meKey && GS.meOpen !== rep + "|" + GS.linked + "|" + QS.period) { GS.meOpen = rep + "|" + GS.linked + "|" + QS.period; if (myId() != null && !QS.open.size) QS.open.add(meKey + myId()); } // 순위표·분기에버: 처음에는 본인 카드를 펼쳐 둠
     const body = [];
     const card = (key, head, detail, extraCls = "") => { const open = QS.open.has(key); return h("div", { class: "phrc" + (open ? " open" : "") + (extraCls ? " " + extraCls : "") }, h("div", { class: "phrh", onclick: () => toggleOpen(key) }, ...head, h("i", { class: "chev" }, open ? "︿" : "﹀")), open ? detail() : null); };
     const scoreDetail = (g) => () => h("div", { class: "phrd" }, h("div", { class: "phscores" }, ...sc(g).map((v, i) => h("div", {}, h("small", {}, `${i + 1}G`), h("b", { class: v >= 200 ? "red" : "" }, v > 0 ? String(v) : "-")))), g.note ? h("div", { class: "phnote" }, g.note) : null);
@@ -1235,7 +1237,7 @@
     } else if (rep === "모임기록") {
       const g0 = groups.find((g) => g.key === GS.linked), list = games.filter((g) => g0 && g0.dates.includes(g.gameDate)).sort((a, b) => gavg(b) - gavg(a));
       body.push(pTitle("모임 기록", g0 ? `${g0.label} / ${[...new Set(list.map(gtype))].join("·")}` : ""));
-      list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("span", { class: "mmain" }, h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : "")), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role] + (r.role === "EVER" ? ` ${r.diff >= 0 ? "+" : ""}${r.diff}` : "")) : null], scoreDetail(g), (r ? "r-" + r.role.toLowerCase() : "") + " mcard")); });
+      list.forEach((g) => { const m = mm.get(g.memberId), r = roles.get(g.recordId), b = qBase(m, g.gameDate), av = gavg(g); body.push(card("m" + g.recordId, [h("span", { class: "mmain" }, h("b", { class: "nm" }, `${nameWithAvg(m, g.gameDate)} ${gtype(g)}`), h("span", { class: "pav" }, `Avg ${fmt1(av)}`), h("span", { class: "pdv" }, b > 0 && av > 0 ? sgn1(av - b) : "")), r ? h("span", { class: "badge " + r.role.toLowerCase() }, ROLE_TXT[r.role] + (r.role === "EVER" ? ` ${r.diff >= 0 ? "+" : ""}${r.diff}` : "")) : null], scoreDetail(g), (r ? "r-" + r.role.toLowerCase() : "") + " mcard" + (g.memberId === myId() ? " me" : ""))); });
     } else if (rep === "최근 기록") {
       // A: 기간(전체·1주~n주 드롭메뉴) / B: 회원 목록(최근에버·최근게임) / C: 회원을 누르면 기록 팝업(상·하 드래그)
       const RW = recWin(groups, GS.linked), { gs, inWin, perLabel, range, year } = RW;
@@ -1272,7 +1274,7 @@
           const row = (lbl, rs) => { const c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return [lbl, "—", "—", "—", "—", null]; const av = recAvg(rs), bw = rs.reduce((a, g) => a + qBase(mm.get(g.memberId), g.gameDate) * cnt(g), 0) / c; return [lbl, String(c), av.toFixed(1), String(Math.max(...rs.map(smax))), bw > 0 ? sgn1(av - bw) : "—", bw > 0 ? av - bw : null]; };
           body.push(card("q" + r.m.memberId, [h("b", { class: "nm" }, `${r.m.name}(${r.base || "-"})`), h("span", { class: "lb" }, "에버"), h("span", { class: "pill" + (qProg || r.ex == null ? " dim" : "") }, qProg ? "진행중" : r.ex != null ? String(r.ex) : "-"), h("span", { class: "acc" }, h("small", {}, "총 누적에버"), h("b", {}, r.recs.some((g) => cnt(g) > 0) ? r.avg.toFixed(1) : "-"))],
             () => h("div", { class: "phrd" }, h("table", { class: "phst" }, h("tbody", {}, h("tr", { class: "hd" }, ["구분", "게임수", "총에버", "최고게임", "편차"].map((x) => h("td", {}, x))),
-              ...[...months.map((mo) => row(`${mo}월`, r.recs.filter((g) => mnum(g.gameDate) === mo))), row("Total", r.recs)].map((v) => h("tr", v[0] === "Total" || v[1] === "—" ? { class: v[0] === "Total" ? "tot" : "" } : { class: "qtap", onclick: (e) => { e.stopPropagation(); rankQuarterPopup(r.m, y, q, r.recs, mm, parseInt(v[0])); } }, v.slice(0, 4).map((x) => h("td", {}, x)), h("td", { class: devCls(v[5]) }, v[4])))))), "qcard"));
+              ...[...months.map((mo) => row(`${mo}월`, r.recs.filter((g) => mnum(g.gameDate) === mo))), row("Total", r.recs)].map((v) => h("tr", v[0] === "Total" || v[1] === "—" ? { class: v[0] === "Total" ? "tot" : "" } : { class: "qtap", onclick: (e) => { e.stopPropagation(); rankQuarterPopup(r.m, y, q, r.recs, mm, parseInt(v[0])); } }, v.slice(0, 4).map((x) => h("td", {}, x)), h("td", { class: devCls(v[5]) }, v[4])))))), "qcard" + (r.m.memberId === myId() ? " me" : "")));
         });
     } else {
       const P = { 전분기: [1, 12], "1분기": [1, 3], "2분기": [4, 6], "3분기": [7, 9], "4분기": [10, 12], 상반기: [1, 6], 하반기: [7, 12] }[QS.period];
@@ -1291,7 +1293,7 @@
           const b = qBase(r.m, ref), dv = b > 0 ? r.avg - b : null;
           body.push(card("r" + r.m.memberId, [h("span", { class: "rk r" + (i + 1) }, String(i + 1)), h("b", { class: "nm" }, `${r.m.name}(${b || "-"})`), h("span", { class: "pn" }, String(r.n)), h("span", { class: "pav" }, r.avg.toFixed(1)), h("span", { class: "pn" }, String(r.best)), h("span", { class: "pdv " + devCls(dv) }, dv == null ? "-" : sgn1(dv))],
             () => h("div", { class: "phrd" }, h("table", { class: "phst" }, h("tbody", {}, h("tr", { class: "hd" }, ["구분", "게임수", "총에버", "최고게임", "편차"].map((x) => h("td", {}, x))),
-              ...[1, 2, 3, 4].filter((q) => q <= (year === y0 ? curQ : 4)).map((q) => { const rs = r.l.filter((g) => Math.floor((mnum(g.gameDate) - 1) / 3) + 1 === q), qb = qBase(r.m, ymd(year, q * 3 - 2, 1)), c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return null; const av = recAvg(rs), d = qb > 0 ? av - qb : null; return h("tr", { class: "qtap", onclick: (e) => { e.stopPropagation(); rankQuarterPopup(r.m, year, q, r.l, mm); } }, h("td", {}, `${q}분기(${qb || "-"})`), h("td", {}, String(c)), h("td", {}, av.toFixed(1)), h("td", {}, String(Math.max(...rs.map(smax)))), h("td", { class: devCls(d) }, d == null ? "-" : sgn1(d))); })))), "rank"));
+              ...[1, 2, 3, 4].filter((q) => q <= (year === y0 ? curQ : 4)).map((q) => { const rs = r.l.filter((g) => Math.floor((mnum(g.gameDate) - 1) / 3) + 1 === q), qb = qBase(r.m, ymd(year, q * 3 - 2, 1)), c = rs.reduce((a, g) => a + cnt(g), 0); if (!c) return null; const av = recAvg(rs), d = qb > 0 ? av - qb : null; return h("tr", { class: "qtap", onclick: (e) => { e.stopPropagation(); rankQuarterPopup(r.m, year, q, r.l, mm); } }, h("td", {}, `${q}분기(${qb || "-"})`), h("td", {}, String(c)), h("td", {}, av.toFixed(1)), h("td", {}, String(Math.max(...rs.map(smax)))), h("td", { class: devCls(d) }, d == null ? "-" : sgn1(d))); })))), "rank" + (r.m.memberId === myId() ? " me" : "")));
         });
     }
     if (body.length <= (rep === "순위표" ? 2 : 1)) body.push(h("div", { class: "phempty" }, "조회된 자료가 없습니다."));
@@ -1333,9 +1335,9 @@
       const status = req > 0 && allPaid ? "완납" : unpaid ? "미납" : cur ? "예정" : "정상";
       return { m, status, pays, by, unpaid, total: pays.reduce((a, p) => a + p.amount, 0) };
     });
-    if (!rows.some((r) => r.m.memberId === QS.fsel)) QS.fsel = rows.length ? rows[0].m.memberId : 0;
+    if (!rows.some((r) => r.m.memberId === QS.fsel)) QS.fsel = meDef(rows.map((r) => r.m.memberId)) || (rows.length ? rows[0].m.memberId : 0);
     const r = rows.find((x) => x.m.memberId === QS.fsel);
-    const items = rows.map((x) => h("div", { class: "phfi" + (x.m.memberId === QS.fsel ? " sel" : ""), onclick: () => { QS.fsel = x.m.memberId; PH_KEEP = true; phqFees(); } }, h("b", {}, x.m.name), h("span", { class: "st " + ST[x.status] }, (x.status === "미납" ? "! " : "✓ ") + x.status), h("b", { class: "amt" }, won(x.total) + "원")));
+    const items = rows.map((x) => h("div", { class: "phfi" + (x.m.memberId === QS.fsel ? " sel" : "") + (x.m.memberId === myId() ? " me" : ""), onclick: () => { QS.fsel = x.m.memberId; PH_KEEP = true; phqFees(); } }, h("b", {}, x.m.name), h("span", { class: "st " + ST[x.status] }, (x.status === "미납" ? "! " : "✓ ") + x.status), h("b", { class: "amt" }, won(x.total) + "원")));
     let det = null;
     if (r) {
       const cp = r.by.get(tm), lastPaid = r.pays.reduce((a, p) => (p.paidDate > a ? p.paidDate : a), "");
@@ -1351,9 +1353,9 @@
   function phqLockers() {
     const st = S.settings, dDep = int(st.key_locker_deposit), dFee = int(st.key_locker_yearly_fee);
     const ms = activeMembers().map((m) => ({ m, l: lockerOf(m.memberId) })).filter((x) => x.l).sort((a, b) => String(a.l.locker_number).localeCompare(String(b.l.locker_number), "ko", { numeric: true }));
-    if (!ms.some((x) => x.m.memberId === QS.ksel)) QS.ksel = ms.length ? ms[0].m.memberId : 0;
+    if (!ms.some((x) => x.m.memberId === QS.ksel)) QS.ksel = meDef(ms.map((x) => x.m.memberId)) || (ms.length ? ms[0].m.memberId : 0);
     const s0 = ms.find((x) => x.m.memberId === QS.ksel);
-    const tiles = ms.map((x) => h("div", { class: "phlk" + (x.m.memberId === QS.ksel ? " sel" : ""), onclick: () => { QS.ksel = x.m.memberId; PH_KEEP = true; phqLockers(); } }, h("b", {}, String(x.l.locker_number)), h("span", { class: "use" }, "● 사용중"), h("span", {}, x.m.name)));
+    const tiles = ms.map((x) => h("div", { class: "phlk" + (x.m.memberId === QS.ksel ? " sel" : "") + (x.m.memberId === myId() ? " me" : ""), onclick: () => { QS.ksel = x.m.memberId; PH_KEEP = true; phqLockers(); } }, h("b", {}, String(x.l.locker_number)), h("span", { class: "use" }, "● 사용중"), h("span", {}, x.m.name)));
     const det = s0 ? h("section", { class: "phdet white" }, h("div", { class: "top" }, h("b", { class: "big" }, String(s0.l.locker_number)), h("span", { class: "dot ok" }, "● 사용중")), h("div", { class: "who" }, s0.m.name),
       h("b", { class: "sec" }, "회원 정보"), kv([["회원명", s0.m.name], ["회원구분", s0.m.grade || "-"], ["연락처", s0.m.phone || "-"], ["성별", s0.m.gender === "MALE" ? "남자" : s0.m.gender === "FEMALE" ? "여자" : "-"], ["가입일", yy(s0.m.joinDate)], ["", ""]]),
       h("b", { class: "sec" }, "락카 정보"), kv([["락카번호", String(s0.l.locker_number)], ["상태", "사용중"], ["보증금", won(int(s0.l.deposit) || dDep) + "원"], ["1년사용료", won(int(s0.l.yearly_fee) || dFee) + "원"], ["계약일", fdate(s0.l.contract_date) || fdate(st.key_locker_contract_date) || "-"], ["만료일", fdate(s0.l.expiry_date) || fdate(st.key_locker_expiry_date) || "-"], ["비고", s0.l.note || "-"], ["", ""]])) : null;
