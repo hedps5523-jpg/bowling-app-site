@@ -600,6 +600,12 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       const [sy, sq, ty, tq] = spanOf(0); // 지난 분기(책정에버가 결정된 가장 최근 구간)
       return { label: `지난 분기에버 (${sy !== ty ? pad2(sy % 100) + "년 " : ""}${sq}→${tq}분기)`, make: () => pageQuarter(0) };
     }
+    if (kind.startsWith("q@")) { // 분기에버 소분류: 지난 분기는 'q분기 기준·누적 → 다음 분기 책정', 지금 분기는 진행중 화면, 아직 오지 않은 분기는 없음
+      const q = +kind.slice(2), cq = curQ();
+      if (!(q >= 1 && q <= 4) || (S.year === Y() && q > cq)) return null;
+      if (S.year === Y() && q === cq) return Svc.quarterRows ? { label: `${q}분기 (진행중)`, make: () => pageQuarterNow() } : null;
+      return { label: `${q}분기 (${q < 4 ? q + 1 + "분기" : "다음해 1분기"} 책정)`, make: () => pageQuarter(q) };
+    }
     if (kind === "qnow") return Svc.quarterRows ? { label: `진행중 분기에버 (${curQ()}분기)`, make: () => pageQuarterNow() } : null;
     if (kind === "annual") return ledgerAll().length ? { label: `1년결산 (${S.year}년)`, make: () => pageLedgerAnnual() } : null;
     if (kind === "summary") { const m = curMonth(); return m ? { label: `월별 요약 (${m}월 기준)`, make: () => pageLedgerSummary() } : null; }
@@ -702,9 +708,10 @@ addEventListener("resize",()=>{if($("fs").classList.contains("on"))fitZ()});
       await window.__albumData;
       const L = (k) => { const p = boxPick(k); return p ? [k, p.label] : null; };
       const ms = meetings().slice().reverse().map((mt) => [`meet@${mt.date}@${mt.type}`, `${wkDay(mt.date)} ${mt.type} · ${new Set(mt.records.map((r) => r.memberId)).size}명`]);
+      const qs = [1, 2, 3, 4].map((q) => L(`q@${q}`)).filter(Boolean); // 분기에버 소분류: 1분기~(진행중인) 이번 분기
       const months = [...new Set(ledgerAll().map((l) => mn(l.date)))].sort((a, b) => b - a).map((m) => [`lm@${m}`, `${m}월 상세`]);
       return [
-        { g: "기록현황", items: [L("meet"), L("rank"), L("quarter"), L("qnow")].filter(Boolean), subs: ms.length ? [{ name: "모임기록 (일자별)", unit: "회", items: ms }] : [] },
+        { g: "기록현황", items: [L("meet"), L("rank")].filter(Boolean), subs: [ms.length ? { name: "모임기록 (일자별)", unit: "회", items: ms } : null, qs.length ? { name: "분기에버", unit: "개", items: qs } : null].filter(Boolean) },
         { g: "장부현황", items: [L("annual"), L("summary")].filter(Boolean), subs: months.length ? [{ name: "월별 상세", unit: "개월", items: months }] : [] },
         { g: "회비현황", items: [L("fee")].filter(Boolean), subs: [] },
         { g: "락카현황", items: [L("locker")].filter(Boolean), subs: [] },
