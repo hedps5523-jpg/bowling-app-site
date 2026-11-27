@@ -409,6 +409,13 @@ body.albopen{overflow:hidden}
 .albcas .c2{flex:1 1 150px;max-width:240px}
 .albcas .c3{flex:1 1 130px;max-width:200px}
 .albcas select[hidden]{display:none}
+.albcas .c3sel{display:none!important} /* 소분류 값만 보관(화면에는 단추 .c3b) */
+.albcas .c3b{padding:6px 24px 6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;font-weight:600;background:#fff;color:var(--text);min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;cursor:pointer}
+.albcas .c3b::after{content:"";position:absolute;right:9px;top:50%;width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-70%) rotate(45deg)}
+.albcas .c3b[hidden]{display:none}
+.albdrop{position:fixed;z-index:3000;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(15,35,60,.18);max-height:calc(5 * 40px + 8px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:4px 0} /* 소분류 목록: 5줄만 보이고 위·아래로 밀어 봄 */
+.albdrop .albli{display:block;width:100%;height:40px;padding:0 12px;border:0;background:none;text-align:left;font:inherit;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.albdrop .albli:hover{background:#f1f5fa}.albdrop .albli.on{background:#e8f1ff;color:#1a56c4;font-weight:700}
 /* 세로 홈(2026-11-27): 기록앨범 대분류·중분류·소분류 드롭메뉴 카드 + 팝업 제목줄 드롭메뉴 */
 #view.hport>.albpick{flex:none;margin-top:8px;padding:10px 12px}
 #view.hport>.clubfoot{margin-top:auto}

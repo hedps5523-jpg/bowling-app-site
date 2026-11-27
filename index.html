@@ -265,19 +265,39 @@ function renderAlbumTree(host, tree, pick) {
 }
 /* 가로 홈 기록앨범 제목 옆 드롭메뉴: 대분류(기록현황·장부현황·회비현황·락카현황·회원현황) → 중분류(항목, ▸ 가 붙은 것은 하위 목록 있음)
    → 소분류(모임기록 일자별·월별 상세처럼 하위 목록이 있을 때만 나타남) 순서로 골라요. 고른 위치는 이 기기에 기억(localStorage albCascade). */
+// 소분류 5줄 목록 닫기(바깥을 누르거나 고르면)
+function closeAlbList() { const l = document.getElementById("albList"); if (l) l.remove(); document.removeEventListener("pointerdown", outAlbList, true); }
+function outAlbList(e) { const l = document.getElementById("albList"); if (l && !l.contains(e.target)) closeAlbList(); }
 function renderAlbumCascade(box, tree, pick, opts = {}) { // opts.noInit: 처음에는 표시하지 않음(세로 홈: 고르거나 보기를 눌러야 팝업)
   const s1 = h("select", { class: "c1", "aria-label": "대분류" }), s2 = h("select", { class: "c2", "aria-label": "중분류" }), s3 = h("select", { class: "c3", "aria-label": "소분류" });
-  box.textContent = ""; box.append(s1, s2, s3);
+  // 소분류는 기본 선택창 대신 단추(b3) + 5줄 목록(위·아래로 밀어 보며 고름). 값은 숨은 select(s3)에 그대로 둠
+  const b3 = h("button", { type: "button", class: "c3 c3b", "aria-label": "소분류", "aria-haspopup": "listbox" });
+  s3.classList.add("c3sel");
+  box.textContent = ""; box.append(s1, s2, s3, b3);
+  const sync3 = () => { b3.hidden = s3.hidden; const o = s3.options[s3.selectedIndex]; b3.textContent = o ? o.textContent : ""; };
+  b3.onclick = (e) => { e.stopPropagation(); openList3(); };
   tree.forEach((g, i) => s1.append(h("option", { value: String(i) }, g.g)));
   const fill2 = () => { const g = tree[+s1.value]; s2.textContent = ""; g.items.forEach(([k, l]) => s2.append(h("option", { value: "k:" + k }, l))); g.subs.forEach((s, j) => s2.append(h("option", { value: "s:" + j }, `${s.name} ▸ ${s.items.length}${s.unit}`))); };
   const fill3 = () => { const v = s2.value, g = tree[+s1.value]; s3.textContent = ""; if (v.startsWith("s:")) { g.subs[+v.slice(2)].items.forEach(([k, l]) => s3.append(h("option", { value: k }, l))); s3.hidden = false; } else s3.hidden = true; };
   const save = () => { try { localStorage.setItem("albCascade", JSON.stringify([s1.value, s2.value, s3.hidden ? "" : s3.value])); } catch {} };
   const fire = () => { const v = s2.value, k = v.startsWith("k:") ? v.slice(2) : s3.value; save(); if (k) pick(k); };
-  s1.onchange = () => { fill2(); fill3(); fire(); }; s2.onchange = () => { fill3(); fire(); }; s3.onchange = fire;
+  const openList3 = () => {
+    closeAlbList();
+    const r = b3.getBoundingClientRect(), opts = [...s3.options];
+    const list = h("div", { class: "albdrop", role: "listbox", id: "albList" }, opts.map((o) => h("button", { type: "button", role: "option", class: "albli" + (o.value === s3.value ? " on" : ""), onclick: (e) => { e.stopPropagation(); closeAlbList(); if (s3.value !== o.value) { s3.value = o.value; sync3(); fire(); } } }, o.textContent)));
+    document.body.append(list);
+    const w = Math.max(r.width, 170), left = Math.min(Math.max(6, r.left), window.innerWidth - w - 6), below = window.innerHeight - r.bottom;
+    Object.assign(list.style, { left: left + "px", width: w + "px" });
+    const lh = list.offsetHeight; if (below < lh + 8 && r.top > below) list.style.top = Math.max(6, r.top - lh - 4) + "px"; else list.style.top = r.bottom + 4 + "px";
+    const on = list.querySelector(".on"); if (on) list.scrollTop = on.offsetTop - (list.clientHeight - on.offsetHeight) / 2; // 고른 항목이 가운데 오게
+    setTimeout(() => document.addEventListener("pointerdown", outAlbList, true), 0);
+  };
+  s1.onchange = () => { fill2(); fill3(); sync3(); fire(); }; s2.onchange = () => { fill3(); sync3(); fire(); }; s3.onchange = () => { sync3(); fire(); };
   const set = (saved) => { // 주어진 위치로 맞춤(표시는 하지 않음)
     if (saved && tree[+saved[0]]) s1.value = saved[0];
     fill2(); if (saved && [...s2.options].some((o) => o.value === saved[1])) s2.value = saved[1];
     fill3(); if (saved && saved[2] && [...s3.options].some((o) => o.value === saved[2])) s3.value = saved[2];
+    sync3();
   };
   const get = () => [s1.value, s2.value, s3.hidden ? "" : s3.value];
   const load = () => { let saved = null; try { saved = JSON.parse(localStorage.getItem("albCascade") || "null"); } catch {} set(saved); }; // 이 기기에 기억해 둔 위치
